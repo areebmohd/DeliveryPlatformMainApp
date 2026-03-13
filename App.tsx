@@ -7,33 +7,21 @@ import { Session } from '@supabase/supabase-js';
 import { View, ActivityIndicator } from 'react-native';
 import { Colors } from './src/theme/colors';
 
-// Placeholder for MainNavigator (Customer/Business)
-const MainNavigator = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <ActivityIndicator size="large" color={Colors.primary} />
-  </View>
-);
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { MainNavigator } from './src/navigation/MainNavigator';
 
 function App() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}
 
-  useEffect(() => {
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+function AppContent() {
+  const { session, loading } = useAuth();
 
   if (loading) {
     return (
@@ -44,11 +32,9 @@ function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        {session ? <MainNavigator /> : <AuthNavigator />}
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <NavigationContainer>
+      {session ? <MainNavigator /> : <AuthNavigator />}
+    </NavigationContainer>
   );
 }
 
