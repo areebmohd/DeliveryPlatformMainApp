@@ -8,13 +8,16 @@ import { View, ActivityIndicator } from 'react-native';
 import { Colors } from './src/theme/colors';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { CartProvider } from './src/context/CartContext';
 import { MainNavigator } from './src/navigation/MainNavigator';
 
 function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AppContent />
+        <CartProvider>
+          <AppContent />
+        </CartProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

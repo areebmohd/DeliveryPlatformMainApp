@@ -14,12 +14,13 @@ import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { supabase } from '../../api/supabase';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
+import { useCart } from '../../context/CartContext';
 
 export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const { store } = route.params;
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState<any[]>([]);
+  const { addItem, updateQuantity, items, totalItems, subtotal } = useCart();
 
   useEffect(() => {
     fetchProducts();
@@ -43,37 +44,10 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const handleAddToCart = (product: any) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => 
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prev, { ...product, quantity: 1 }];
-    });
-  };
-
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart(prev => {
-      return prev.map(item => {
-        if (item.id === productId) {
-          const newQty = item.quantity + delta;
-          return newQty > 0 ? { ...item, quantity: newQty } : null;
-        }
-        return item;
-      }).filter(Boolean);
-    });
-  };
-
   const getQuantity = (productId: string) => {
-    const item = cart.find(i => i.id === productId);
+    const item = items.find(i => i.id === productId);
     return item ? item.quantity : 0;
   };
-
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -129,7 +103,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
               <CustomerProductCard
                 key={product.id}
                 product={product}
-                onAdd={handleAddToCart}
+                onAdd={() => addItem(product, store)}
                 quantity={getQuantity(product.id)}
                 onIncrease={() => updateQuantity(product.id, 1)}
                 onDecrease={() => updateQuantity(product.id, -1)}
@@ -149,11 +123,11 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         <TouchableOpacity 
           style={styles.cartBar}
           activeOpacity={0.9}
-          onPress={() => console.log('Go to cart')}
+          onPress={() => navigation.navigate('Cart')}
         >
           <View style={styles.cartInfo}>
             <Text style={styles.cartCount}>{totalItems} Item{totalItems > 1 ? 's' : ''}</Text>
-            <Text style={styles.cartTotal}>₹{totalPrice.toFixed(2)}</Text>
+            <Text style={styles.cartTotal}>₹{subtotal.toFixed(2)}</Text>
           </View>
           <View style={styles.viewCartAction}>
             <Text style={styles.viewCartText}>View Cart</Text>
