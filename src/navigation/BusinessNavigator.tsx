@@ -1,13 +1,24 @@
 import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StoreScreen } from '../screens/business/StoreScreen';
 import { OrdersScreen } from '../screens/business/OrdersScreen';
 import { BusinessAccountScreen } from '../screens/business/BusinessAccountScreen';
+import { ManageProductsScreen } from '../screens/business/ManageProductsScreen';
 import { Colors } from '../theme/colors';
-
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+const StoreStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="StoreDashboard" component={StoreScreen} />
+      <Stack.Screen name="ManageProducts" component={ManageProductsScreen} />
+    </Stack.Navigator>
+  );
+};
 
 export const BusinessNavigator = () => {
   return (
@@ -30,7 +41,7 @@ export const BusinessNavigator = () => {
         },
       })}
     >
-      <Tab.Screen name="Store" component={StoreScreen} />
+      <Tab.Screen name="Store" component={StoreStack} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
       <Tab.Screen name="Account" component={BusinessAccountScreen} />
     </Tab.Navigator>

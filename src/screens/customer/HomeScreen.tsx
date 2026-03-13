@@ -25,7 +25,7 @@ const CATEGORIES = [
   { id: '6', name: 'Meat', icon: 'food-steak' },
 ];
 
-export const HomeScreen = () => {
+export const HomeScreen = ({ navigation }: any) => {
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -41,8 +41,7 @@ export const HomeScreen = () => {
       const { data, error } = await supabase
         .from('stores')
         .select('*')
-        .eq('is_active', true)
-        .eq('is_approved', true);
+        .eq('is_active', true);
 
       if (error) throw error;
       setStores(data || []);
@@ -141,7 +140,7 @@ export const HomeScreen = () => {
             <StoreCard 
               key={store.id} 
               store={store} 
-              onPress={() => console.log('Store pressed:', store.id)} 
+              onPress={() => (navigation as any).navigate('StoreDetails', { store })} 
             />
           ))
         ) : (

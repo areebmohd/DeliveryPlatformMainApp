@@ -6,16 +6,17 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { Colors, Spacing } from '../../theme/colors';
+import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-export const StoreScreen = () => {
+export const StoreScreen = ({ navigation }: any) => {
   const { profile, user } = useAuth();
   const [store, setStore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -119,14 +120,15 @@ export const StoreScreen = () => {
           </Text>
         </View>
 
-        {!store?.is_approved && store && (
+        {/* Admin approval warning disabled for development */}
+        {/* {!store?.is_approved && store && (
           <View style={styles.warningBox}>
             <Icon name="clock-outline" size={20} color="#856404" />
             <Text style={styles.warningText}>
               Your store is pending admin approval. You can still add products.
             </Text>
           </View>
-        )}
+        )} */}
 
         <View style={styles.form}>
           <Input
@@ -168,6 +170,21 @@ export const StoreScreen = () => {
             loading={saving}
             style={styles.saveButton}
           />
+
+          {store && (
+            <TouchableOpacity 
+              style={styles.manageProductsButton}
+              onPress={() => navigation.navigate('ManageProducts', { storeId: store.id })}
+            >
+              <View style={styles.manageProductsContent}>
+                <View>
+                  <Text style={styles.manageProductsTitle}>Manage Products</Text>
+                  <Text style={styles.manageProductsSubtitle}>Add items and toggle stock</Text>
+                </View>
+                <Icon name="chevron-right" size={24} color={Colors.primary} />
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -220,5 +237,28 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: Spacing.lg,
+  },
+  manageProductsButton: {
+    marginTop: Spacing.xl,
+    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  manageProductsContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  manageProductsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  manageProductsSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });
