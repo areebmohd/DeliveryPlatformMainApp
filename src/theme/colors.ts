@@ -7,6 +7,8 @@ export const Colors = {
   textSecondary: '#6C757D',
   error: '#DC3545',
   border: '#E9ECEF',
+  success: '#28A745',
+  warning: '#FFC107',
   white: '#FFFFFF',
   black: '#000000',
   glass: 'rgba(255, 255, 255, 0.8)',

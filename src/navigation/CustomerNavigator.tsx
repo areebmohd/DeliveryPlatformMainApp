@@ -8,6 +8,8 @@ import { AccountScreen } from '../screens/customer/AccountScreen';
 import { Colors } from '../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { CustomerOrdersScreen } from '../screens/customer/CustomerOrdersScreen';
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -35,6 +37,7 @@ export const CustomerNavigator = () => {
         tabBarIcon: ({ color, size }) => {
           let iconName = '';
           if (route.name === 'Home') iconName = 'home-variant';
+          else if (route.name === 'Orders') iconName = 'clipboard-list';
           else if (route.name === 'Cart') iconName = 'cart';
           else if (route.name === 'Account') iconName = 'account';
           return <Icon name={iconName} size={size} color={color} />;
@@ -42,6 +45,7 @@ export const CustomerNavigator = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} />
+      <Tab.Screen name="Orders" component={CustomerOrdersScreen} />
       <Tab.Screen name="Cart" component={CartScreen} />
       <Tab.Screen name="Account" component={AccountScreen} />
     </Tab.Navigator>

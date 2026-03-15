@@ -121,11 +121,11 @@ export const CartScreen = ({ navigation }: any) => {
         (success) => {
           Alert.alert('Success', 'Payment initiated! We will verify and process your order.');
           clearCart();
-          navigation.navigate('Home');
+          navigation.navigate('Orders');
         },
         (error) => {
           Alert.alert('Payment Failed', 'If money was deducted, please contact support with Order ID.');
-          navigation.navigate('Home');
+          navigation.navigate('Orders');
         }
       );
 
