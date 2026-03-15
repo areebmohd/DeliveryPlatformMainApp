@@ -7,6 +7,7 @@ import { CartScreen } from '../screens/customer/CartScreen';
 import { AccountScreen } from '../screens/customer/AccountScreen';
 import { Colors } from '../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CustomerOrdersScreen } from '../screens/customer/CustomerOrdersScreen';
 
@@ -23,6 +24,8 @@ const HomeStack = () => {
 };
 
 export const CustomerNavigator = () => {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -30,9 +33,15 @@ export const CustomerNavigator = () => {
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 60,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom + 8,
+          paddingTop: 2,
+          backgroundColor: Colors.white,
+          borderTopColor: Colors.border,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
         },
         tabBarIcon: ({ color, size }) => {
           let iconName = '';

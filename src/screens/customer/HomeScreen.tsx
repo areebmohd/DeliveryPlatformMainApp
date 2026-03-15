@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TextInput,
   TouchableOpacity,
@@ -11,6 +10,7 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StoreCard } from '../../components/StoreCard';
@@ -79,8 +79,10 @@ export const HomeScreen = ({ navigation }: any) => {
     </TouchableOpacity>
   );
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       
       {/* Header */}
@@ -111,7 +113,13 @@ export const HomeScreen = ({ navigation }: any) => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={[
+          styles.scrollContent, 
+          { paddingBottom: insets.bottom + 100 }
+        ]}
+      >
         {/* Categories */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Categories</Text>
@@ -136,13 +144,15 @@ export const HomeScreen = ({ navigation }: any) => {
         {loading ? (
           <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
         ) : stores.length > 0 ? (
-          stores.map((store) => (
-            <StoreCard 
-              key={store.id} 
-              store={store} 
-              onPress={() => (navigation as any).navigate('StoreDetails', { store })} 
-            />
-          ))
+          <View style={styles.storesContainer}>
+            {stores.map((store) => (
+              <StoreCard 
+                key={store.id} 
+                store={store} 
+                onPress={() => (navigation as any).navigate('StoreDetails', { store })} 
+              />
+            ))}
+          </View>
         ) : (
           <View style={styles.emptyContainer}>
             <Icon name="store-off-outline" size={64} color={Colors.border} />
@@ -151,7 +161,7 @@ export const HomeScreen = ({ navigation }: any) => {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -283,5 +293,8 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
+  },
+  storesContainer: {
+    paddingHorizontal: Spacing.lg,
   },
 });

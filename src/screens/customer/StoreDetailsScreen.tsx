@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { supabase } from '../../api/supabase';
@@ -21,6 +21,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { addItem, updateQuantity, items, totalItems, subtotal } = useCart();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchProducts();
@@ -50,7 +51,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" />
       
       {/* Custom Header */}
@@ -64,7 +65,10 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: totalItems > 0 ? 100 : insets.bottom + 20 }}
+      >
         <View style={styles.content}>
           <View style={styles.storeHero}>
             <View style={styles.storeBadge}>
@@ -121,7 +125,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
       {/* Floating Cart Bar */}
       {totalItems > 0 && (
         <TouchableOpacity 
-          style={styles.cartBar}
+          style={[styles.cartBar, { bottom: insets.bottom + 10 }]}
           activeOpacity={0.9}
           onPress={() => navigation.navigate('Cart')}
         >
@@ -135,7 +139,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
           </View>
         </TouchableOpacity>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 

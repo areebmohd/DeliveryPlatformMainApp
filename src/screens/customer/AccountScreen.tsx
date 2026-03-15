@@ -1,14 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 
 export const AccountScreen = () => {
   const { profile, signOut } = useAuth();
+  const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.content}>
         <Text style={styles.title}>Account</Text>
         <Text style={styles.userName}>{profile?.full_name || 'User'}</Text>
@@ -21,7 +23,7 @@ export const AccountScreen = () => {
           style={styles.signOutButton}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

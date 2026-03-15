@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoreScreen } from '../screens/business/StoreScreen';
 import { OrdersScreen } from '../screens/business/OrdersScreen';
 import { BusinessAccountScreen } from '../screens/business/BusinessAccountScreen';
@@ -21,6 +22,8 @@ const StoreStack = () => {
 };
 
 export const BusinessNavigator = () => {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -28,9 +31,15 @@ export const BusinessNavigator = () => {
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 60,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom + 8,
+          paddingTop: 2,
+          backgroundColor: Colors.white,
+          borderTopColor: Colors.border,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
         },
         tabBarIcon: ({ color, size }) => {
           let iconName = '';

@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
   RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +21,7 @@ export const OrdersScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
   const [store, setStore] = useState<any>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchStoreAndOrders();
@@ -184,7 +185,7 @@ export const OrdersScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Manage Orders</Text>
         <Text style={styles.subtitle}>{store?.name || 'Store Dashboard'}</Text>
@@ -199,7 +200,7 @@ export const OrdersScreen = () => {
           data={orders}
           renderItem={renderOrderItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
           }
@@ -211,7 +212,7 @@ export const OrdersScreen = () => {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 

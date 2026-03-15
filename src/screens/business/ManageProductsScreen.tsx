@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   Modal,
   Alert,
@@ -11,6 +10,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -24,6 +24,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -157,7 +158,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Icon 
           name="arrow-left" 
@@ -177,7 +178,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
         <FlatList
           data={products}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
           renderItem={({ item }) => (
             <BusinessProductCard
               product={item}
@@ -260,7 +261,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

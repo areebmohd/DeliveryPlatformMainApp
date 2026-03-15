@@ -3,11 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { useCart } from '../../context/CartContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -22,6 +22,7 @@ export const CartScreen = ({ navigation }: any) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [address, setAddress] = useState('');
+  const insets = useSafeAreaInsets();
   
   const deliveryFee = totalItems > 0 ? 25 : 0; 
   const platformFee = totalItems > 0 ? 2 : 0;
@@ -61,9 +62,9 @@ export const CartScreen = ({ navigation }: any) => {
         })
         .select()
         .single();
-
+ 
       if (addrError) throw addrError;
-
+ 
       // 3. Create Order with address_id
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -81,9 +82,9 @@ export const CartScreen = ({ navigation }: any) => {
         })
         .select()
         .single();
-
+ 
       if (orderError) throw orderError;
-
+ 
       // 4. Create Order Items
       const orderItems = items.map(item => ({
         order_id: order.id,
@@ -92,13 +93,13 @@ export const CartScreen = ({ navigation }: any) => {
         product_price: item.price,
         quantity: item.quantity
       }));
-
+ 
       const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItems);
-
+ 
       if (itemsError) throw itemsError;
-
+ 
       // 5. Trigger UPI Payment
       if (!RNUpiPayment || !RNUpiPayment.initializePayment) {
         Alert.alert(
@@ -109,7 +110,7 @@ export const CartScreen = ({ navigation }: any) => {
         clearCart();
         return;
       }
-
+ 
       RNUpiPayment.initializePayment(
         {
           vpa: store.upi_id,
@@ -128,7 +129,7 @@ export const CartScreen = ({ navigation }: any) => {
           navigation.navigate('Orders');
         }
       );
-
+ 
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {
@@ -138,7 +139,7 @@ export const CartScreen = ({ navigation }: any) => {
 
   if (items.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.emptyContainer}>
           <Icon name="cart-off" size={80} color={Colors.border} />
           <Text style={styles.emptyTitle}>Your cart is empty</Text>
@@ -149,12 +150,12 @@ export const CartScreen = ({ navigation }: any) => {
             style={styles.browseBtn}
           />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Review Cart</Text>
         <TouchableOpacity onPress={clearCart}>
@@ -162,7 +163,7 @@ export const CartScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}>
         <View style={styles.storeHeader}>
           <Icon name="storefront" size={20} color={Colors.primary} />
           <Text style={styles.storeName}>{items[0]?.store_name}</Text>
@@ -225,7 +226,7 @@ export const CartScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.lg }]}>
         <View style={styles.checkoutInfo}>
           <Text style={styles.checkoutTotal}>₹{total.toFixed(2)}</Text>
           <Text style={styles.checkoutLabel}>Total Payable</Text>
@@ -237,7 +238,7 @@ export const CartScreen = ({ navigation }: any) => {
           loading={loading}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
