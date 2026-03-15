@@ -16,3 +16,22 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+export const uploadImage = async (bucket: string, path: string, base64: string) => {
+  const { decode } = require('base64-arraybuffer');
+  
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(path, decode(base64), {
+      contentType: 'image/jpeg',
+      upsert: true,
+    });
+
+  if (error) throw error;
+
+  const { data: { publicUrl } } = supabase.storage
+    .from(bucket)
+    .getPublicUrl(path);
+
+  return publicUrl;
+};
