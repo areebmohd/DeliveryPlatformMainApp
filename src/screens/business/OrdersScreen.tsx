@@ -77,7 +77,8 @@ export const OrdersScreen = () => {
       .from('orders')
       .select(`
         *,
-        profiles:customer_id (full_name, phone),
+        customer:profiles!orders_customer_id_fkey (full_name, phone),
+        rider:profiles!orders_rider_id_fkey (full_name),
         order_items (*)
       `)
       .eq('store_id', id)
@@ -102,87 +103,165 @@ export const OrdersScreen = () => {
 
       if (error) throw error;
       Alert.alert('Status Updated', `Order is now ${newStatus.replace('_', ' ')}`);
+      fetchOrders();
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
   };
 
+  const handleRemoveItem = async (order: any, itemToRemove: any) => {
+    const activeItemsCount = order.order_items?.filter((i: any) => !i.is_removed).length || 0;
+    if (activeItemsCount <= 1) {
+      Alert.alert('Cannot Remove', 'Order must have at least one item. Consider cancelling the order instead.');
+      return;
+    }
+
+    Alert.alert(
+      'Remove Item',
+      `Are you sure you want to remove ${itemToRemove.product_name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              // 1. Mark item as removed
+              const { error: itemError } = await supabase
+                .from('order_items')
+                .update({ is_removed: true })
+                .eq('id', itemToRemove.id);
+
+              if (itemError) throw itemError;
+
+              // 2. Recalculate totals
+              const remainingItems = order.order_items.filter((i: any) => i.id !== itemToRemove.id && !i.is_removed);
+              const newSubtotal = remainingItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
+              
+              // Only recalculate fees if NOT prepaid (payment_status pending)
+              // Since fees are static for now, they don't change unless items go to 0
+              const deliveryFee = 25;
+              const platformFee = 2;
+              const newTotal = newSubtotal + deliveryFee + platformFee;
+
+              // 3. Update Order
+              const { error: orderError } = await supabase
+                .from('orders')
+                .update({
+                  subtotal: newSubtotal,
+                  total_amount: newTotal,
+                })
+                .eq('id', order.id);
+
+              if (orderError) throw orderError;
+
+              Alert.alert('Success', 'Item removed and order total updated.');
+              fetchOrders();
+            } catch (e: any) {
+              Alert.alert('Error', e.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending_verification': return Colors.warning;
-      case 'accepted': return Colors.secondary;
-      case 'preparing': return '#2196F3';
-      case 'ready': return '#9C27B0';
-      case 'delivered': return Colors.success;
-      case 'cancelled': return Colors.error;
-      default: return Colors.textSecondary;
+      case 'pending_verification':
+      case 'accepted':
+      case 'preparing':
+      case 'ready': 
+        return Colors.warning;
+      case 'picked_up': 
+        return '#FF9800';
+      case 'delivered': 
+        return Colors.success;
+      case 'cancelled': 
+        return Colors.error;
+      default: 
+        return Colors.textSecondary;
     }
   };
 
-  const renderOrderItem = ({ item }: { item: any }) => (
-    <View style={styles.orderCard}>
-      <View style={styles.orderHeader}>
-        <View>
-          <Text style={styles.orderNumber}>{item.order_number}</Text>
-          <Text style={styles.orderDate}>
-            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending_verification':
+      case 'accepted':
+      case 'preparing':
+      case 'ready': 
+        return 'WAITING FOR PICKUP';
+      case 'picked_up': 
+        return 'PICKED UP';
+      case 'delivered': 
+        return 'DELIVERED';
+      case 'cancelled': 
+        return 'CANCELLED';
+      default: 
+        return status.toUpperCase().replace('_', ' ');
+    }
+  };
+
+  const renderOrderItem = ({ item }: { item: any }) => {
+    const activeItems = item.order_items?.filter((i: any) => !i.is_removed) || [];
+    // Allow removal in any state before the rider picks it up
+    const isModifiable = ['pending_verification', 'accepted', 'preparing', 'ready'].includes(item.status);
+
+    return (
+      <View style={styles.orderCard}>
+        <View style={styles.orderHeader}>
+          <View>
+            <Text style={styles.orderNumber}>#{item.order_number}</Text>
+            <Text style={styles.orderDate}>
+              {new Date(item.created_at).toLocaleDateString([], { day: '2-digit', month: 'short' })}, {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+              {getStatusLabel(item.status)}
+            </Text>
+          </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-          <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-            {item.status.toUpperCase().replace('_', ' ')}
-          </Text>
+
+        <View style={styles.customerInfo}>
+          <Icon name="account" size={16} color={Colors.textSecondary} />
+          <Text style={styles.customerName}>{item.customer?.full_name || 'Guest'}</Text>
+        </View>
+
+        {item.rider && (
+          <View style={styles.riderInfo}>
+            <Icon name="bike" size={16} color={Colors.secondary} />
+            <Text style={styles.riderName}>Rider: {item.rider.full_name}</Text>
+          </View>
+        )}
+
+        <View style={styles.itemsList}>
+          {activeItems.map((product: any, idx: number) => (
+            <View key={idx} style={styles.itemRowContainer}>
+              <Text style={styles.itemRow}>
+                {product.quantity}x {product.product_name} (₹{product.product_price})
+              </Text>
+              {isModifiable && (
+                <TouchableOpacity onPress={() => handleRemoveItem(item, product)}>
+                  <Icon name="trash-can-outline" size={18} color={Colors.error} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.orderFooter}>
+          <View>
+            <Text style={styles.amountLabel}>Total (inc. fees)</Text>
+            <Text style={styles.amountValue}>₹{item.total_amount}</Text>
+          </View>
         </View>
       </View>
-
-      <View style={styles.customerInfo}>
-        <Icon name="account" size={16} color={Colors.textSecondary} />
-        <Text style={styles.customerName}>{item.profiles?.full_name || 'Guest Customer'}</Text>
-      </View>
-
-      <View style={styles.itemsList}>
-        {item.order_items?.map((product: any, idx: number) => (
-          <Text key={idx} style={styles.itemRow}>
-            {product.quantity}x {product.product_name}
-          </Text>
-        ))}
-      </View>
-
-      <View style={styles.orderFooter}>
-        <View>
-          <Text style={styles.amountLabel}>Grand Total</Text>
-          <Text style={styles.amountValue}>₹{item.total_amount}</Text>
-        </View>
-
-        <View style={styles.actions}>
-          {item.status === 'pending_verification' && (
-            <TouchableOpacity 
-              style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
-              onPress={() => updateStatus(item.id, 'accepted')}
-            >
-              <Text style={styles.actionBtnText}>Accept</Text>
-            </TouchableOpacity>
-          )}
-          {item.status === 'accepted' && (
-            <TouchableOpacity 
-              style={[styles.actionBtn, { backgroundColor: '#2196F3' }]}
-              onPress={() => updateStatus(item.id, 'preparing')}
-            >
-              <Text style={styles.actionBtnText}>Prepare</Text>
-            </TouchableOpacity>
-          )}
-          {item.status === 'preparing' && (
-            <TouchableOpacity 
-              style={[styles.actionBtn, { backgroundColor: '#9C27B0' }]}
-              onPress={() => updateStatus(item.id, 'ready')}
-            >
-              <Text style={styles.actionBtnText}>Ready</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -289,13 +368,34 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginLeft: 6,
   },
+  riderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.secondary + '10',
+    padding: 6,
+    borderRadius: 6,
+  },
+  riderName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.secondary,
+    marginLeft: 6,
+  },
   itemsList: {
     marginBottom: Spacing.md,
   },
+  itemRowContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+    paddingRight: 4,
+  },
   itemRow: {
     fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 2,
+    color: Colors.text,
+    flex: 1,
   },
   orderFooter: {
     flexDirection: 'row',
