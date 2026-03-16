@@ -54,10 +54,29 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   };
 
   const handleNavigateToForm = (product?: any) => {
-    navigation.navigate('ProductForm', {
-      storeId,
-      product,
-    });
+    if (product) {
+      navigation.navigate('ProductForm', { 
+        storeId,
+        product 
+      });
+      return;
+    }
+
+    Alert.alert(
+      'Add Product',
+      'Choose product type:',
+      [
+        {
+          text: 'Manual Product',
+          onPress: () => navigation.navigate('ProductForm', { storeId, mode: 'manual' }),
+        },
+        {
+          text: 'Barcode Product',
+          onPress: () => navigation.navigate('ProductForm', { storeId, mode: 'barcode' }),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   const handleToggleStock = async (id: string, currentStatus: boolean) => {

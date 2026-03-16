@@ -95,10 +95,29 @@ export const StoreScreen = ({ navigation }: any) => {
   };
 
   const handleNavigateToProductForm = (product?: any) => {
-    navigation.navigate('ProductForm', { 
-      storeId: store.id,
-      product 
-    });
+    if (product) {
+      navigation.navigate('ProductForm', { 
+        storeId: store.id,
+        product 
+      });
+      return;
+    }
+
+    Alert.alert(
+      'Add Product',
+      'Choose product type:',
+      [
+        {
+          text: 'Manual Product',
+          onPress: () => navigation.navigate('ProductForm', { storeId: store.id, mode: 'manual' }),
+        },
+        {
+          text: 'Barcode Product',
+          onPress: () => navigation.navigate('ProductForm', { storeId: store.id, mode: 'barcode' }),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   const handleToggleStock = async (id: string, currentStatus: boolean) => {

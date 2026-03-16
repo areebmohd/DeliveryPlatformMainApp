@@ -19,7 +19,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useAuth } from '../../context/AuthContext';
 
 export const ProductFormScreen = ({ route, navigation }: any) => {
-  const { storeId, product } = route.params || {};
+  const { storeId, product, mode } = route.params || {};
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   
@@ -32,9 +32,50 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [imageUrl, setImageUrl] = useState(product?.image_url || '');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  // Barcode & Stock states
+  const [barcode, setBarcode] = useState(product?.barcode || '');
+  const [stockQuantity, setStockQuantity] = useState(product?.stock_quantity?.toString() || '0');
+  const [isBarcodeMatched, setIsBarcodeMatched] = useState(false);
+  const [searchingBarcode, setSearchingBarcode] = useState(false);
+
   const isEditing = !!product;
+  const isBarcodeMode = mode === 'barcode';
+
+  const handleBarcodeLookup = async () => {
+    if (!barcode) return;
+    try {
+      setSearchingBarcode(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('barcode', barcode)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setName(data.name);
+        setDescription(data.description || '');
+        setPrice(data.price.toString());
+        setWeight(data.weight_kg?.toString() || '');
+        setCategory(data.category || '');
+        setImageUrl(data.image_url || '');
+        setIsBarcodeMatched(true);
+        Alert.alert('Product Found', 'Product details have been pre-filled and locked.');
+      } else {
+        setIsBarcodeMatched(false);
+        Alert.alert('Not Found', 'Generic product not found. You can enter details manually.');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setSearchingBarcode(false);
+    }
+  };
 
   const pickImage = async () => {
+    if (isBarcodeMatched && !isEditing) return; // Lock image pick if barcode matched
     const result = await launchImageLibrary({
       mediaType: 'photo',
       includeBase64: true,
@@ -75,7 +116,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         weight_kg: weight ? parseFloat(weight) : 0,
         category,
         image_url: imageUrl,
-        in_stock: product ? product.in_stock : true,
+        in_stock: parseInt(stockQuantity) > 0,
+        barcode: barcode || null,
+        stock_quantity: parseInt(stockQuantity) || 0,
       };
 
       if (isEditing) {
@@ -112,11 +155,33 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {(isBarcodeMode || barcode) && (
+          <View style={styles.barcodeSection}>
+            <Input
+              label="Barcode Number"
+              placeholder="Scan or enter barcode"
+              value={barcode}
+              onChangeText={setBarcode}
+              keyboardType="numeric"
+              editable={!isEditing && !isBarcodeMatched}
+            />
+            {!isEditing && !isBarcodeMatched && (
+              <Button 
+                title="Lookup Product" 
+                onPress={handleBarcodeLookup} 
+                loading={searchingBarcode}
+                style={styles.lookupButton}
+                variant="outline"
+              />
+            )}
+          </View>
+        )}
+
         <Text style={styles.inputLabel}>Product Image</Text>
         <TouchableOpacity 
           style={styles.imagePickerButton} 
           onPress={pickImage}
-          disabled={isUploadingImage}
+          disabled={isUploadingImage || (isBarcodeMatched && !isEditing)}
         >
           {imageUrl ? (
             <Image source={{ uri: imageUrl }} style={styles.pickedImage} />
@@ -138,6 +203,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           placeholder="e.g. Fresh Milk 1L"
           value={name}
           onChangeText={setName}
+          editable={!isBarcodeMatched || isEditing}
         />
         <Input
           label="Price (₹)"
@@ -145,19 +211,29 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           value={price}
           onChangeText={setPrice}
           keyboardType="numeric"
+          editable={!isBarcodeMatched || isEditing}
         />
         <Input
           label="Weight (kg)"
-          placeholder="e.g. 0.5"
+          placeholder="0.5"
           value={weight}
           onChangeText={setWeight}
           keyboardType="numeric"
+          editable={!isBarcodeMatched || isEditing}
         />
         <Input
           label="Category"
-          placeholder="e.g. Dairy"
+          placeholder="Dairy, Snacks, etc."
           value={category}
           onChangeText={setCategory}
+          editable={!isBarcodeMatched || isEditing}
+        />
+        <Input
+          label="Product Stock"
+          placeholder="0"
+          value={stockQuantity}
+          onChangeText={setStockQuantity}
+          keyboardType="numeric"
         />
         <Input
           label="Description"
@@ -166,6 +242,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           onChangeText={setDescription}
           multiline
           numberOfLines={4}
+          editable={!isBarcodeMatched || isEditing}
         />
 
         <Button
@@ -212,7 +289,7 @@ const styles = StyleSheet.create({
   },
   imagePickerButton: {
     width: '100%',
-    height: 180,
+    height: 200,
     backgroundColor: Colors.surface,
     borderRadius: borderRadius.md,
     marginBottom: Spacing.lg,
@@ -244,5 +321,17 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: Spacing.xl,
+  },
+  barcodeSection: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  lookupButton: {
+    marginTop: -8,
+    marginBottom: 8,
   },
 });
