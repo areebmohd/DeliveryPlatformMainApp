@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import { StoreScreen } from '../screens/business/StoreScreen';
 import { OrdersScreen } from '../screens/business/OrdersScreen';
 import { BusinessAccountScreen } from '../screens/business/BusinessAccountScreen';
@@ -47,7 +48,7 @@ export const BusinessNavigator = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
+        tabBarActiveTintColor: Colors.black,
         tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {
           height: 60 + insets.bottom,
@@ -58,14 +59,34 @@ export const BusinessNavigator = () => {
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: '800',
         },
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ focused, size }) => {
           let iconName = '';
           if (route.name === 'Store') iconName = 'storefront';
           else if (route.name === 'Orders') iconName = 'clipboard-text-clock';
           else if (route.name === 'Account') iconName = 'account';
-          return <Icon name={iconName} size={size} color={color} />;
+
+          if (focused) {
+            return (
+              <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+                {/* Simulated border using multiple icons logic or shadow */}
+                <Icon 
+                  name={iconName} 
+                  size={size + 1} 
+                  color={Colors.black} 
+                  style={{ position: 'absolute' }} 
+                />
+                <Icon 
+                  name={iconName.endsWith('-outline') ? iconName.replace('-outline', '') : iconName} 
+                  size={size} 
+                  color={Colors.primary} 
+                />
+              </View>
+            );
+          }
+
+          return <Icon name={iconName} size={size} color={Colors.textSecondary} />;
         },
       })}
     >

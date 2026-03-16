@@ -8,6 +8,7 @@ import { AccountScreen } from '../screens/customer/AccountScreen';
 import { Colors } from '../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
 import { CustomerOrdersScreen } from '../screens/customer/CustomerOrdersScreen';
 
@@ -30,7 +31,7 @@ export const CustomerNavigator = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
+        tabBarActiveTintColor: Colors.black,
         tabBarInactiveTintColor: Colors.textSecondary,
         tabBarStyle: {
           height: 60 + insets.bottom,
@@ -41,15 +42,34 @@ export const CustomerNavigator = () => {
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: '800',
         },
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ focused, size }) => {
           let iconName = '';
           if (route.name === 'Home') iconName = 'home-variant';
           else if (route.name === 'Orders') iconName = 'clipboard-list';
           else if (route.name === 'Cart') iconName = 'cart';
           else if (route.name === 'Account') iconName = 'account';
-          return <Icon name={iconName} size={size} color={color} />;
+
+          if (focused) {
+            return (
+              <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon 
+                  name={iconName} 
+                  size={size + 1} 
+                  color={Colors.black} 
+                  style={{ position: 'absolute' }} 
+                />
+                <Icon 
+                  name={iconName.endsWith('-outline') ? iconName.replace('-outline', '') : iconName} 
+                  size={size} 
+                  color={Colors.primary} 
+                />
+              </View>
+            );
+          }
+
+          return <Icon name={iconName} size={size} color={Colors.textSecondary} />;
         },
       })}
     >
