@@ -22,21 +22,18 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   const { storeId } = route.params;
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [saving, setSaving] = useState(false);
   const insets = useSafeAreaInsets();
-
-  // Form state
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [weight, setWeight] = useState('');
-  const [category, setCategory] = useState('');
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+    
+    // Add focus listener to refresh products when returning from form
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchProducts();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const fetchProducts = async () => {
     try {
@@ -56,63 +53,11 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const handleOpenModal = (product?: any) => {
-    if (product) {
-      setEditingId(product.id);
-      setName(product.name);
-      setDescription(product.description || '');
-      setPrice(product.price.toString());
-      setWeight(product.weight_kg?.toString() || '');
-      setCategory(product.category || '');
-    } else {
-      setEditingId(null);
-      setName('');
-      setDescription('');
-      setPrice('');
-      setWeight('');
-      setCategory('');
-    }
-    setModalVisible(true);
-  };
-
-  const handleSaveProduct = async () => {
-    if (!name || !price) {
-      Alert.alert('Error', 'Name and price are required');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const productData = {
-        store_id: storeId,
-        name,
-        description,
-        price: parseFloat(price),
-        weight_kg: weight ? parseFloat(weight) : 0,
-        category,
-        in_stock: true,
-      };
-
-      if (editingId) {
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('products')
-          .insert(productData);
-        if (error) throw error;
-      }
-
-      setModalVisible(false);
-      fetchProducts();
-    } catch (e: any) {
-      Alert.alert('Error', e.message);
-    } finally {
-      setSaving(false);
-    }
+  const handleNavigateToForm = (product?: any) => {
+    navigation.navigate('ProductForm', {
+      storeId,
+      product,
+    });
   };
 
   const handleToggleStock = async (id: string, currentStatus: boolean) => {
@@ -167,7 +112,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
           onPress={() => navigation.goBack()} 
         />
         <Text style={styles.title}>Manage Products</Text>
-        <TouchableOpacity onPress={() => handleOpenModal()}>
+        <TouchableOpacity onPress={() => handleNavigateToForm()}>
           <Icon name="plus-circle" size={28} color={Colors.primary} />
         </TouchableOpacity>
       </View>
@@ -183,7 +128,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
             <BusinessProductCard
               product={item}
               onToggleStock={handleToggleStock}
-              onEdit={handleOpenModal}
+              onEdit={handleNavigateToForm}
               onDelete={handleDeleteProduct}
             />
           )}
@@ -193,74 +138,13 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
               <Text style={styles.emptyText}>No products added yet.</Text>
               <Button 
                 title="Add Your First Product" 
-                onPress={() => handleOpenModal()} 
+                onPress={() => handleNavigateToForm()} 
                 style={{ marginTop: 20 }}
               />
             </View>
           }
         />
       )}
-
-      {/* Add/Edit Modal */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingId ? 'Edit Product' : 'Add New Product'}
-              </Text>
-              <Icon name="close" size={24} onPress={() => setModalVisible(false)} />
-            </View>
-
-            <ScrollView>
-              <Input
-                label="Product Name"
-                placeholder="e.g. Fresh Milk 1L"
-                value={name}
-                onChangeText={setName}
-              />
-              <Input
-                label="Price (₹)"
-                placeholder="0.00"
-                value={price}
-                onChangeText={setPrice}
-                keyboardType="numeric"
-              />
-              <Input
-                label="Weight (kg)"
-                placeholder="e.g. 0.5"
-                value={weight}
-                onChangeText={setWeight}
-                keyboardType="numeric"
-              />
-              <Input
-                label="Category"
-                placeholder="e.g. Dairy"
-                value={category}
-                onChangeText={setCategory}
-              />
-              <Input
-                label="Description"
-                placeholder="Product details..."
-                value={description}
-                onChangeText={setDescription}
-                multiline
-              />
-
-              <Button
-                title={editingId ? "Update Product" : "Add Product"}
-                onPress={handleSaveProduct}
-                loading={saving}
-                style={{ marginTop: 20 }}
-              />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -299,28 +183,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textSecondary,
     marginTop: 12,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: Spacing.lg,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.text,
   },
 });

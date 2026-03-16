@@ -9,6 +9,9 @@ import { ManageProductsScreen } from '../screens/business/ManageProductsScreen';
 import { Colors } from '../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { ProductFormScreen } from '../screens/business/ProductFormScreen';
+import { StoreDetailsFormScreen } from '../screens/business/StoreDetailsFormScreen';
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -17,6 +20,8 @@ const StoreStack = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="StoreDashboard" component={StoreScreen} />
       <Stack.Screen name="ManageProducts" component={ManageProductsScreen} />
+      <Stack.Screen name="ProductForm" component={ProductFormScreen} />
+      <Stack.Screen name="StoreDetailsForm" component={StoreDetailsFormScreen} />
     </Stack.Navigator>
   );
 };
