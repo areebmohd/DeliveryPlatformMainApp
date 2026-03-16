@@ -37,6 +37,11 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [upiId, setUpiId] = useState(store?.upi_id || '');
   const [bannerUrl, setBannerUrl] = useState(store?.banner_url || '');
   const [openingHours, setOpeningHours] = useState(store?.opening_hours || '');
+  const [phone, setPhone] = useState(store?.phone || '');
+  const [email, setEmail] = useState(store?.email || '');
+  const [instagramUrl, setInstagramUrl] = useState(store?.instagram_url || '');
+  const [facebookUrl, setFacebookUrl] = useState(store?.facebook_url || '');
+  const [whatsappNumber, setWhatsappNumber] = useState(store?.whatsapp_number || '');
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
   // Alert Modal state
@@ -99,6 +104,11 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         upi_id: upiId,
         banner_url: bannerUrl,
         opening_hours: openingHours,
+        phone,
+        email,
+        instagram_url: instagramUrl,
+        facebook_url: facebookUrl,
+        whatsapp_number: whatsappNumber,
         location: store?.location || 'SRID=4326;POINT(77.0266 28.4595)', 
       };
 
@@ -168,9 +178,16 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Location & Hours</Text>
-          <Input label="Address" value={address} onChangeText={setAddress} placeholder="Full building/street address" multiline numberOfLines={2} />
-          <Input label="Opening Hours" value={openingHours} onChangeText={setOpeningHours} placeholder="e.g. 8 AM - 10 PM" />
+          <Text style={styles.sectionTitle}>Contact Info</Text>
+          <Input label="Store Phone" value={phone} onChangeText={setPhone} placeholder="e.g. +91 9876543210" keyboardType="phone-pad" />
+          <Input label="Store Email" value={email} onChangeText={setEmail} placeholder="e.g. contact@store.com" keyboardType="email-address" autoCapitalize="none" />
+          <Input label="WhatsApp Number" value={whatsappNumber} onChangeText={setWhatsappNumber} placeholder="For customer queries" keyboardType="phone-pad" />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Social Media</Text>
+          <Input label="Instagram URL" value={instagramUrl} onChangeText={setInstagramUrl} placeholder="instagram.com/yourstore" autoCapitalize="none" />
+          <Input label="Facebook URL" value={facebookUrl} onChangeText={setFacebookUrl} placeholder="facebook.com/yourstore" autoCapitalize="none" />
         </View>
 
         <View style={styles.section}>

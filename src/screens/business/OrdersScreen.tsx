@@ -152,25 +152,21 @@ export const OrdersScreen = () => {
   };
 
   const handleRemoveItem = async (order: any, itemToRemove: any) => {
-    const activeItemsCount = order.order_items?.filter((i: any) => !i.is_removed).length || 0;
-    if (activeItemsCount <= 1) {
-      showAlert({
-        title: 'Cannot Remove',
-        message: 'Order must have at least one item. Consider cancelling the order instead.',
-        type: 'warning'
-      });
-      return;
-    }
+    const activeItems = order.order_items?.filter((i: any) => !i.is_removed) || [];
+    const isLastItem = activeItems.length <= 1;
 
     showAlert({
-      title: 'Remove Item',
-      message: `Are you sure you want to remove ${itemToRemove.product_name} from this order?`,
+      title: isLastItem ? 'Cancel Order?' : 'Remove Item',
+      message: isLastItem 
+        ? `Removing "${itemToRemove.product_name}" will cancel the entire order. Proceed?`
+        : `Are you sure you want to remove "${itemToRemove.product_name}" from this order?`,
       type: 'warning',
       primaryAction: {
-        text: 'Remove',
+        text: isLastItem ? 'Remove & Cancel' : 'Remove',
         onPress: async () => {
           try {
             setLoading(true);
+            // 1. Mark item as removed
             const { error: itemError } = await supabase
               .from('order_items')
               .update({ is_removed: true })
@@ -178,24 +174,33 @@ export const OrdersScreen = () => {
 
             if (itemError) throw itemError;
 
-            const remainingItems = order.order_items.filter((i: any) => i.id !== itemToRemove.id && !i.is_removed);
-            const newSubtotal = remainingItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
-            
-            const deliveryFee = 25;
-            const platformFee = 2;
-            const newTotal = newSubtotal + deliveryFee + platformFee;
+            if (isLastItem) {
+              // 2. Update order status to cancelled
+              const { error: orderError } = await supabase
+                .from('orders')
+                .update({ status: 'cancelled' })
+                .eq('id', order.id);
+              if (orderError) throw orderError;
+              showAlert({ title: 'Order Cancelled', message: 'The order was cancelled because all items were removed.', type: 'info' });
+            } else {
+              // 3. Recalculate total for multiple items
+              const remainingItems = activeItems.filter((i: any) => i.id !== itemToRemove.id);
+              const newSubtotal = remainingItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
+              const deliveryFee = 25;
+              const platformFee = 2;
+              const newTotal = newSubtotal + deliveryFee + platformFee;
 
-            const { error: orderError } = await supabase
-              .from('orders')
-              .update({
-                subtotal: newSubtotal,
-                total_amount: newTotal,
-              })
-              .eq('id', order.id);
+              const { error: orderError } = await supabase
+                .from('orders')
+                .update({
+                  subtotal: newSubtotal,
+                  total_amount: newTotal,
+                })
+                .eq('id', order.id);
 
-            if (orderError) throw orderError;
-
-            showAlert({ title: 'Success', message: 'Item removed and order total updated.', type: 'success' });
+              if (orderError) throw orderError;
+              showAlert({ title: 'Success', message: 'Item removed and total updated.', type: 'success' });
+            }
             fetchOrders();
           } catch (e: any) {
             showAlert({ title: 'Error', message: e.message, type: 'error' });

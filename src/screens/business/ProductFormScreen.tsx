@@ -38,6 +38,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [stockQuantity, setStockQuantity] = useState(product?.stock_quantity?.toString() || '0');
   const [isBarcodeMatched, setIsBarcodeMatched] = useState(false);
   const [searchingBarcode, setSearchingBarcode] = useState(false);
+  const [hasSearchedBarcode, setHasSearchedBarcode] = useState(false);
 
   // Alert Modal state
   const [alertConfig, setAlertConfig] = useState<{
@@ -73,6 +74,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
       if (error) throw error;
 
+      setHasSearchedBarcode(true);
       if (data) {
         setName(data.name);
         setDescription(data.description || '');
@@ -93,8 +95,10 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const canEditDetails = isEditing || !isBarcodeMode || (hasSearchedBarcode && !isBarcodeMatched);
+
   const pickImage = async () => {
-    if (isBarcodeMatched && !isEditing) return;
+    if (!canEditDetails) return;
     const result = await launchImageLibrary({
       mediaType: 'photo',
       includeBase64: true,
@@ -202,9 +206,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
           <View style={styles.imageSection}>
             <TouchableOpacity 
-              style={styles.imagePicker} 
+              style={[styles.imagePicker, !canEditDetails && styles.disabledPicker]} 
               onPress={pickImage}
-              disabled={isUploadingImage || (isBarcodeMatched && !isEditing)}
+              disabled={isUploadingImage || !canEditDetails}
             >
               {imageUrl ? (
                 <Image source={{ uri: imageUrl }} style={styles.pickedImage} />
@@ -230,14 +234,14 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             placeholder="e.g. Milk 1L"
             value={name}
             onChangeText={setName}
-            editable={!isBarcodeMatched || isEditing}
+            editable={canEditDetails}
           />
           <Input
             label="Category"
             placeholder="Dairy, Snacks, etc."
             value={category}
             onChangeText={setCategory}
-            editable={!isBarcodeMatched || isEditing}
+            editable={canEditDetails}
           />
           <Input
             label="Description"
@@ -246,7 +250,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             onChangeText={setDescription}
             multiline
             numberOfLines={3}
-            editable={!isBarcodeMatched || isEditing}
+            editable={canEditDetails}
           />
         </View>
 
@@ -260,7 +264,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               onChangeText={setPrice}
               keyboardType="numeric"
               containerStyle={{ flex: 1, marginRight: Spacing.sm }}
-              editable={!isBarcodeMatched || isEditing}
+              editable={canEditDetails}
             />
             <Input
               label="Stock"
@@ -277,7 +281,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             value={weight}
             onChangeText={setWeight}
             keyboardType="numeric"
-            editable={!isBarcodeMatched || isEditing}
+            editable={canEditDetails}
           />
         </View>
 
@@ -372,6 +376,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.primary,
     borderStyle: 'dashed',
+  },
+  disabledPicker: {
+    backgroundColor: '#F1F3F5',
+    borderColor: Colors.border,
   },
   pickedImage: {
     width: '100%',
