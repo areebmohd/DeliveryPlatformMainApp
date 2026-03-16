@@ -220,7 +220,10 @@ export const OrdersScreen = () => {
             </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+            <Text style={[
+              styles.statusText, 
+              { color: ['pending_verification', 'accepted', 'preparing', 'ready'].includes(item.status) ? Colors.black : getStatusColor(item.status) }
+            ]}>
               {getStatusLabel(item.status)}
             </Text>
           </View>

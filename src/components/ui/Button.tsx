@@ -56,7 +56,7 @@ export const Button = ({
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? Colors.primary : Colors.white} />
+        <ActivityIndicator color={variant === 'outline' ? Colors.primary : Colors.black} />
       ) : (
         <Text style={[styles.textBase, getTextStyle(), textStyle]}>{title}</Text>
       )}
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   primaryText: {
-    color: Colors.white,
+    color: Colors.black,
   },
   outlineText: {
     color: Colors.primary,

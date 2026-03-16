@@ -104,7 +104,7 @@ export const CartScreen = ({ navigation }: any) => {
       if (!RNUpiPayment || !RNUpiPayment.initializePayment) {
         Alert.alert(
           'Note', 
-          'UPI Payment module not linked. If you just installed it, please restart the app with "npm run android".\n\nOrder saved as Pending.',
+          'UPI Payment module not linked. If you just installed it, please restart the app with "npm run android".\n\nOrder saved as Waiting for Pickup.',
           [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
         );
         clearCart();

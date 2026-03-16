@@ -32,12 +32,12 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
   const AccountOption = ({ icon, title, onPress, color = Colors.text }: any) => (
     <TouchableOpacity style={styles.optionItem} onPress={onPress}>
       <View style={styles.optionLeft}>
-        <View style={[styles.iconContainer, { backgroundColor: color + '15' }]}>
-          <Icon name={icon} size={22} color={color} />
+        <View style={[styles.iconContainer, { backgroundColor: Colors.primaryLight }]}>
+          <Icon name={icon} size={22} color={color === Colors.primary || color === Colors.secondary ? Colors.black : color} />
         </View>
-        <Text style={[styles.optionTitle, { color }]}>{title}</Text>
+        <Text style={[styles.optionTitle, { color: Colors.text }]}>{title}</Text>
       </View>
-      <Icon name="chevron-right" size={20} color={Colors.border} />
+      <Icon name="chevron-right" size={20} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 
