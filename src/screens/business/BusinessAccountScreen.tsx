@@ -13,7 +13,35 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     fetchStore();
-  }, []);
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchStore();
+    });
+
+    if (!user?.id) return unsubscribe;
+
+    // Subscribe to store changes (to update name/category instantly)
+    const channel = supabase
+      .channel(`account-store-sync-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'stores',
+          filter: `owner_id=eq.${user.id}`,
+        },
+        () => {
+          fetchStore();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      unsubscribe();
+      supabase.removeChannel(channel);
+    };
+  }, [navigation, user?.id]);
 
   const fetchStore = async () => {
     try {
@@ -55,7 +83,7 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
             </View>
             <View style={styles.profileDetails}>
               <Text style={styles.storeName}>{store?.name || 'Your Store'}</Text>
-              <Text style={styles.emailValue}>{user?.email}</Text>
+              <Text style={styles.categoryValue}>{store?.category || 'General Store'}</Text>
             </View>
           </View>
         </View>
@@ -159,6 +187,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: Colors.text,
+  },
+  categoryValue: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '600',
   },
   emailValue: {
     fontSize: 14,

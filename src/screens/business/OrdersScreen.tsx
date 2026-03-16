@@ -48,17 +48,33 @@ export const OrdersScreen = () => {
   useEffect(() => {
     fetchStoreAndOrders();
 
-    // Subscribe to real-time order updates
+    if (!store?.id) return;
+
+    // Subscribe to real-time order and item updates for this store
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel(`store-orders-sync-${store.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'orders',
+          filter: `store_id=eq.${store.id}`,
         },
         () => {
+          fetchOrders();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_items',
+        },
+        () => {
+          // We can't easily filter order_items by store_id in the subscription 
+          // without a join, so we refresh orders to catch item changes
           fetchOrders();
         }
       )
@@ -67,7 +83,7 @@ export const OrdersScreen = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [store?.id]);
 
   const fetchStoreAndOrders = async () => {
     try {

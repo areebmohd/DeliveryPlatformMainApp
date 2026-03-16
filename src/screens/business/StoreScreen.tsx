@@ -67,9 +67,50 @@ export const StoreScreen = ({ navigation }: any) => {
   }, [navigation]);
 
   useEffect(() => {
-    if (store?.id && activeTab === 'products') {
+    if (!store?.id) return;
+
+    if (activeTab === 'products') {
       fetchProducts();
     }
+
+    // Subscribe to store changes
+    const storeChannel = supabase
+      .channel(`store-updates-${store.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'stores',
+          filter: `id=eq.${store.id}`,
+        },
+        (payload) => {
+          if (payload.new) setStore(payload.new);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to product changes for this store
+    const productsChannel = supabase
+      .channel(`product-updates-${store.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products',
+          filter: `store_id=eq.${store.id}`,
+        },
+        () => {
+          fetchProducts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(storeChannel);
+      supabase.removeChannel(productsChannel);
+    };
   }, [store?.id, activeTab]);
 
   const fetchStore = async () => {
@@ -281,7 +322,7 @@ export const StoreScreen = ({ navigation }: any) => {
                     <Icon name="package-variant" size={60} color={Colors.border} />
                   </View>
                   <Text style={styles.emptyTitle}>No Products Yet</Text>
-                  <Text style={styles.emptySubtitle}>Start adding items to your menu to begin selling.</Text>
+                  <Text style={styles.emptySubtitle}>Start adding store items to begin selling.</Text>
                   <Button 
                     title="Add Your First Product" 
                     onPress={() => handleNavigateToProductForm()}
@@ -490,7 +531,6 @@ const styles = StyleSheet.create({
   emptyProducts: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
   },
   emptyIconContainer: {
     width: 100,
@@ -499,7 +539,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.lg,
   },
   emptyTitle: {
     fontSize: 20,

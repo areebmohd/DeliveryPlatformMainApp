@@ -50,13 +50,33 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   useEffect(() => {
     fetchProducts();
     
-    // Add focus listener to refresh products when returning from form
+    // Add focus listener
     const unsubscribe = navigation.addListener('focus', () => {
       fetchProducts();
     });
 
-    return unsubscribe;
-  }, [navigation]);
+    // Subscribe to product changes for this store
+    const channel = supabase
+      .channel(`manage-products-${storeId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products',
+          filter: `store_id=eq.${storeId}`,
+        },
+        () => {
+          fetchProducts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      unsubscribe();
+      supabase.removeChannel(channel);
+    };
+  }, [navigation, storeId]);
 
   const fetchProducts = async () => {
     try {
