@@ -9,6 +9,9 @@ import { ManageProductsScreen } from '../screens/business/ManageProductsScreen';
 import { Colors } from '../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { NotificationsScreen } from '../screens/business/NotificationsScreen';
+import { PremiumScreen } from '../screens/business/PremiumScreen';
+import { DashboardScreen } from '../screens/business/DashboardScreen';
 import { ProductFormScreen } from '../screens/business/ProductFormScreen';
 import { StoreDetailsFormScreen } from '../screens/business/StoreDetailsFormScreen';
 
@@ -22,6 +25,17 @@ const StoreStack = () => {
       <Stack.Screen name="ManageProducts" component={ManageProductsScreen} />
       <Stack.Screen name="ProductForm" component={ProductFormScreen} />
       <Stack.Screen name="StoreDetailsForm" component={StoreDetailsFormScreen} />
+    </Stack.Navigator>
+  );
+};
+
+const AccountStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AccountMain" component={BusinessAccountScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Premium" component={PremiumScreen} />
+      <Stack.Screen name="Dashboard" component={DashboardScreen} />
     </Stack.Navigator>
   );
 };
@@ -57,7 +71,7 @@ export const BusinessNavigator = () => {
     >
       <Tab.Screen name="Store" component={StoreStack} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
-      <Tab.Screen name="Account" component={BusinessAccountScreen} />
+      <Tab.Screen name="Account" component={AccountStack} />
     </Tab.Navigator>
   );
 };
