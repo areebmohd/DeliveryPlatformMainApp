@@ -17,6 +17,7 @@ interface ProductCardProps {
     name: string;
     price: number;
     in_stock: boolean;
+    stock_quantity?: number;
     weight_kg?: number;
     category?: string;
     image_url?: string;
@@ -34,43 +35,59 @@ export const BusinessProductCard = ({
 }: ProductCardProps) => {
   return (
     <View style={styles.container}>
-      {product.image_url ? (
-        <Image source={{ uri: product.image_url }} style={styles.productImage} />
-      ) : (
-        <View style={[styles.productImage, styles.imagePlaceholder]}>
-          <Icon name="package-variant" size={24} color={Colors.textSecondary} />
-        </View>
-      )}
-      <View style={styles.info}>
-        <Text style={styles.name}>{product.name}</Text>
-        <Text style={styles.category}>{product.category || 'Standard'}</Text>
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>₹{product.price}</Text>
-          {product.weight_kg ? (
-            <Text style={styles.weight}> • {product.weight_kg} kg</Text>
-          ) : null}
+      <View style={styles.mainContent}>
+        {product.image_url ? (
+          <Image source={{ uri: product.image_url }} style={styles.productImage} />
+        ) : (
+          <View style={[styles.productImage, styles.imagePlaceholder]}>
+            <Icon name="package-variant" size={28} color={Colors.textSecondary} />
+          </View>
+        )}
+        
+        <View style={styles.info}>
+          <View>
+            <Text style={styles.name} numberOfLines={1}>{product.name}</Text>
+            <Text style={styles.category}>{product.category || 'General'}</Text>
+          </View>
+          
+          <View style={styles.detailsRow}>
+            <View style={styles.priceContainer}>
+              <Text style={styles.price}>₹{product.price}</Text>
+              {product.weight_kg ? (
+                <Text style={styles.weight}> / {product.weight_kg}kg</Text>
+              ) : null}
+            </View>
+            
+            {product.stock_quantity !== undefined && (
+              <View style={[styles.stockBadge, product.stock_quantity > 0 ? styles.inStockBadge : styles.outOfStockBadge]}>
+                <Text style={[styles.stockBadgeText, product.stock_quantity > 0 ? styles.inStockText : styles.outOfStockText]}>
+                  {product.stock_quantity} in stock
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
       
-      <View style={styles.actions}>
-        <View style={styles.stockToggle}>
-          <Text style={[styles.stockText, !product.in_stock && styles.outOfStockText]}>
-            {product.in_stock ? 'Live' : 'Off'}
-          </Text>
+      <View style={styles.footer}>
+        <View style={styles.stockToggleContainer}>
+          <Text style={styles.toggleLabel}>Online Status</Text>
           <Switch
             value={product.in_stock}
             onValueChange={() => onToggleStock(product.id, product.in_stock)}
             trackColor={{ false: Colors.border, true: Colors.primary }}
             thumbColor={Colors.white}
+            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
           />
         </View>
         
-        <View style={styles.iconButtons}>
-          <TouchableOpacity onPress={() => onEdit(product)} style={styles.iconButton}>
-            <Icon name="pencil" size={18} color={Colors.textSecondary} />
+        <View style={styles.actionButtons}>
+          <TouchableOpacity onPress={() => onEdit(product)} style={styles.actionButton}>
+            <Icon name="pencil-outline" size={20} color={Colors.text} />
+            <Text style={styles.actionButtonText}>Edit</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => onDelete(product.id)} style={styles.iconButton}>
-            <Icon name="delete-outline" size={18} color={Colors.error} />
+          <TouchableOpacity onPress={() => onDelete(product.id)} style={[styles.actionButton, styles.deleteButton]}>
+            <Icon name="trash-can-outline" size={20} color={Colors.error} />
           </TouchableOpacity>
         </View>
       </View>
@@ -81,30 +98,26 @@ export const BusinessProductCard = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.white,
-    borderRadius: borderRadius.lg,
+    borderRadius: 20,
+    marginBottom: Spacing.lg,
     padding: Spacing.md,
-    marginBottom: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
-    ...Platform.select({
-      ios: {
-        shadowColor: Colors.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  mainContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
   },
   productImage: {
-    width: 60,
-    height: 60,
-    borderRadius: borderRadius.md,
-    marginRight: Spacing.md,
+    width: 80,
+    height: 80,
+    borderRadius: 16,
     backgroundColor: Colors.surface,
   },
   imagePlaceholder: {
@@ -116,67 +129,106 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
+    marginLeft: Spacing.md,
+    justifyContent: 'space-between',
+    height: 80,
+    paddingVertical: 2,
   },
   name: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     color: Colors.text,
   },
   category: {
     fontSize: 12,
     color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '600',
     marginTop: 2,
+    textTransform: 'uppercase',
   },
-  priceRow: {
+  detailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'space-between',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
   price: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.primary,
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.black,
   },
   weight: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.textSecondary,
+    marginLeft: 2,
   },
-  actions: {
-    alignItems: 'flex-end',
-    marginLeft: Spacing.sm,
-  },
-  stockToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    backgroundColor: Colors.surface,
+  stockBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  stockText: {
+  inStockBadge: {
+    backgroundColor: Colors.success + '15',
+  },
+  outOfStockBadge: {
+    backgroundColor: Colors.error + '15',
+  },
+  stockBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
-    marginRight: 6,
-    textTransform: 'uppercase',
+  },
+  inStockText: {
+    color: Colors.success,
   },
   outOfStockText: {
     color: Colors.error,
   },
-  iconButtons: {
+  footer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F3F5',
   },
-  iconButton: {
-    marginLeft: 12,
-    padding: 6,
+  stockToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  toggleLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginRight: 8,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginLeft: Spacing.sm,
+  },
+  actionButtonText: {
+    marginLeft: 4,
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.black,
+  },
+  deleteButton: {
+    backgroundColor: Colors.error + '10',
+    paddingHorizontal: 10,
   },
 });
