@@ -20,7 +20,6 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { BusinessProductCard } from '../../components/BusinessProductCard';
 
 const { width } = Dimensions.get('window');
-const BANNER_HEIGHT = width * (9 / 16); // 16:9 Aspect ratio
 
 type TabType = 'products' | 'info';
 
@@ -31,19 +30,15 @@ export const StoreScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<TabType>('products');
   const insets = useSafeAreaInsets();
 
-  // Products state
   const [products, setProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
 
   useEffect(() => {
     fetchStore();
-    
-    // Add focus listener to refresh data when returning from form
     const unsubscribe = navigation.addListener('focus', () => {
       fetchStore();
       fetchProducts();
     });
-
     return unsubscribe;
   }, [navigation]);
 
@@ -155,7 +150,7 @@ export const StoreScreen = ({ navigation }: any) => {
   }
 
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: Spacing.sm }]}>
       <Text style={styles.headerTitle}>My Store</Text>
       <TouchableOpacity 
         style={styles.editButton}
@@ -297,11 +292,9 @@ export const StoreScreen = ({ navigation }: any) => {
           )}
         </View>
         
-        {/* Spacing for FAB */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Modern FAB */}
       <TouchableOpacity 
         style={[styles.fab, { bottom: 20 + insets.bottom }]} 
         onPress={() => handleNavigateToProductForm()}
@@ -332,15 +325,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   header: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.xs,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.white,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
     color: Colors.text,
   },
@@ -359,7 +351,7 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     width: '100%',
-    padding: Spacing.md,
+    padding: Spacing.sm,
   },
   banner: {
     width: '100%',
@@ -380,9 +372,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   storeBasicInfo: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
   storeName: {
     fontSize: 28,
@@ -418,7 +410,7 @@ const styles = StyleSheet.create({
   },
   tabWrapper: {
     backgroundColor: '#F8F9FA',
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.sm,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -449,7 +441,7 @@ const styles = StyleSheet.create({
     color: Colors.black,
   },
   tabContent: {
-    padding: Spacing.md,
+    padding: Spacing.sm,
   },
   productsContainer: {
     flex: 1,

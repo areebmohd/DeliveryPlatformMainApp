@@ -71,7 +71,7 @@ export const BusinessProductCard = ({
       
       <View style={styles.footer}>
         <View style={styles.stockToggleContainer}>
-          <Text style={styles.toggleLabel}>Online Status</Text>
+          <Text style={styles.toggleLabel}>Available</Text>
           <Switch
             value={product.in_stock}
             onValueChange={() => onToggleStock(product.id, product.in_stock)}
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.white,
     borderRadius: 20,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md, // Reduced from LG
     padding: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,

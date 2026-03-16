@@ -4,7 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { supabase } from './src/api/supabase';
 import { Session } from '@supabase/supabase-js';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, StatusBar } from 'react-native';
 import { Colors } from './src/theme/colors';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -36,6 +36,7 @@ function AppContent() {
 
   return (
     <NavigationContainer>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       {session ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
