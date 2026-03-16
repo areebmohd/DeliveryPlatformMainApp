@@ -6,11 +6,11 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
+import { AlertModal } from '../../components/ui/AlertModal';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -22,6 +22,28 @@ export const OrdersScreen = () => {
   const { user } = useAuth();
   const [store, setStore] = useState<any>(null);
   const insets = useSafeAreaInsets();
+
+  // Alert Modal state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    primaryAction?: any;
+    secondaryAction?: any;
+    showCancel?: boolean;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  const showAlert = (config: any) => {
+    setAlertConfig({ visible: true, ...config });
+  };
+
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
 
   useEffect(() => {
     fetchStoreAndOrders();
@@ -102,71 +124,72 @@ export const OrdersScreen = () => {
         .eq('id', orderId);
 
       if (error) throw error;
-      Alert.alert('Status Updated', `Order is now ${newStatus.replace('_', ' ')}`);
+      showAlert({ 
+        title: 'Status Updated', 
+        message: `Order is now ${newStatus.replace('_', ' ')}`,
+        type: 'success'
+      });
       fetchOrders();
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     }
   };
 
   const handleRemoveItem = async (order: any, itemToRemove: any) => {
     const activeItemsCount = order.order_items?.filter((i: any) => !i.is_removed).length || 0;
     if (activeItemsCount <= 1) {
-      Alert.alert('Cannot Remove', 'Order must have at least one item. Consider cancelling the order instead.');
+      showAlert({
+        title: 'Cannot Remove',
+        message: 'Order must have at least one item. Consider cancelling the order instead.',
+        type: 'warning'
+      });
       return;
     }
 
-    Alert.alert(
-      'Remove Item',
-      `Are you sure you want to remove ${itemToRemove.product_name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              // 1. Mark item as removed
-              const { error: itemError } = await supabase
-                .from('order_items')
-                .update({ is_removed: true })
-                .eq('id', itemToRemove.id);
+    showAlert({
+      title: 'Remove Item',
+      message: `Are you sure you want to remove ${itemToRemove.product_name} from this order?`,
+      type: 'warning',
+      primaryAction: {
+        text: 'Remove',
+        onPress: async () => {
+          try {
+            setLoading(true);
+            const { error: itemError } = await supabase
+              .from('order_items')
+              .update({ is_removed: true })
+              .eq('id', itemToRemove.id);
 
-              if (itemError) throw itemError;
+            if (itemError) throw itemError;
 
-              // 2. Recalculate totals
-              const remainingItems = order.order_items.filter((i: any) => i.id !== itemToRemove.id && !i.is_removed);
-              const newSubtotal = remainingItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
-              
-              // Only recalculate fees if NOT prepaid (payment_status pending)
-              // Since fees are static for now, they don't change unless items go to 0
-              const deliveryFee = 25;
-              const platformFee = 2;
-              const newTotal = newSubtotal + deliveryFee + platformFee;
+            const remainingItems = order.order_items.filter((i: any) => i.id !== itemToRemove.id && !i.is_removed);
+            const newSubtotal = remainingItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
+            
+            const deliveryFee = 25;
+            const platformFee = 2;
+            const newTotal = newSubtotal + deliveryFee + platformFee;
 
-              // 3. Update Order
-              const { error: orderError } = await supabase
-                .from('orders')
-                .update({
-                  subtotal: newSubtotal,
-                  total_amount: newTotal,
-                })
-                .eq('id', order.id);
+            const { error: orderError } = await supabase
+              .from('orders')
+              .update({
+                subtotal: newSubtotal,
+                total_amount: newTotal,
+              })
+              .eq('id', order.id);
 
-              if (orderError) throw orderError;
+            if (orderError) throw orderError;
 
-              Alert.alert('Success', 'Item removed and order total updated.');
-              fetchOrders();
-            } catch (e: any) {
-              Alert.alert('Error', e.message);
-            } finally {
-              setLoading(false);
-            }
+            showAlert({ title: 'Success', message: 'Item removed and order total updated.', type: 'success' });
+            fetchOrders();
+          } catch (e: any) {
+            showAlert({ title: 'Error', message: e.message, type: 'error' });
+          } finally {
+            setLoading(false);
           }
-        }
-      ]
-    );
+        },
+        variant: 'destructive',
+      }
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -295,8 +318,17 @@ export const OrdersScreen = () => {
           }
         />
       )}
+      <AlertModal
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={closeAlert}
+        primaryAction={alertConfig.primaryAction}
+        secondaryAction={alertConfig.secondaryAction}
+      />
     </View>
-  );
+);
 };
 
 const styles = StyleSheet.create({

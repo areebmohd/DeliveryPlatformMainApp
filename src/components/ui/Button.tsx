@@ -67,7 +67,7 @@ export const Button = ({
 const styles = StyleSheet.create({
   base: {
     height: 56,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
     marginVertical: Spacing.sm,
@@ -76,22 +76,22 @@ const styles = StyleSheet.create({
   primary: {
     backgroundColor: Colors.primary,
     shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   secondary: {
     backgroundColor: Colors.secondary,
   },
   outline: {
     backgroundColor: 'transparent',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: Colors.primary,
   },
   textBase: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
   primaryText: {
@@ -101,6 +101,9 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   disabled: {
-    opacity: 0.6,
+    opacity: 0.5,
+    backgroundColor: Colors.border,
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });

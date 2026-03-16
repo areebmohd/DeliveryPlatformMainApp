@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   Modal,
-  Alert,
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
@@ -14,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { AlertModal } from '../../components/ui/AlertModal';
 import { BusinessProductCard } from '../../components/BusinessProductCard';
 import { supabase } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -23,6 +23,29 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
+
+  // Alert Modal state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    primaryAction?: any;
+    secondaryAction?: any;
+    verticalButtons?: boolean;
+    showCancel?: boolean;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  const showAlert = (config: any) => {
+    setAlertConfig({ visible: true, ...config });
+  };
+
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
 
   useEffect(() => {
     fetchProducts();
@@ -62,21 +85,21 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
       return;
     }
 
-    Alert.alert(
-      'Add Product',
-      'Choose product type:',
-      [
-        {
-          text: 'Manual Product',
-          onPress: () => navigation.navigate('ProductForm', { storeId, mode: 'manual' }),
-        },
-        {
-          text: 'Barcode Product',
-          onPress: () => navigation.navigate('ProductForm', { storeId, mode: 'barcode' }),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    showAlert({
+      title: 'Add Product',
+      message: 'Choose how to add your product. Scanning a barcode is faster!',
+      type: 'info',
+      verticalButtons: true,
+      primaryAction: {
+        text: 'Barcode Product',
+        onPress: () => navigation.navigate('ProductForm', { storeId, mode: 'barcode' }),
+      },
+      secondaryAction: {
+        text: 'Manual Product',
+        onPress: () => navigation.navigate('ProductForm', { storeId, mode: 'manual' }),
+        variant: 'outline',
+      },
+    });
   };
 
   const handleToggleStock = async (id: string, currentStatus: boolean) => {
@@ -91,34 +114,32 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
         p.id === id ? { ...p, in_stock: !currentStatus } : p
       ));
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     }
   };
 
   const handleDeleteProduct = (id: string) => {
-    Alert.alert(
-      'Delete Product',
-      'Are you sure you want to delete this product?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('products')
-                .delete()
-                .eq('id', id);
-              if (error) throw error;
-              fetchProducts();
-            } catch (e: any) {
-              Alert.alert('Error', e.message);
-            }
+    showAlert({
+      title: 'Delete Product',
+      message: 'Are you sure you want to delete this product? All its data will be removed permanently.',
+      type: 'warning',
+      primaryAction: {
+        text: 'Delete',
+        onPress: async () => {
+          try {
+            const { error } = await supabase
+              .from('products')
+              .delete()
+              .eq('id', id);
+            if (error) throw error;
+            fetchProducts();
+          } catch (e: any) {
+            showAlert({ title: 'Error', message: e.message, type: 'error' });
           }
-        }
-      ]
-    );
+        },
+        variant: 'destructive',
+      }
+    });
   };
 
   return (
@@ -164,6 +185,17 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
           }
         />
       )}
+
+      <AlertModal
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={closeAlert}
+        primaryAction={alertConfig.primaryAction}
+        secondaryAction={alertConfig.secondaryAction}
+        verticalButtons={alertConfig.verticalButtons}
+      />
     </View>
   );
 };

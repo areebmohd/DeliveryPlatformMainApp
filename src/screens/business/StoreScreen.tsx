@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   ActivityIndicator,
   Image,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
+import { AlertModal } from '../../components/ui/AlertModal';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
@@ -32,6 +32,30 @@ export const StoreScreen = ({ navigation }: any) => {
 
   const [products, setProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+
+  // Alert Modal state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    primaryAction?: any;
+    secondaryAction?: any;
+    tertiaryAction?: any;
+    verticalButtons?: boolean;
+    showCancel?: boolean;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  const showAlert = (config: any) => {
+    setAlertConfig({ visible: true, ...config });
+  };
+
+  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
 
   useEffect(() => {
     fetchStore();
@@ -98,21 +122,21 @@ export const StoreScreen = ({ navigation }: any) => {
       return;
     }
 
-    Alert.alert(
-      'Add Product',
-      'Choose product type:',
-      [
-        {
-          text: 'Manual Product',
-          onPress: () => navigation.navigate('ProductForm', { storeId: store.id, mode: 'manual' }),
-        },
-        {
-          text: 'Barcode Product',
-          onPress: () => navigation.navigate('ProductForm', { storeId: store.id, mode: 'barcode' }),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    showAlert({
+      title: 'Add Product',
+      message: 'Select how you want to add this product. Barcode products pre-fill details automatically.',
+      type: 'info',
+      verticalButtons: true,
+      primaryAction: {
+        text: 'Barcode Product',
+        onPress: () => navigation.navigate('ProductForm', { storeId: store.id, mode: 'barcode' }),
+      },
+      secondaryAction: {
+        text: 'Manual Product',
+        onPress: () => navigation.navigate('ProductForm', { storeId: store.id, mode: 'manual' }),
+        variant: 'outline',
+      },
+    });
   };
 
   const handleToggleStock = async (id: string, currentStatus: boolean) => {
@@ -127,18 +151,25 @@ export const StoreScreen = ({ navigation }: any) => {
         p.id === id ? { ...p, in_stock: !currentStatus } : p
       ));
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     }
   };
 
   const handleDeleteProduct = (id: string) => {
-    Alert.alert('Delete', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        const { error } = await supabase.from('products').delete().eq('id', id);
-        if (!error) fetchProducts();
-      }},
-    ]);
+    showAlert({
+      title: 'Delete Product',
+      message: 'Are you sure you want to remove this item from your inventory? This cannot be undone.',
+      type: 'warning',
+      primaryAction: {
+        text: 'Delete',
+        onPress: async () => {
+          const { error } = await supabase.from('products').delete().eq('id', id);
+          if (!error) fetchProducts();
+          else showAlert({ title: 'Error', message: 'Could not delete product.', type: 'error' });
+        },
+        variant: 'destructive',
+      },
+    });
   };
 
   if (loading) {
@@ -304,6 +335,18 @@ export const StoreScreen = ({ navigation }: any) => {
           <Text style={styles.fabText}>Add Product</Text>
         </View>
       </TouchableOpacity>
+
+      <AlertModal
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={closeAlert}
+        primaryAction={alertConfig.primaryAction}
+        secondaryAction={alertConfig.secondaryAction}
+        verticalButtons={alertConfig.verticalButtons}
+        showCancel={alertConfig.showCancel}
+      />
     </View>
   );
 };
@@ -331,7 +374,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: Colors.text,
   },
@@ -442,7 +485,7 @@ const styles = StyleSheet.create({
   },
   productsContainer: {
     flex: 1,
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
   },
   emptyProducts: {
     alignItems: 'center',
@@ -476,6 +519,7 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     flex: 1,
+    paddingHorizontal: Spacing.xs,
   },
   infoCard: {
     backgroundColor: Colors.white,

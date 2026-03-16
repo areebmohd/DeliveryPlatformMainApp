@@ -14,6 +14,7 @@ import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { supabase, uploadImage } from '../../api/supabase';
+import { AlertModal } from '../../components/ui/AlertModal';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useAuth } from '../../context/AuthContext';
@@ -37,6 +38,24 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [stockQuantity, setStockQuantity] = useState(product?.stock_quantity?.toString() || '0');
   const [isBarcodeMatched, setIsBarcodeMatched] = useState(false);
   const [searchingBarcode, setSearchingBarcode] = useState(false);
+
+  // Alert Modal state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  const showAlert = (title: string, message: string, type: any = 'info', onConfirm?: () => void) => {
+    setAlertConfig({ visible: true, title, message, type, onConfirm });
+  };
 
   const isEditing = !!product;
   const isBarcodeMode = mode === 'barcode';
@@ -62,20 +81,20 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         setCategory(data.category || '');
         setImageUrl(data.image_url || '');
         setIsBarcodeMatched(true);
-        Alert.alert('Product Found', 'Product details have been pre-filled and locked.');
+        showAlert('Product Found', 'Product details have been pre-filled and locked.', 'success');
       } else {
         setIsBarcodeMatched(false);
-        Alert.alert('Not Found', 'Generic product not found. You can enter details manually.');
+        showAlert('Not Found', 'Generic product not found. You can enter details manually.', 'warning');
       }
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showAlert('Error', e.message, 'error');
     } finally {
       setSearchingBarcode(false);
     }
   };
 
   const pickImage = async () => {
-    if (isBarcodeMatched && !isEditing) return; // Lock image pick if barcode matched
+    if (isBarcodeMatched && !isEditing) return;
     const result = await launchImageLibrary({
       mediaType: 'photo',
       includeBase64: true,
@@ -94,7 +113,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       const publicUrl = await uploadImage('products', fileName, base64);
       setImageUrl(publicUrl);
     } catch (error: any) {
-      Alert.alert('Upload Failed', error.message || 'Could not upload image');
+      showAlert('Upload Failed', error.message || 'Could not upload image', 'error');
     } finally {
       setIsUploadingImage(false);
     }
@@ -102,7 +121,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
   const handleSaveProduct = async () => {
     if (!name || !price) {
-      Alert.alert('Error', 'Name and price are required');
+      showAlert('Required Fields', 'Please enter product name and price.', 'warning');
       return;
     }
 
@@ -134,124 +153,153 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         if (error) throw error;
       }
 
-      navigation.goBack();
+      showAlert('Success', isEditing ? 'Product updated!' : 'Product added!', 'success', () => {
+        navigation.goBack();
+      });
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showAlert('Error', e.message, 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>
-          {isEditing ? 'Edit Product' : 'Add New Product'}
+        <Text style={styles.headerTitle}>
+          {isEditing ? 'Edit Product' : 'Add Product'}
         </Text>
         <View style={{ width: 40 }} /> 
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {(isBarcodeMode || barcode) && (
-          <View style={styles.barcodeSection}>
-            <Input
-              label="Barcode Number"
-              placeholder="Scan or enter barcode"
-              value={barcode}
-              onChangeText={setBarcode}
-              keyboardType="numeric"
-              editable={!isEditing && !isBarcodeMatched}
-            />
-            {!isEditing && !isBarcodeMatched && (
-              <Button 
-                title="Lookup Product" 
-                onPress={handleBarcodeLookup} 
-                loading={searchingBarcode}
-                style={styles.lookupButton}
-                variant="outline"
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Identification</Text>
+          {(isBarcodeMode || barcode) && (
+            <View style={styles.barcodeWrapper}>
+              <Input
+                label="Barcode"
+                placeholder="Scan or enter barcode"
+                value={barcode}
+                onChangeText={setBarcode}
+                keyboardType="numeric"
+                editable={!isEditing && !isBarcodeMatched}
               />
-            )}
+              {!isEditing && !isBarcodeMatched && (
+                <Button 
+                  title="Search Barcode" 
+                  onPress={handleBarcodeLookup} 
+                  loading={searchingBarcode}
+                  variant="outline"
+                  style={styles.lookupButton}
+                />
+              )}
+            </View>
+          )}
+
+          <View style={styles.imageSection}>
+            <TouchableOpacity 
+              style={styles.imagePicker} 
+              onPress={pickImage}
+              disabled={isUploadingImage || (isBarcodeMatched && !isEditing)}
+            >
+              {imageUrl ? (
+                <Image source={{ uri: imageUrl }} style={styles.pickedImage} />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Icon name="camera-plus" size={32} color={Colors.textSecondary} />
+                  <Text style={styles.imagePlaceholderText}>Upload Product Image</Text>
+                </View>
+              )}
+              {isUploadingImage && (
+                <View style={styles.uploadOverlay}>
+                  <ActivityIndicator color={Colors.primary} />
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
-        )}
+        </View>
 
-        <Text style={styles.inputLabel}>Product Image</Text>
-        <TouchableOpacity 
-          style={styles.imagePickerButton} 
-          onPress={pickImage}
-          disabled={isUploadingImage || (isBarcodeMatched && !isEditing)}
-        >
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.pickedImage} />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Icon name="camera-plus" size={32} color={Colors.textSecondary} />
-              <Text style={styles.imagePlaceholderText}>Upload Product Image</Text>
-            </View>
-          )}
-          {isUploadingImage && (
-            <View style={styles.uploadOverlay}>
-              <ActivityIndicator color={Colors.primary} />
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Product Details</Text>
+          <Input
+            label="Name"
+            placeholder="e.g. Milk 1L"
+            value={name}
+            onChangeText={setName}
+            editable={!isBarcodeMatched || isEditing}
+          />
+          <Input
+            label="Category"
+            placeholder="Dairy, Snacks, etc."
+            value={category}
+            onChangeText={setCategory}
+            editable={!isBarcodeMatched || isEditing}
+          />
+          <Input
+            label="Description"
+            placeholder="Details..."
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={3}
+            editable={!isBarcodeMatched || isEditing}
+          />
+        </View>
 
-        <Input
-          label="Product Name"
-          placeholder="e.g. Fresh Milk 1L"
-          value={name}
-          onChangeText={setName}
-          editable={!isBarcodeMatched || isEditing}
-        />
-        <Input
-          label="Price (₹)"
-          placeholder="0.00"
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="numeric"
-          editable={!isBarcodeMatched || isEditing}
-        />
-        <Input
-          label="Weight (kg)"
-          placeholder="0.5"
-          value={weight}
-          onChangeText={setWeight}
-          keyboardType="numeric"
-          editable={!isBarcodeMatched || isEditing}
-        />
-        <Input
-          label="Category"
-          placeholder="Dairy, Snacks, etc."
-          value={category}
-          onChangeText={setCategory}
-          editable={!isBarcodeMatched || isEditing}
-        />
-        <Input
-          label="Product Stock"
-          placeholder="0"
-          value={stockQuantity}
-          onChangeText={setStockQuantity}
-          keyboardType="numeric"
-        />
-        <Input
-          label="Description"
-          placeholder="Product details..."
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          editable={!isBarcodeMatched || isEditing}
-        />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Pricing & Inventory</Text>
+          <View style={styles.row}>
+            <Input
+              label="Price (₹)"
+              placeholder="0.00"
+              value={price}
+              onChangeText={setPrice}
+              keyboardType="numeric"
+              containerStyle={{ flex: 1, marginRight: Spacing.sm }}
+              editable={!isBarcodeMatched || isEditing}
+            />
+            <Input
+              label="Stock"
+              placeholder="0"
+              value={stockQuantity}
+              onChangeText={setStockQuantity}
+              keyboardType="numeric"
+              containerStyle={{ flex: 1 }}
+            />
+          </View>
+          <Input
+            label="Weight (kg)"
+            placeholder="0.5"
+            value={weight}
+            onChangeText={setWeight}
+            keyboardType="numeric"
+            editable={!isBarcodeMatched || isEditing}
+          />
+        </View>
 
         <Button
-          title={isEditing ? "Update Product" : "Add Product"}
+          title={isEditing ? "Save Changes" : "Confirm Product"}
           onPress={handleSaveProduct}
           loading={loading}
           style={styles.submitButton}
         />
       </ScrollView>
+
+      <AlertModal
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        primaryAction={alertConfig.onConfirm ? {
+          text: 'Confirm',
+          onPress: alertConfig.onConfirm,
+        } : undefined}
+      />
     </View>
   );
 };
@@ -259,43 +307,70 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
   },
-  backButton: {
-    padding: 4,
-  },
-  title: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: Colors.text,
   },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: Colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
   scrollContent: {
-    padding: Spacing.lg,
+    padding: Spacing.md,
     paddingBottom: 40,
   },
-  inputLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 8,
+  section: {
+    backgroundColor: Colors.white,
+    borderRadius: borderRadius.xl,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
   },
-  imagePickerButton: {
-    width: '100%',
-    height: 200,
-    backgroundColor: Colors.surface,
-    borderRadius: borderRadius.md,
-    marginBottom: Spacing.lg,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: Spacing.md,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  imageSection: {
+    alignItems: 'center',
+    marginVertical: Spacing.sm,
+  },
+  imagePicker: {
+    width: 140,
+    height: 140,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderWidth: 2,
+    borderColor: Colors.primary,
     borderStyle: 'dashed',
   },
   pickedImage: {
@@ -303,15 +378,13 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   imagePlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
   },
   imagePlaceholderText: {
-    marginTop: 8,
-    color: Colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
+    marginTop: 4,
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   uploadOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -319,19 +392,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  submitButton: {
-    marginTop: Spacing.xl,
+  row: {
+    flexDirection: 'row',
   },
-  barcodeSection: {
-    marginBottom: Spacing.lg,
-    padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  barcodeWrapper: {
+    marginBottom: Spacing.md,
   },
   lookupButton: {
+    height: 44,
     marginTop: -8,
-    marginBottom: 8,
+  },
+  submitButton: {
+    marginTop: Spacing.md,
+    elevation: 4,
   },
 });
