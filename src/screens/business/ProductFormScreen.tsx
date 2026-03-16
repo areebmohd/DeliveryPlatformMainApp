@@ -24,18 +24,18 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   
-  const [loading, setLoading] = useState(false);
   const [name, setName] = useState(product?.name || '');
   const [description, setDescription] = useState(product?.description || '');
   const [price, setPrice] = useState(product?.price?.toString() || '');
   const [weight, setWeight] = useState(product?.weight_kg?.toString() || '');
   const [category, setCategory] = useState(product?.category || '');
   const [imageUrl, setImageUrl] = useState(product?.image_url || '');
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [stockQuantity, setStockQuantity] = useState(product?.stock_quantity?.toString() || '0');
+  const [inStock, setInStock] = useState(product?.in_stock !== false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Barcode & Stock states
   const [barcode, setBarcode] = useState(product?.barcode || '');
-  const [stockQuantity, setStockQuantity] = useState(product?.stock_quantity?.toString() || '0');
   const [isBarcodeMatched, setIsBarcodeMatched] = useState(false);
   const [searchingBarcode, setSearchingBarcode] = useState(false);
   const [hasSearchedBarcode, setHasSearchedBarcode] = useState(false);
@@ -97,31 +97,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
   const canEditDetails = isEditing || !isBarcodeMode || (hasSearchedBarcode && !isBarcodeMatched);
 
-  const pickImage = async () => {
-    if (!canEditDetails) return;
-    const result = await launchImageLibrary({
-      mediaType: 'photo',
-      includeBase64: true,
-      quality: 0.7,
-    });
-
-    if (result.didCancel || !result.assets || result.assets.length === 0) return;
-
-    const asset = result.assets[0];
-    const base64 = asset.base64;
-    if (!base64) return;
-
-    try {
-      setIsUploadingImage(true);
-      const fileName = `${user?.id}_p_${Date.now()}.jpg`;
-      const publicUrl = await uploadImage('products', fileName, base64);
-      setImageUrl(publicUrl);
-    } catch (error: any) {
-      showAlert('Upload Failed', error.message || 'Could not upload image', 'error');
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
+  // Removed pickImage function
 
   const handleSaveProduct = async () => {
     if (!name || !price) {
@@ -130,18 +106,35 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     }
 
     try {
-      setLoading(true);
+      setIsLoading(true);
+
+      // 1. Search for existing image by name if current imageUrl is empty
+      let finalImageUrl = imageUrl;
+      if (!finalImageUrl && name) {
+        const { data: existingProducts } = await supabase
+          .from('products')
+          .select('image_url')
+          .eq('name', name.trim())
+          .not('image_url', 'is', null)
+          .limit(1);
+        
+        if (existingProducts && existingProducts.length > 0) {
+          finalImageUrl = existingProducts[0].image_url;
+        }
+      }
+
       const productData = {
         store_id: storeId,
-        name,
-        description,
+        name: name.trim(),
+        description: description.trim(),
         price: parseFloat(price),
         weight_kg: weight ? parseFloat(weight) : 0,
-        category,
-        image_url: imageUrl,
-        in_stock: parseInt(stockQuantity) > 0,
-        barcode: barcode || null,
-        stock_quantity: parseInt(stockQuantity) || 0,
+        category: category.trim(),
+        image_url: finalImageUrl,
+        barcode: barcode.trim() || null,
+        stock_quantity: parseInt(stockQuantity),
+        in_stock: inStock,
+        updated_at: new Date().toISOString(),
       };
 
       if (isEditing) {
@@ -163,7 +156,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     } catch (e: any) {
       showAlert('Error', e.message, 'error');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -204,27 +197,24 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          <View style={styles.imageSection}>
-            <TouchableOpacity 
-              style={[styles.imagePicker, !canEditDetails && styles.disabledPicker]} 
-              onPress={pickImage}
-              disabled={isUploadingImage || !canEditDetails}
-            >
-              {imageUrl ? (
-                <Image source={{ uri: imageUrl }} style={styles.pickedImage} />
-              ) : (
-                <View style={styles.imagePlaceholder}>
-                  <Icon name="camera-plus" size={32} color={Colors.textSecondary} />
-                  <Text style={styles.imagePlaceholderText}>Upload Product Image</Text>
-                </View>
-              )}
-              {isUploadingImage && (
-                <View style={styles.uploadOverlay}>
-                  <ActivityIndicator color={Colors.primary} />
-                </View>
-              )}
-            </TouchableOpacity>
+          <View style={styles.inputContainer}>
+          <Text style={styles.label}>Product Image</Text>
+          <View style={[styles.imagePreviewContainer, !canEditDetails && styles.disabledInput]}>
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={styles.previewImage} />
+            ) : (
+              <View style={styles.placeholderContainer}>
+                <Icon name="image-search" size={40} color={Colors.textSecondary} />
+                <Text style={styles.placeholderText}>
+                  {name ? `Searching library for "${name}"...` : "Image will be added by Admin"}
+                </Text>
+              </View>
+            )}
           </View>
+          <Text style={styles.helperText}>
+            Images are managed globally. If a matching product image is found in our library, it will be added automatically.
+          </Text>
+        </View>
         </View>
 
         <View style={styles.section}>
@@ -288,7 +278,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         <Button
           title={isEditing ? "Save Changes" : "Confirm Product"}
           onPress={handleSaveProduct}
-          loading={loading}
+          loading={isLoading}
           style={styles.submitButton}
         />
       </ScrollView>
@@ -361,44 +351,50 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-  imageSection: {
-    alignItems: 'center',
-    marginVertical: Spacing.sm,
+  inputContainer: {
+    marginBottom: Spacing.md,
   },
-  imagePicker: {
-    width: 140,
-    height: 140,
-    borderRadius: 10,
-    backgroundColor: Colors.primaryLight,
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: Spacing.xs,
+  },
+  imagePreviewContainer: {
+    height: 200,
+    borderRadius: borderRadius.lg,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    borderStyle: 'dashed',
   },
-  disabledPicker: {
-    backgroundColor: '#F1F3F5',
-    borderColor: Colors.border,
-  },
-  pickedImage: {
+  previewImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
-  imagePlaceholder: {
+  placeholderContainer: {
     alignItems: 'center',
+    padding: Spacing.md,
   },
-  imagePlaceholderText: {
-    marginTop: 4,
-    color: Colors.primary,
+  placeholderText: {
+    marginTop: Spacing.sm,
+    color: Colors.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  helperText: {
     fontSize: 12,
-    fontWeight: '700',
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+    fontStyle: 'italic',
   },
-  uploadOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  disabledInput: {
+    backgroundColor: '#F1F3F5',
+    opacity: 0.7,
   },
   row: {
     flexDirection: 'row',

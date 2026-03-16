@@ -15,7 +15,7 @@ import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../context/AuthContext';
-import { supabase, uploadImage } from '../../api/supabase';
+import { supabase, uploadImage, deleteFile } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 
@@ -77,6 +77,12 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
 
     try {
       setIsUploadingBanner(true);
+      
+      // Delete old banner if exists
+      if (bannerUrl) {
+        await deleteFile('banners', bannerUrl);
+      }
+
       const fileName = `${user?.id}_b_${Date.now()}.jpg`;
       const publicUrl = await uploadImage('banners', fileName, base64);
       setBannerUrl(publicUrl);
