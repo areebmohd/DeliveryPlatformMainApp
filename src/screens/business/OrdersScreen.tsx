@@ -268,11 +268,6 @@ export const OrdersScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Text style={styles.title}>Manage Orders</Text>
-        <Text style={styles.subtitle}>{store?.name || 'Store Dashboard'}</Text>
-      </View>
-
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -282,6 +277,12 @@ export const OrdersScreen = () => {
           data={orders}
           renderItem={renderOrderItem}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            <View style={[styles.header, { paddingTop: insets.top }]}>
+              <Text style={styles.title}>Manage Orders</Text>
+              <Text style={styles.subtitle}>{store?.name || 'Store Dashboard'}</Text>
+            </View>
+          }
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
@@ -304,8 +305,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingBottom: Spacing.md,
   },
   title: {
     fontSize: 22,

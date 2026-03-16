@@ -43,11 +43,10 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Text style={styles.title}>Business Account</Text>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <Text style={styles.title}>Business Account</Text>
+        </View>
         {/* Box 1: Profile */}
         <View style={styles.card}>
           <View style={styles.profileInfo}>
@@ -117,8 +116,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingBottom: Spacing.md,
   },
   scrollContent: {
     padding: Spacing.md,

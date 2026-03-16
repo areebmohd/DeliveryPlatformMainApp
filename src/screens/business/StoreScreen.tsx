@@ -150,13 +150,13 @@ export const StoreScreen = ({ navigation }: any) => {
   }
 
   const renderHeader = () => (
-    <View style={[styles.header, { paddingTop: Spacing.sm }]}>
+    <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
       <Text style={styles.headerTitle}>My Store</Text>
       <TouchableOpacity 
         style={styles.editButton}
         onPress={handleNavigateToStoreForm}
       >
-        <Icon name="cog-outline" size={22} color={Colors.text} />
+        <Icon name="cog-outline" size={22} color={Colors.black} />
       </TouchableOpacity>
     </View>
   );
@@ -214,14 +214,13 @@ export const StoreScreen = ({ navigation }: any) => {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {renderHeader()}
-      
+    <View style={styles.container}>
       <ScrollView 
-        stickyHeaderIndices={[2]}
+        stickyHeaderIndices={[3]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {renderHeader()}
         {renderBanner()}
         
         <View style={{ height: 10 }} />
@@ -337,14 +336,12 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   editButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: Colors.surface,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   scrollContent: {
     flexGrow: 1,
@@ -374,7 +371,6 @@ const styles = StyleSheet.create({
   storeBasicInfo: {
     paddingHorizontal: Spacing.sm,
     paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xs,
   },
   storeName: {
     fontSize: 28,
@@ -411,6 +407,7 @@ const styles = StyleSheet.create({
   tabWrapper: {
     backgroundColor: '#F8F9FA',
     paddingHorizontal: Spacing.sm,
+    paddingBottom: Spacing.sm,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -445,6 +442,7 @@ const styles = StyleSheet.create({
   },
   productsContainer: {
     flex: 1,
+    paddingHorizontal: Spacing.sm,
   },
   emptyProducts: {
     alignItems: 'center',
@@ -522,10 +520,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
     elevation: 8,
   },
   fabGradient: {

@@ -11,7 +11,7 @@ export const Colors = {
   warning: '#F59E0B',
   white: '#FFFFFF',
   black: '#000000',
-  primaryLight: '#FFFBE6', // Very light yellow for icon backgrounds
+  primaryLight: '#FFF0B3', // Even more saturated light yellow for better contrast
   glass: 'rgba(255, 255, 255, 0.8)',
 };
 
