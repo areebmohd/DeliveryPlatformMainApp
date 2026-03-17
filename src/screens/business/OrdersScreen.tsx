@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -50,34 +51,10 @@ export const OrdersScreen = () => {
 
     if (!store?.id) return;
 
-    // Subscribe to real-time order and item updates for this store
     const channel = supabase
       .channel(`store-orders-sync-${store.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-          filter: `store_id=eq.${store.id}`,
-        },
-        () => {
-          fetchOrders();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'order_items',
-        },
-        () => {
-          // We can't easily filter order_items by store_id in the subscription 
-          // without a join, so we refresh orders to catch item changes
-          fetchOrders();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `store_id=eq.${store.id}` }, () => fetchOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => fetchOrders())
       .subscribe();
 
     return () => {
@@ -88,7 +65,6 @@ export const OrdersScreen = () => {
   const fetchStoreAndOrders = async () => {
     try {
       setLoading(true);
-      // 1. Get store owned by user
       const { data: storeData, error: storeError } = await supabase
         .from('stores')
         .select('id, name')
@@ -97,8 +73,6 @@ export const OrdersScreen = () => {
 
       if (storeError) throw storeError;
       setStore(storeData);
-
-      // 2. Fetch orders for this store
       await fetchOrders(storeData.id);
     } catch (e) {
       console.error('Error fetching store/orders:', e);
@@ -123,7 +97,11 @@ export const OrdersScreen = () => {
       .order('created_at', { ascending: false });
 
     if (error) console.error('Error fetching orders:', error);
-    else setOrders(data || []);
+    else {
+      // Filter for active orders only
+      const activeOrders = (data || []).filter((o: any) => !['delivered', 'cancelled'].includes(o.status));
+      setOrders(activeOrders);
+    }
   };
 
   const onRefresh = async () => {
@@ -167,7 +145,6 @@ export const OrdersScreen = () => {
         onPress: async () => {
           try {
             setLoading(true);
-            // 1. Mark item as removed
             const { error: itemError } = await supabase
               .from('order_items')
               .update({ is_removed: true })
@@ -176,7 +153,6 @@ export const OrdersScreen = () => {
             if (itemError) throw itemError;
 
             if (isLastItem) {
-              // 2. Update order status to cancelled
               const { error: orderError } = await supabase
                 .from('orders')
                 .update({ status: 'cancelled' })
@@ -184,7 +160,6 @@ export const OrdersScreen = () => {
               if (orderError) throw orderError;
               showAlert({ title: 'Order Cancelled', message: 'The order was cancelled because all items were removed.', type: 'info' });
             } else {
-              // 3. Recalculate total for multiple items
               const remainingItems = activeItems.filter((i: any) => i.id !== itemToRemove.id);
               const newSubtotal = remainingItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
               const deliveryFee = 25;
@@ -193,10 +168,7 @@ export const OrdersScreen = () => {
 
               const { error: orderError } = await supabase
                 .from('orders')
-                .update({
-                  subtotal: newSubtotal,
-                  total_amount: newTotal,
-                })
+                .update({ subtotal: newSubtotal, total_amount: newTotal })
                 .eq('id', order.id);
 
               if (orderError) throw orderError;
@@ -219,16 +191,11 @@ export const OrdersScreen = () => {
       case 'pending_verification':
       case 'accepted':
       case 'preparing':
-      case 'ready': 
-        return Colors.warning;
-      case 'picked_up': 
-        return '#FF9800';
-      case 'delivered': 
-        return Colors.success;
-      case 'cancelled': 
-        return Colors.error;
-      default: 
-        return Colors.textSecondary;
+      case 'ready': return Colors.warning;
+      case 'picked_up': return '#FF9800';
+      case 'delivered': return Colors.success;
+      case 'cancelled': return Colors.error;
+      default: return Colors.textSecondary;
     }
   };
 
@@ -237,64 +204,97 @@ export const OrdersScreen = () => {
       case 'pending_verification':
       case 'accepted':
       case 'preparing':
-      case 'ready': 
-        return 'WAITING FOR PICKUP';
-      case 'picked_up': 
-        return 'PICKED UP';
-      case 'delivered': 
-        return 'DELIVERED';
-      case 'cancelled': 
-        return 'CANCELLED';
-      default: 
-        return status.toUpperCase().replace('_', ' ');
+      case 'ready': return 'Waiting for Pickup';
+      case 'picked_up': return 'Picked Up';
+      case 'delivered': return 'Delivered';
+      case 'cancelled': return 'Cancelled';
+      default: return status.replace('_', ' ');
     }
   };
 
-  const renderOrderItem = ({ item }: { item: any }) => {
+  const stats = {
+    active: orders.length,
+  };
+
+  // Group orders by date
+  const groupedOrders = orders.reduce((groups: any, order: any) => {
+    const dateObj = new Date(order.created_at);
+    // Explicitly format as Day Month Year
+    const day = dateObj.getDate().toString().padStart(2, '0');
+    const month = dateObj.toLocaleDateString([], { month: 'short' });
+    const year = dateObj.getFullYear();
+    const formattedDate = `${day} ${month} ${year}`;
+    
+    if (!groups[formattedDate]) groups[formattedDate] = [];
+    groups[formattedDate].push(order);
+    return groups;
+  }, {});
+
+  const orderList = Object.keys(groupedOrders).map(date => ({
+    title: date,
+    data: groupedOrders[date],
+  }));
+
+  const renderOrderCard = (item: any) => {
     const activeItems = item.order_items?.filter((i: any) => !i.is_removed) || [];
-    // Allow removal in any state before the rider picks it up
     const isModifiable = ['pending_verification', 'accepted', 'preparing', 'ready'].includes(item.status);
+    const statusColor = getStatusColor(item.status);
 
     return (
-      <View style={styles.orderCard}>
+      <View key={item.id} style={styles.orderCard}>
         <View style={styles.orderHeader}>
           <View>
             <Text style={styles.orderNumber}>#{item.order_number}</Text>
-            <Text style={styles.orderDate}>
-              {new Date(item.created_at).toLocaleDateString([], { day: '2-digit', month: 'short' })}, {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <Text style={styles.orderTime}>
+              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-            <Text style={[
-              styles.statusText, 
-              { color: ['pending_verification', 'accepted', 'preparing', 'ready'].includes(item.status) ? Colors.black : getStatusColor(item.status) }
-            ]}>
+          <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.statusText, { color: statusColor }]}>
               {getStatusLabel(item.status)}
             </Text>
           </View>
         </View>
 
-        <View style={styles.customerInfo}>
-          <Icon name="account" size={16} color={Colors.textSecondary} />
-          <Text style={styles.customerName}>{item.customer?.full_name || 'Guest'}</Text>
+        <View style={styles.peopleSection}>
+          <View style={styles.personRow}>
+            <View style={styles.iconCircle}>
+              <Icon name="account" size={16} color={Colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.personName}>{item.customer?.full_name || 'Guest Customer'}</Text>
+              <Text style={styles.personRole}>Customer • {item.customer?.phone || 'No phone'}</Text>
+            </View>
+          </View>
+
+          {item.rider && (
+            <View style={[styles.personRow, { marginTop: Spacing.sm }]}>
+              <View style={[styles.iconCircle, { backgroundColor: Colors.secondary + '15' }]}>
+                <Icon name="bike" size={16} color={Colors.secondary} />
+              </View>
+              <View>
+                <Text style={[styles.personName, { color: Colors.secondary }]}>{item.rider.full_name}</Text>
+                <Text style={styles.personRole}>Delivery Partner</Text>
+              </View>
+            </View>
+          )}
         </View>
 
-        {item.rider && (
-          <View style={styles.riderInfo}>
-            <Icon name="bike" size={16} color={Colors.secondary} />
-            <Text style={styles.riderName}>Rider: {item.rider.full_name}</Text>
-          </View>
-        )}
-
         <View style={styles.itemsList}>
+          <Text style={styles.itemsTitle}>ORDER ITEMS</Text>
           {activeItems.map((product: any, idx: number) => (
             <View key={idx} style={styles.itemRowContainer}>
-              <Text style={styles.itemRow}>
-                {product.quantity}x {product.product_name} (₹{product.product_price})
+              <View style={styles.itemQuantityBox}>
+                <Text style={styles.itemQuantityText}>{product.quantity}x</Text>
+              </View>
+              <Text style={styles.itemRowText} numberOfLines={1}>
+                {product.product_name}
               </Text>
+              <Text style={styles.itemPriceText}>₹{product.product_price * product.quantity}</Text>
               {isModifiable && (
-                <TouchableOpacity onPress={() => handleRemoveItem(item, product)}>
-                  <Icon name="trash-can-outline" size={18} color={Colors.error} />
+                <TouchableOpacity onPress={() => handleRemoveItem(item, product)} style={styles.removeBtn}>
+                  <Icon name="close-circle-outline" size={20} color={Colors.error} />
                 </TouchableOpacity>
               )}
             </View>
@@ -303,7 +303,7 @@ export const OrdersScreen = () => {
 
         <View style={styles.orderFooter}>
           <View>
-            <Text style={styles.amountLabel}>Total (inc. fees)</Text>
+            <Text style={styles.amountLabel}>Grand Total</Text>
             <Text style={styles.amountValue}>₹{item.total_amount}</Text>
           </View>
         </View>
@@ -313,33 +313,45 @@ export const OrdersScreen = () => {
 
   return (
     <View style={styles.container}>
-      {loading ? (
+      {loading && !refreshing ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : (
-        <FlatList
-          data={orders}
-          renderItem={renderOrderItem}
-          keyExtractor={(item) => item.id}
-          ListHeaderComponent={
-            <View style={[styles.header, { paddingTop: insets.top }]}>
-              <Text style={styles.title}>Manage Orders</Text>
-              <Text style={styles.subtitle}>{store?.name || 'Store Dashboard'}</Text>
+        <ScrollView 
+          contentContainerStyle={[styles.listContent, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + 100 }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>Orders</Text>
+            {stats.active > 0 && (
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>{stats.active} Active</Text>
+              </View>
+            )}
+          </View>
+
+          {orderList.length > 0 ? orderList.map((group) => (
+            <View key={group.title}>
+              <View style={styles.dateHeader}>
+                <Text style={styles.dateHeaderText}>{group.title}</Text>
+                <View style={styles.dateHeaderLine} />
+              </View>
+              {group.data.map((order: any) => renderOrderCard(order))}
             </View>
-          }
-          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
-          }
-          ListEmptyComponent={
+          )) : (
             <View style={styles.emptyContainer}>
-              <Icon name="clipboard-text-off" size={64} color={Colors.border} />
-              <Text style={styles.emptyText}>No orders found yet.</Text>
+              <View style={styles.emptyIconCircle}>
+                <Icon name="clipboard-text-outline" size={48} color={Colors.border} />
+              </View>
+              <Text style={styles.emptyTitle}>All Clear!</Text>
+              <Text style={styles.emptySubtitle}>You don't have any orders yet.</Text>
             </View>
-          }
-        />
+          )}
+        </ScrollView>
       )}
+
       <AlertModal
         visible={alertConfig.visible}
         title={alertConfig.title}
@@ -351,7 +363,7 @@ export const OrdersScreen = () => {
         showCancel={alertConfig.showCancel !== undefined ? alertConfig.showCancel : alertConfig.type !== 'success'}
       />
     </View>
-);
+  );
 };
 
 const styles = StyleSheet.create({
@@ -360,100 +372,167 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    paddingHorizontal: Spacing.sm,
-    paddingBottom: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   title: {
     fontSize: 22,
     fontWeight: '800',
     color: Colors.text,
   },
-  subtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 0,
+  headerBadge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  headerBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.primary,
   },
   listContent: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  dateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
+    gap: 10,
+  },
+  dateHeaderText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  dateHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
   },
   orderCard: {
     backgroundColor: Colors.white,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: Spacing.md,
     marginBottom: Spacing.md,
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    paddingBottom: Spacing.sm,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   orderNumber: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '800',
-    color: Colors.text,
+    color: Colors.black,
+    letterSpacing: 0.5,
   },
-  orderDate: {
+  orderTime: {
     fontSize: 12,
     color: Colors.textSecondary,
+    marginTop: 2,
+    fontWeight: '500',
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
   },
   statusText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
   },
-  customerInfo: {
+  peopleSection: {
+    backgroundColor: Colors.surface,
+    padding: Spacing.sm,
+    borderRadius: borderRadius.lg,
+    marginBottom: Spacing.md,
+  },
+  personRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    gap: 10,
   },
-  customerName: {
+  iconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  personName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.text,
-    marginLeft: 6,
   },
-  riderInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-    backgroundColor: Colors.secondary + '10',
-    padding: 6,
-    borderRadius: 6,
-  },
-  riderName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.secondary,
-    marginLeft: 6,
+  personRole: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '500',
   },
   itemsList: {
     marginBottom: Spacing.md,
+    paddingHorizontal: 4,
+  },
+  itemsTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    letterSpacing: 1.5,
+    marginBottom: Spacing.sm,
   },
   itemRowContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
-    paddingRight: 4,
+    marginBottom: 8,
   },
-  itemRow: {
+  itemQuantityBox: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: 10,
+  },
+  itemQuantityText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  itemRowText: {
     fontSize: 14,
     color: Colors.text,
+    fontWeight: '500',
     flex: 1,
+  },
+  itemPriceText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+    marginHorizontal: 8,
+  },
+  removeBtn: {
+    padding: 2,
   },
   orderFooter: {
     flexDirection: 'row',
@@ -466,25 +545,12 @@ const styles = StyleSheet.create({
   amountLabel: {
     fontSize: 12,
     color: Colors.textSecondary,
+    fontWeight: '600',
   },
   amountValue: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
     color: Colors.text,
-  },
-  actions: {
-    flexDirection: 'row',
-  },
-  actionBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  actionBtnText: {
-    color: Colors.white,
-    fontWeight: '700',
-    fontSize: 14,
   },
   center: {
     flex: 1,
@@ -492,12 +558,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyContainer: {
-    marginTop: 100,
+    marginTop: 80,
     alignItems: 'center',
+    paddingHorizontal: 40,
   },
-  emptyText: {
-    fontSize: 16,
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
     color: Colors.textSecondary,
-    marginTop: 12,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
+
+
+
+
