@@ -190,8 +190,20 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         {/* Store Branding (Moved below banner) */}
         <View style={styles.brandingContainer}>
           <Text style={styles.storeName}>{store.name}</Text>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{store.category}</Text>
+          <View style={styles.badgeRow}>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{store.category}</Text>
+            </View>
+            {store.sector_area && (
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryText}>{store.sector_area}</Text>
+              </View>
+            )}
+            {store.city && (
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryText}>{store.city}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -461,6 +473,11 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700',
     textTransform: 'uppercase',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   bannerContainer: {
     width: '100%',

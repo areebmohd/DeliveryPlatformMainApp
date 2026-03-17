@@ -248,10 +248,26 @@ export const StoreScreen = ({ navigation }: any) => {
     <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
       <View style={styles.headerContent}>
         <Text style={styles.headerName}>{store?.name || 'Your Store'}</Text>
-        <View style={styles.headerCategoryBadge}>
-          <Text style={styles.headerCategoryText}>
-            {store?.category || 'General Store'}
-          </Text>
+        <View style={styles.badgeRow}>
+          <View style={styles.headerCategoryBadge}>
+            <Text style={styles.headerCategoryText}>
+              {store?.category || 'General Store'}
+            </Text>
+          </View>
+          {store?.sector_area && (
+            <View style={styles.headerCategoryBadge}>
+              <Text style={styles.headerCategoryText}>
+                {store.sector_area}
+              </Text>
+            </View>
+          )}
+          {store?.city && (
+            <View style={styles.headerCategoryBadge}>
+              <Text style={styles.headerCategoryText}>
+                {store.city}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </View>
@@ -640,6 +656,11 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     marginLeft: 4,
     fontWeight: '600',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   tabWrapper: {
     backgroundColor: '#F8F9FA',
