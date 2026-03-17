@@ -244,13 +244,14 @@ export const StoreScreen = ({ navigation }: any) => {
 
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-      <Text style={styles.headerTitle}>Your Store</Text>
-      <TouchableOpacity
-        style={styles.editButton}
-        onPress={handleNavigateToStoreForm}
-      >
-        <Icon name="cog-outline" size={22} color={Colors.primary} />
-      </TouchableOpacity>
+      <View style={styles.headerContent}>
+        <Text style={styles.headerName}>{store?.name || 'Your Store'}</Text>
+        <View style={styles.headerCategoryBadge}>
+          <Text style={styles.headerCategoryText}>
+            {store?.category || 'General Store'}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 
@@ -264,14 +265,6 @@ export const StoreScreen = ({ navigation }: any) => {
           <Text style={styles.placeholderText}>Design your storefront</Text>
         </View>
       )}
-      <View style={styles.storeBasicInfo}>
-        <Text style={styles.storeName}>{store?.name || 'Your Store'}</Text>
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>
-            {store?.category || 'General Store'}
-          </Text>
-        </View>
-      </View>
     </View>
   );
 
@@ -474,12 +467,18 @@ export const StoreScreen = ({ navigation }: any) => {
 
       <TouchableOpacity
         style={[styles.fab, { bottom: 20 + insets.bottom }]}
-        onPress={() => handleNavigateToProductForm()}
+        onPress={() => activeTab === 'products' ? handleNavigateToProductForm() : handleNavigateToStoreForm()}
         activeOpacity={0.9}
       >
         <View style={styles.fabGradient}>
-          <Icon name="plus" size={30} color={Colors.white} />
-          <Text style={styles.fabText}>Add Product</Text>
+          <Icon 
+            name={activeTab === 'products' ? "plus" : "pencil-outline"} 
+            size={activeTab === 'products' ? 30 : 24} 
+            color={Colors.white} 
+          />
+          <Text style={styles.fabText}>
+            {activeTab === 'products' ? 'Add Product' : 'Edit Info'}
+          </Text>
         </View>
       </TouchableOpacity>
 
@@ -515,23 +514,29 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.xs,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingBottom: Spacing.sm,
   },
-  headerTitle: {
-    fontSize: 22,
+  headerContent: {
+    flex: 1,
+  },
+  headerName: {
+    fontSize: 28,
     fontWeight: '800',
     color: Colors.text,
+    marginBottom: 7,
   },
-  editButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+  headerCategoryBadge: {
     backgroundColor: Colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  headerCategoryText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   scrollContent: {
     flexGrow: 1,
@@ -559,30 +564,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: '500',
   },
-  storeBasicInfo: {
-    paddingHorizontal: Spacing.sm,
-    paddingTop: Spacing.sm,
-  },
-  storeName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.text,
-    marginBottom: 7,
-  },
-  categoryBadge: {
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 10,
-    marginBottom: 10,
-    alignSelf: 'flex-start',
-  },
-  categoryText: {
-    fontSize: 12,
-    color: Colors.primary,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
   addressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -602,7 +583,7 @@ const styles = StyleSheet.create({
   tabWrapper: {
     backgroundColor: '#F8F9FA',
     paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   tabContainer: {
     flexDirection: 'row',
