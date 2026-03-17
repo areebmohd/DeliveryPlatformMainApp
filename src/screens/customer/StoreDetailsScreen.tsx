@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Linking,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -22,6 +23,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { addItem, updateQuantity, items, totalItems, subtotal } = useCart();
+  const [activeTab, setActiveTab] = useState<'products' | 'info'>('products');
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -86,146 +88,183 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
       
-      {/* Custom Header */}
-      <View style={styles.header}>
+      {/* Custom Header with Branding */}
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>{store.name}</Text>
-          <Text style={styles.headerSubTitle} numberOfLines={1}>{store.address}</Text>
-        </View>
+        <Text style={styles.headerMainTitle}>Store</Text>
       </View>
 
       <ScrollView 
+        stickyHeaderIndices={[3]}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: totalItems > 0 ? 100 : insets.bottom + 20 }}
+        contentContainerStyle={{ paddingBottom: totalItems > 0 ? 120 : insets.bottom + 20 }}
       >
-        <View style={styles.content}>
-          <View style={styles.storeHero}>
-            <View style={styles.storeBadge}>
-              <Text style={styles.badgeText}>{store.category}</Text>
-            </View>
-            <Text style={styles.storeName}>{store.name}</Text>
-            <Text style={styles.storeDesc}>{store.description || 'Quality products from your neighborhood.'}</Text>
-            
-            <View style={styles.statsRow}>
-              <View style={styles.stat}>
-                <Icon name="star" size={18} color={Colors.primary} />
-                <Text style={styles.statText}>4.5</Text>
-              </View>
-              <View style={styles.statDot} />
-              <View style={styles.stat}>
-                <Icon name="clock-outline" size={18} color={Colors.primary} />
-                <Text style={styles.statText}>25-30 mins</Text>
-              </View>
-              <View style={styles.statDot} />
-              <View style={styles.stat}>
-                <Icon name="map-marker-outline" size={18} color={Colors.textSecondary} />
-                <Text style={styles.statText}>2.4 km</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Store Information</Text>
-          </View>
-
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Icon name="clock-outline" size={20} color={Colors.primary} />
-              <View style={styles.infoTextContainer}>
-                <Text style={styles.infoLabel}>Opening Hours</Text>
-                <Text style={styles.infoText}>{store.opening_hours || 'Contact store for timings'}</Text>
-              </View>
-            </View>
-
-            <View style={styles.infoRow}>
-              <Icon name="map-marker-outline" size={20} color={Colors.primary} />
-              <View style={styles.infoTextContainer}>
-                <Text style={styles.infoLabel}>Address</Text>
-                <Text style={styles.infoText}>{store.address}</Text>
-              </View>
-            </View>
-
-            {(store.phone || store.email || store.whatsapp_number) && (
-              <View style={styles.contactActions}>
-                {store.phone && (
-                  <TouchableOpacity 
-                    style={styles.contactButton} 
-                    onPress={() => handleContact('tel', store.phone)}
-                  >
-                    <Icon name="phone" size={20} color={Colors.white} />
-                    <Text style={styles.contactButtonText}>Call</Text>
-                  </TouchableOpacity>
-                )}
-                {store.whatsapp_number && (
-                  <TouchableOpacity 
-                    style={[styles.contactButton, { backgroundColor: '#25D366' }]} 
-                    onPress={() => handleContact('whatsapp', store.whatsapp_number)}
-                  >
-                    <Icon name="whatsapp" size={20} color={Colors.white} />
-                    <Text style={styles.contactButtonText}>WhatsApp</Text>
-                  </TouchableOpacity>
-                )}
-                {store.email && (
-                  <TouchableOpacity 
-                    style={[styles.contactButton, { backgroundColor: Colors.textSecondary }]} 
-                    onPress={() => handleContact('mailto', store.email)}
-                  >
-                    <Icon name="email" size={20} color={Colors.white} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {(store.instagram_url || store.facebook_url) && (
-              <View style={styles.socialRow}>
-                {store.instagram_url && (
-                  <TouchableOpacity 
-                    style={styles.socialButton}
-                    onPress={() => handleContact('browser', store.instagram_url)}
-                  >
-                    <Icon name="instagram" size={24} color="#E4405F" />
-                  </TouchableOpacity>
-                )}
-                {store.facebook_url && (
-                  <TouchableOpacity 
-                    style={styles.socialButton}
-                    onPress={() => handleContact('browser', store.facebook_url)}
-                  >
-                    <Icon name="facebook" size={24} color="#1877F2" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Available Products</Text>
-            <Text style={styles.productCount}>{products.length} Items</Text>
-          </View>
-
-          {loading ? (
-            <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
-          ) : products.length > 0 ? (
-            products.map((product) => (
-              <CustomerProductCard
-                key={product.id}
-                product={product}
-                onAdd={() => addItem(product, store)}
-                quantity={getQuantity(product.id)}
-                onIncrease={() => updateQuantity(product.id, 1)}
-                onDecrease={() => updateQuantity(product.id, -1)}
-              />
-            ))
+        {/* Banner */}
+        <View style={styles.bannerContainer}>
+          {store.banner_url ? (
+            <Image source={{ uri: store.banner_url }} style={styles.banner} />
           ) : (
-            <View style={styles.emptyContainer}>
-              <Icon name="package-variant" size={64} color={Colors.border} />
-              <Text style={styles.emptyText}>No products available right now.</Text>
+            <View style={[styles.banner, styles.bannerPlaceholder]}>
+              <Icon name="store" size={60} color={Colors.border} />
+              <Text style={styles.placeholderText}>Welcome to our store</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Store Branding (Moved below banner) */}
+        <View style={styles.brandingContainer}>
+          <Text style={styles.storeName}>{store.name}</Text>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{store.category}</Text>
+          </View>
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabWrapper}>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'products' && styles.activeTab]}
+              onPress={() => setActiveTab('products')}
+            >
+              <Icon
+                name="package-variant-closed"
+                size={20}
+                color={activeTab === 'products' ? Colors.white : Colors.primary}
+              />
+              <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
+                Products
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'info' && styles.activeTab]}
+              onPress={() => setActiveTab('info')}
+            >
+              <Icon
+                name={activeTab === 'info' ? 'information' : 'information-outline'}
+                size={20}
+                color={activeTab === 'info' ? Colors.white : Colors.primary}
+              />
+              <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>
+                Store Info
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.tabContent}>
+          {activeTab === 'products' ? (
+            <View style={styles.productsSection}>
+              {loading ? (
+                <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
+              ) : products.length > 0 ? (
+                products.map((product) => (
+                  <CustomerProductCard
+                    key={product.id}
+                    product={product}
+                    onAdd={() => addItem(product, store)}
+                    quantity={getQuantity(product.id)}
+                    onIncrease={() => updateQuantity(product.id, 1)}
+                    onDecrease={() => updateQuantity(product.id, -1)}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Icon name="package-variant" size={64} color={Colors.border} />
+                  <Text style={styles.emptyText}>No products available right now.</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.infoSection}>
+              <View style={styles.infoCard}>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>About the Store</Text>
+                  <Text style={styles.infoValue}>
+                    {store.description || 'Quality products from your neighborhood store.'}
+                  </Text>
+                </View>
+
+                <View style={styles.infoDivider} />
+
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Operating Hours</Text>
+                  <View style={styles.infoRow}>
+                    <Icon name="clock-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.infoValue}>{store.opening_hours || 'Contact store for timings'}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.infoDivider} />
+
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Address</Text>
+                  <View style={styles.infoRow}>
+                    <Icon name="map-marker-outline" size={18} color={Colors.error} />
+                    <Text style={styles.infoValue}>{store.address}</Text>
+                  </View>
+                </View>
+
+                {(store.phone || store.email || store.whatsapp_number) && (
+                  <>
+                    <View style={styles.infoDivider} />
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>Contact Information</Text>
+                      <View style={styles.contactActions}>
+                        {store.phone && (
+                          <TouchableOpacity 
+                            style={styles.contactButton} 
+                            onPress={() => handleContact('tel', store.phone)}
+                          >
+                            <Icon name="phone" size={18} color={Colors.white} />
+                            <Text style={styles.contactButtonText}>Call</Text>
+                          </TouchableOpacity>
+                        )}
+                        {store.whatsapp_number && (
+                          <TouchableOpacity 
+                            style={[styles.contactButton, { backgroundColor: '#25D366' }]} 
+                            onPress={() => handleContact('whatsapp', store.whatsapp_number)}
+                          >
+                            <Icon name="whatsapp" size={18} color={Colors.white} />
+                            <Text style={styles.contactButtonText}>WhatsApp</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                {(store.instagram_url || store.facebook_url) && (
+                  <>
+                    <View style={styles.infoDivider} />
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>Social Media</Text>
+                      <View style={styles.socialRow}>
+                        {store.instagram_url && (
+                          <TouchableOpacity 
+                            style={styles.socialButton}
+                            onPress={() => handleContact('browser', store.instagram_url)}
+                          >
+                            <Icon name="instagram" size={24} color="#E4405F" />
+                          </TouchableOpacity>
+                        )}
+                        {store.facebook_url && (
+                          <TouchableOpacity 
+                            style={styles.socialButton}
+                            onPress={() => handleContact('browser', store.facebook_url)}
+                          >
+                            <Icon name="facebook" size={24} color="#1877F2" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  </>
+                )}
+              </View>
             </View>
           )}
         </View>
@@ -255,15 +294,14 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingBottom: Spacing.sm,
+    backgroundColor: '#F8F9FA',
   },
   backButton: {
     width: 40,
@@ -271,133 +309,149 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerInfo: {
-    marginLeft: Spacing.sm,
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 16,
+  headerMainTitle: {
+    fontSize: 20,
     fontWeight: '800',
     color: Colors.text,
+    marginLeft: Spacing.sm,
   },
-  headerSubTitle: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  content: {
+  brandingContainer: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
-  storeHero: {
-    marginBottom: Spacing.xl,
+  storeName: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 7,
   },
-  storeBadge: {
-    backgroundColor: Colors.primary + '15',
+  categoryBadge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 8,
   },
-  badgeText: {
-    color: Colors.primary,
+  categoryText: {
     fontSize: 12,
+    color: Colors.primary,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
-  storeName: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: Colors.text,
+  bannerContainer: {
+    width: '100%',
+    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
   },
-  storeDesc: {
-    fontSize: 14,
+  banner: {
+    width: '100%',
+    height: 160,
+    borderRadius: 24,
+    backgroundColor: Colors.surface,
+  },
+  bannerPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
+  },
+  placeholderText: {
+    marginTop: 8,
     color: Colors.textSecondary,
-    marginTop: 4,
-    lineHeight: 20,
+    fontWeight: '500',
   },
-  statsRow: {
+  tabWrapper: {
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  tabContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
+    backgroundColor: Colors.white,
+    padding: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  stat: {
+  tab: {
+    flex: 1,
     flexDirection: 'row',
+    paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
   },
-  statText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text,
-    marginLeft: 4,
+  activeTab: {
+    backgroundColor: Colors.primary,
   },
-  statDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
-    marginHorizontal: 12,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.text,
-  },
-  productCount: {
+  tabText: {
     fontSize: 14,
+    fontWeight: '700',
     color: Colors.textSecondary,
-    fontWeight: '600',
+    marginLeft: 8,
+  },
+  activeTabText: {
+    color: Colors.white,
+  },
+  tabContent: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  productsSection: {
+    flex: 1,
+  },
+  infoSection: {
+    flex: 1,
   },
   infoCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.xl,
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.md,
-  },
-  infoTextContainer: {
-    marginLeft: Spacing.sm,
-    flex: 1,
+  infoItem: {
+    marginVertical: 4,
   },
   infoLabel: {
     fontSize: 12,
     color: Colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'uppercase',
-    marginBottom: 2,
+    letterSpacing: 1,
+    marginBottom: 8,
   },
-  infoText: {
-    fontSize: 14,
+  infoValue: {
+    fontSize: 15,
     color: Colors.text,
-    lineHeight: 20,
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  infoDivider: {
+    height: 1,
+    backgroundColor: '#F1F3F5',
+    marginVertical: Spacing.lg,
   },
   contactActions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.md,
+    marginTop: 8,
   },
   contactButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
   },
   contactButtonText: {
     color: Colors.white,
@@ -406,11 +460,8 @@ const styles = StyleSheet.create({
   },
   socialRow: {
     flexDirection: 'row',
-    gap: 20,
-    marginTop: Spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: Spacing.md,
+    gap: 16,
+    marginTop: 8,
   },
   socialButton: {
     width: 44,
@@ -424,6 +475,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   emptyContainer: {
     marginTop: 40,
@@ -436,7 +489,6 @@ const styles = StyleSheet.create({
   },
   cartBar: {
     position: 'absolute',
-    bottom: 20,
     left: 20,
     right: 20,
     backgroundColor: Colors.primary,
