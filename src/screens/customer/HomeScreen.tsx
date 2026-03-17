@@ -136,7 +136,7 @@ export const HomeScreen = ({ navigation }: any) => {
     <View style={{ marginRight: Spacing.sm }}>
       <CustomerProductCard 
         product={item}
-        onPress={() => (navigation as any).navigate('StoreDetails', { store: item.stores })}
+        onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
         onAdd={() => addItem(item, item.stores)}
         quantity={getQuantity(item.id)}
         onIncrease={() => updateQuantity(item.id, 1)}
@@ -150,7 +150,7 @@ export const HomeScreen = ({ navigation }: any) => {
     <CustomerProductCard 
       key={item.id}
       product={item}
-      onPress={() => (navigation as any).navigate('StoreDetails', { store: item.stores })}
+      onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
       onAdd={() => addItem(item, item.stores)}
       quantity={getQuantity(item.id)}
       onIncrease={() => updateQuantity(item.id, 1)}

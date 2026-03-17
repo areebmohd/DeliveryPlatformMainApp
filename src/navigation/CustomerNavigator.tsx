@@ -12,6 +12,8 @@ import { View } from 'react-native';
 
 import { CustomerOrdersScreen } from '../screens/customer/CustomerOrdersScreen';
 
+import { ProductDetailScreen } from '../screens/customer/ProductDetailScreen';
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -20,6 +22,7 @@ const HomeStack = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeMain" component={HomeScreen} />
       <Stack.Screen name="StoreDetails" component={StoreDetailsScreen} />
+      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
     </Stack.Navigator>
   );
 };

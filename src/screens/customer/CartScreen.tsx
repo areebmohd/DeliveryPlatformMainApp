@@ -252,7 +252,7 @@ export const CartScreen = ({ navigation }: any) => {
         <View style={styles.paymentNotice}>
           <Icon name="shield-check" size={20} color={Colors.secondary} />
           <Text style={styles.noticeText}>
-            Secure payments via Google Pay, PhonePe, or Paytm.
+            Secure payments via UPI mobile apps.
           </Text>
         </View>
       </ScrollView>

@@ -171,6 +171,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                     quantity={getQuantity(product.id)}
                     onIncrease={() => updateQuantity(product.id, 1)}
                     onDecrease={() => updateQuantity(product.id, -1)}
+                    onPress={() => navigation.navigate('ProductDetail', { product, store })}
                     width="48.5%"
                   />
                 ))}
