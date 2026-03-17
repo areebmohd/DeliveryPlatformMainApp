@@ -9,7 +9,9 @@ import {
   FlatList,
   StatusBar,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
+const { width } = Dimensions.get('window');
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -32,10 +34,13 @@ export const HomeScreen = ({ navigation }: any) => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [bestSellers, setBestSellers] = useState<any[]>([]);
   const [bestSellersLoading, setBestSellersLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
   useEffect(() => {
     fetchStores();
     fetchBestSellers();
+    fetchSuggestions();
   }, []);
 
   const fetchStores = async () => {
@@ -70,6 +75,25 @@ export const HomeScreen = ({ navigation }: any) => {
       console.error('Error fetching best sellers:', e);
     } finally {
       setBestSellersLoading(false);
+    }
+  };
+
+  const fetchSuggestions = async () => {
+    try {
+      setSuggestionsLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, stores(*)')
+        .eq('in_stock', true)
+        .order('id', { ascending: false })
+        .limit(12);
+
+      if (error) throw error;
+      setSuggestions(data || []);
+    } catch (e) {
+      console.error('Error fetching suggestions:', e);
+    } finally {
+      setSuggestionsLoading(false);
     }
   };
 
@@ -113,6 +137,23 @@ export const HomeScreen = ({ navigation }: any) => {
         <Text style={styles.bestSellerName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.bestSellerStore} numberOfLines={1}>{item.stores?.name}</Text>
         <Text style={styles.bestSellerPrice}>₹{item.price}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderSuggestion = (item: any) => (
+    <TouchableOpacity 
+      key={item.id}
+      style={styles.suggestionCard}
+      onPress={() => (navigation as any).navigate('StoreDetails', { store: item.stores })}
+      activeOpacity={0.8}
+    >
+      <View style={styles.suggestionImagePlaceholder}>
+        <Icon name="package-variant" size={24} color={Colors.border} />
+      </View>
+      <View style={styles.suggestionInfo}>
+        <Text style={styles.suggestionName} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.suggestionPrice}>₹{item.price}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -214,8 +255,20 @@ export const HomeScreen = ({ navigation }: any) => {
             <Text style={styles.emptyText}>No stores found in your area yet.</Text>
             <Text style={styles.emptySubtext}>We're expanding fast! Check back soon.</Text>
           </View>
-        )}
-      </ScrollView>
+          )}
+
+          {/* Suggestions */}
+          {suggestions.length > 0 && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Suggestions</Text>
+              </View>
+              <View style={styles.suggestionsGrid}>
+                {suggestions.map((item) => renderSuggestion(item))}
+              </View>
+            </>
+          )}
+        </ScrollView>
     </View>
   );
 };
@@ -402,5 +455,43 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.primary,
     marginTop: 4,
+  },
+  suggestionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: Spacing.md,
+    justifyContent: 'flex-start',
+    gap: 10,
+  },
+  suggestionCard: {
+    width: (width - Spacing.md * 2 - 20) / 3,
+    backgroundColor: Colors.white,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 6,
+    marginBottom: 4,
+  },
+  suggestionImagePlaceholder: {
+    width: '100%',
+    height: 70,
+    borderRadius: borderRadius.sm,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  suggestionInfo: {
+    marginTop: 6,
+  },
+  suggestionName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  suggestionPrice: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.primary,
+    marginTop: 2,
   },
 });
