@@ -108,6 +108,27 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     try {
       setIsLoading(true);
 
+      // 0. Check for duplicate name in the same store
+      if (!isEditing) {
+        const { data: duplicateProduct, error: duplicateError } = await supabase
+          .from('products')
+          .select('id')
+          .eq('store_id', storeId)
+          .eq('name', name.trim())
+          .maybeSingle();
+        
+        if (duplicateProduct) {
+          showAlert('Duplicate Product', 'A product with this name already exists in your store.', 'warning');
+          return;
+        }
+        if (duplicateError) console.error('Error checking duplicates:', duplicateError);
+      }
+
+      if (!storeId) {
+        showAlert('Error', 'Store ID is missing. Please try again.', 'error');
+        return;
+      }
+
       // 1. Search for existing image by name if current imageUrl is empty
       let finalImageUrl = imageUrl;
       if (!finalImageUrl && name) {
@@ -153,6 +174,11 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       showAlert('Success', isEditing ? 'Product updated!' : 'Product added!', 'success', () => {
         navigation.goBack();
       });
+      
+      // Auto-navigate after a brief delay if user doesn't interact
+      setTimeout(() => {
+        if (navigation.canGoBack()) navigation.goBack();
+      }, 1500);
     } catch (e: any) {
       showAlert('Error', e.message, 'error');
     } finally {
@@ -288,9 +314,14 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
-        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        onClose={() => {
+          setAlertConfig(prev => ({ ...prev, visible: false }));
+          if (alertConfig.type === 'success' && alertConfig.onConfirm) {
+            alertConfig.onConfirm();
+          }
+        }}
         primaryAction={alertConfig.onConfirm ? {
-          text: 'Confirm',
+          text: alertConfig.type === 'success' ? 'OK' : 'Confirm',
           onPress: alertConfig.onConfirm,
         } : undefined}
       />
@@ -404,7 +435,7 @@ const styles = StyleSheet.create({
   },
   lookupButton: {
     height: 44,
-    marginTop: -8,
+    marginTop: 3,
   },
   submitButton: {
     marginTop: Spacing.md,

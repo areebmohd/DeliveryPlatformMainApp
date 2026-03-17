@@ -48,18 +48,20 @@ export const BusinessNavigator = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: Colors.black,
-        tabBarInactiveTintColor: Colors.textSecondary,
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: {
           height: 60 + insets.bottom,
           paddingBottom: insets.bottom + 8,
           paddingTop: 2,
           backgroundColor: Colors.white,
           borderTopColor: Colors.border,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '800',
+          fontWeight: '700',
         },
         tabBarIcon: ({ focused, size }) => {
           let iconName = '';
@@ -67,26 +69,13 @@ export const BusinessNavigator = () => {
           else if (route.name === 'Orders') iconName = 'clipboard-text-clock';
           else if (route.name === 'Account') iconName = 'account';
 
-          if (focused) {
-            return (
-              <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-                {/* Simulated border using multiple icons logic or shadow */}
-                <Icon 
-                  name={iconName} 
-                  size={size + 1} 
-                  color={Colors.black} 
-                  style={{ position: 'absolute' }} 
-                />
-                <Icon 
-                  name={iconName.endsWith('-outline') ? iconName.replace('-outline', '') : iconName} 
-                  size={size} 
-                  color={Colors.primary} 
-                />
-              </View>
-            );
-          }
-
-          return <Icon name={iconName} size={size} color={Colors.textSecondary} />;
+          return (
+            <Icon 
+              name={focused ? iconName : `${iconName}-outline`} 
+              size={size} 
+              color={focused ? Colors.primary : '#9CA3AF'} 
+            />
+          );
         },
       })}
     >

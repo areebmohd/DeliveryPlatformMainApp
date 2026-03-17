@@ -54,7 +54,9 @@ export const BusinessProductCard = ({
             <View style={styles.priceContainer}>
               <Text style={styles.price}>₹{product.price}</Text>
               {product.weight_kg ? (
-                <Text style={styles.weight}> / {product.weight_kg}kg</Text>
+                <Text style={styles.weight}>
+                  / {product.weight_kg < 1 ? `${product.weight_kg * 1000}gm` : `${product.weight_kg}kg`}
+                </Text>
               ) : null}
             </View>
             

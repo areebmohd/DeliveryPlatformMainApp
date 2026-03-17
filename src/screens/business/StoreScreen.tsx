@@ -55,7 +55,8 @@ export const StoreScreen = ({ navigation }: any) => {
     setAlertConfig({ visible: true, ...config });
   };
 
-  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
+  const closeAlert = () =>
+    setAlertConfig(prev => ({ ...prev, visible: false }));
 
   useEffect(() => {
     fetchStore();
@@ -84,9 +85,9 @@ export const StoreScreen = ({ navigation }: any) => {
           table: 'stores',
           filter: `id=eq.${store.id}`,
         },
-        (payload) => {
+        payload => {
           if (payload.new) setStore(payload.new);
-        }
+        },
       )
       .subscribe();
 
@@ -103,7 +104,7 @@ export const StoreScreen = ({ navigation }: any) => {
         },
         () => {
           fetchProducts();
-        }
+        },
       )
       .subscribe();
 
@@ -156,25 +157,34 @@ export const StoreScreen = ({ navigation }: any) => {
 
   const handleNavigateToProductForm = (product?: any) => {
     if (product) {
-      navigation.navigate('ProductForm', { 
+      navigation.navigate('ProductForm', {
         storeId: store.id,
-        product 
+        product,
       });
       return;
     }
 
     showAlert({
       title: 'Add Product',
-      message: 'Select how you want to add this product. Barcode products pre-fill details automatically.',
+      message:
+        'Select how you want to add this product. Barcode products pre-fill details automatically.',
       type: 'info',
       verticalButtons: true,
       primaryAction: {
         text: 'Barcode Product',
-        onPress: () => navigation.navigate('ProductForm', { storeId: store.id, mode: 'barcode' }),
+        onPress: () =>
+          navigation.navigate('ProductForm', {
+            storeId: store.id,
+            mode: 'barcode',
+          }),
       },
       secondaryAction: {
         text: 'Manual Product',
-        onPress: () => navigation.navigate('ProductForm', { storeId: store.id, mode: 'manual' }),
+        onPress: () =>
+          navigation.navigate('ProductForm', {
+            storeId: store.id,
+            mode: 'manual',
+          }),
         variant: 'outline',
       },
     });
@@ -187,10 +197,12 @@ export const StoreScreen = ({ navigation }: any) => {
         .update({ in_stock: !currentStatus })
         .eq('id', id);
       if (error) throw error;
-      
-      setProducts(products.map(p => 
-        p.id === id ? { ...p, in_stock: !currentStatus } : p
-      ));
+
+      setProducts(
+        products.map(p =>
+          p.id === id ? { ...p, in_stock: !currentStatus } : p,
+        ),
+      );
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
     }
@@ -199,14 +211,23 @@ export const StoreScreen = ({ navigation }: any) => {
   const handleDeleteProduct = (id: string) => {
     showAlert({
       title: 'Delete Product',
-      message: 'Are you sure you want to remove this item from your inventory? This cannot be undone.',
+      message:
+        'Are you sure you want to remove this item from your inventory? This cannot be undone.',
       type: 'warning',
       primaryAction: {
         text: 'Delete',
         onPress: async () => {
-          const { error } = await supabase.from('products').delete().eq('id', id);
+          const { error } = await supabase
+            .from('products')
+            .delete()
+            .eq('id', id);
           if (!error) fetchProducts();
-          else showAlert({ title: 'Error', message: 'Could not delete product.', type: 'error' });
+          else
+            showAlert({
+              title: 'Error',
+              message: 'Could not delete product.',
+              type: 'error',
+            });
         },
         variant: 'destructive',
       },
@@ -223,12 +244,12 @@ export const StoreScreen = ({ navigation }: any) => {
 
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-      <Text style={styles.headerTitle}>My Store</Text>
-      <TouchableOpacity 
+      <Text style={styles.headerTitle}>Your Store</Text>
+      <TouchableOpacity
         style={styles.editButton}
         onPress={handleNavigateToStoreForm}
       >
-        <Icon name="cog-outline" size={22} color={Colors.black} />
+        <Icon name="cog-outline" size={22} color={Colors.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -245,12 +266,10 @@ export const StoreScreen = ({ navigation }: any) => {
       )}
       <View style={styles.storeBasicInfo}>
         <Text style={styles.storeName}>{store?.name || 'Your Store'}</Text>
-        <View style={styles.addressContainer}>
-          <Icon name="map-marker-outline" size={16} color={Colors.textSecondary} />
-          <Text style={styles.storeAddress}>{store?.address || 'Set your location'}</Text>
-        </View>
         <View style={styles.categoryBadge}>
-          <Text style={styles.categoryText}>{store?.category || 'General Store'}</Text>
+          <Text style={styles.categoryText}>
+            {store?.category || 'General Store'}
+          </Text>
         </View>
       </View>
     </View>
@@ -259,27 +278,45 @@ export const StoreScreen = ({ navigation }: any) => {
   const renderTabs = () => (
     <View style={styles.tabWrapper}>
       <View style={styles.tabContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'products' && styles.activeTab]}
           onPress={() => setActiveTab('products')}
         >
-          <Icon 
-            name={activeTab === 'products' ? 'package-variant' : 'package-variant-closed'} 
-            size={20} 
-            color={activeTab === 'products' ? Colors.black : Colors.textSecondary} 
+          <Icon
+            name={
+              activeTab === 'products'
+                ? 'package-variant-closed'
+                : 'package-variant-closed'
+            }
+            size={20}
+            color={activeTab === 'products' ? Colors.white : Colors.primary}
           />
-          <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>Inventory</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'products' && styles.activeTabText,
+            ]}
+          >
+            Products
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'info' && styles.activeTab]}
           onPress={() => setActiveTab('info')}
         >
-          <Icon 
-            name={activeTab === 'info' ? 'information' : 'information-outline'} 
-            size={20} 
-            color={activeTab === 'info' ? Colors.black : Colors.textSecondary} 
+          <Icon
+            name={activeTab === 'info' ? 'information' : 'information-outline'}
+            size={20}
+            color={activeTab === 'info' ? Colors.white : Colors.primary}
           />
-          <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>Store Info</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'info' && styles.activeTabText,
+            ]}
+          >
+            Store Info
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -287,14 +324,14 @@ export const StoreScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <ScrollView
         stickyHeaderIndices={[3]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {renderHeader()}
         {renderBanner()}
-        
+
         <View style={{ height: 10 }} />
 
         {renderTabs()}
@@ -319,12 +356,18 @@ export const StoreScreen = ({ navigation }: any) => {
               ) : (
                 <View style={styles.emptyProducts}>
                   <View style={styles.emptyIconContainer}>
-                    <Icon name="package-variant" size={60} color={Colors.border} />
+                    <Icon
+                      name="package-variant"
+                      size={60}
+                      color={Colors.border}
+                    />
                   </View>
                   <Text style={styles.emptyTitle}>No Products Yet</Text>
-                  <Text style={styles.emptySubtitle}>Start adding store items to begin selling.</Text>
-                  <Button 
-                    title="Add Your First Product" 
+                  <Text style={styles.emptySubtitle}>
+                    Start adding store items to begin selling.
+                  </Text>
+                  <Button
+                    title="Add Your First Product"
                     onPress={() => handleNavigateToProductForm()}
                     style={styles.emptyButton}
                   />
@@ -336,16 +379,25 @@ export const StoreScreen = ({ navigation }: any) => {
               <View style={styles.infoCard}>
                 <View style={styles.infoSection}>
                   <Text style={styles.infoLabel}>About the Store</Text>
-                  <Text style={styles.infoValue}>{store?.description || 'Build your store profile to attract more customers.'}</Text>
+                  <Text style={styles.infoValue}>
+                    {store?.description ||
+                      'Build your store profile to attract more customers.'}
+                  </Text>
                 </View>
-                
+
                 <View style={styles.infoDivider} />
-                
+
                 <View style={styles.infoSection}>
                   <Text style={styles.infoLabel}>Operating Hours</Text>
                   <View style={styles.hoursRow}>
-                    <Icon name="clock-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.infoValue}>{store?.opening_hours || 'Schedule not set'}</Text>
+                    <Icon
+                      name="clock-outline"
+                      size={18}
+                      color={Colors.primary}
+                    />
+                    <Text style={styles.infoValue}>
+                      {store?.opening_hours || 'Schedule not set'}
+                    </Text>
                   </View>
                 </View>
 
@@ -354,25 +406,31 @@ export const StoreScreen = ({ navigation }: any) => {
                 <View style={styles.infoSection}>
                   <Text style={styles.infoLabel}>Pickup Address</Text>
                   <View style={styles.hoursRow}>
-                    <Icon name="map-marker-radius" size={18} color={Colors.error} />
-                    <Text style={styles.infoValue}>{store?.address || 'Location required for deliveries'}</Text>
+                    <Icon
+                      name="map-marker-radius"
+                      size={18}
+                      color={Colors.error}
+                    />
+                    <Text style={styles.infoValue}>
+                      {store?.address || 'Location required for deliveries'}
+                    </Text>
                   </View>
                 </View>
               </View>
             </View>
           )}
         </View>
-        
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <TouchableOpacity 
-        style={[styles.fab, { bottom: 20 + insets.bottom }]} 
+      <TouchableOpacity
+        style={[styles.fab, { bottom: 20 + insets.bottom }]}
         onPress={() => handleNavigateToProductForm()}
         activeOpacity={0.9}
       >
         <View style={styles.fabGradient}>
-          <Icon name="plus" size={30} color={Colors.black} />
+          <Icon name="plus" size={30} color={Colors.white} />
           <Text style={styles.fabText}>Add Product</Text>
         </View>
       </TouchableOpacity>
@@ -432,7 +490,8 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     width: '100%',
-    padding: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
   },
   banner: {
     width: '100%',
@@ -460,37 +519,41 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     color: Colors.text,
-    marginBottom: 4,
+    marginBottom: 7,
   },
   categoryBadge: {
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 10,
-    marginTop: 14,
+    marginBottom: 10,
     alignSelf: 'flex-start',
   },
   categoryText: {
     fontSize: 12,
-    color: Colors.black,
+    color: Colors.primary,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   addressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 6,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
   storeAddress: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    marginLeft: 6,
-    fontWeight: '500',
-    flex: 1,
+    fontSize: 14,
+    color: Colors.primary,
+    marginLeft: 4,
+    fontWeight: '600',
   },
   tabWrapper: {
     backgroundColor: '#F8F9FA',
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
   },
   tabContainer: {
@@ -519,10 +582,11 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   activeTabText: {
-    color: Colors.black,
+    color: Colors.white,
   },
   tabContent: {
-    padding: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   productsContainer: {
     flex: 1,
@@ -603,14 +667,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
+    elevation: 3,
   },
   fabGradient: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   fabText: {
-    color: Colors.black,
+    color: Colors.white,
     fontSize: 16,
     fontWeight: '800',
     marginLeft: 8,

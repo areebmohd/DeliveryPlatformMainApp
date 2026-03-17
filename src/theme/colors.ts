@@ -1,6 +1,6 @@
 export const Colors = {
-  primary: '#FFD700', // Premium Golden Yellow
-  secondary: '#FFB800', // Complementary darker yellow
+  primary: '#007bff', // Main Blue
+  secondary: '#0056b3', // Darker Blue
   background: '#FFFFFF',
   surface: '#F8F9FA',
   text: '#121212',
@@ -11,7 +11,7 @@ export const Colors = {
   warning: '#F59E0B',
   white: '#FFFFFF',
   black: '#000000',
-  primaryLight: '#FFF0B3', // Even more saturated light yellow for better contrast
+  primaryLight: '#e7f1ff', // Light Blue
   glass: 'rgba(255, 255, 255, 0.8)',
 };
 
@@ -30,4 +30,24 @@ export const borderRadius = {
   lg: 16,
   xl: 24,
   round: 999,
+};
+
+export const Typography = {
+  header: {
+    fontSize: 28,
+    fontWeight: '800' as const,
+    letterSpacing: -0.5,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+  },
+  body: {
+    fontSize: 16,
+    fontWeight: '500' as const,
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+  },
 };

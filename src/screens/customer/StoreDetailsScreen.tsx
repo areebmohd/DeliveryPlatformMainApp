@@ -79,7 +79,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
             
             <View style={styles.statsRow}>
               <View style={styles.stat}>
-                <Icon name="star" size={18} color="#FFD700" />
+                <Icon name="star" size={18} color={Colors.primary} />
                 <Text style={styles.statText}>4.5</Text>
               </View>
               <View style={styles.statDot} />
@@ -151,7 +151,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -175,7 +176,8 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   content: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.lg,
   },
   storeHero: {
     marginBottom: Spacing.xl,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { supabase } from './src/api/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -25,6 +25,8 @@ function App() {
 
 function AppContent() {
   const { session, loading } = useAuth();
+  const insets = useSafeAreaInsets();
+
 
   if (loading) {
     return (
@@ -35,10 +37,25 @@ function AppContent() {
   }
 
   return (
-    <NavigationContainer>
+    <View style={{ flex: 1 }}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
-      {session ? <MainNavigator /> : <AuthNavigator />}
-    </NavigationContainer>
+      {/* Notch Cover: Stays fixed at the top even when screens scroll */}
+      <View 
+        style={{ 
+          height: Math.max(insets.top, 0), 
+          backgroundColor: Colors.surface, 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          zIndex: 9999 
+        }} 
+      />
+      
+      <NavigationContainer>
+        {session ? <MainNavigator /> : <AuthNavigator />}
+      </NavigationContainer>
+    </View>
   );
 }
 

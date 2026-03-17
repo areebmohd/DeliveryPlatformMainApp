@@ -229,7 +229,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -242,7 +243,8 @@ const styles = StyleSheet.create({
     marginTop: 100,
   },
   listContent: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.lg,
   },
   emptyContainer: {
     flex: 1,

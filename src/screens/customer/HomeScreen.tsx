@@ -62,17 +62,17 @@ export const HomeScreen = ({ navigation }: any) => {
     >
       <View style={[
         styles.categoryIconContainer,
-        selectedCategory === item.name && styles.categoryIconActive
+        selectedCategory === item.name ? styles.categoryIconActive : styles.inactiveCategoryBg
       ]}>
         <Icon 
           name={item.icon} 
           size={24} 
-          color={selectedCategory === item.name ? Colors.white : Colors.text} 
+          color={selectedCategory === item.name ? Colors.white : Colors.primary} 
         />
       </View>
       <Text style={[
         styles.categoryText,
-        selectedCategory === item.name && styles.categoryTextActive
+        selectedCategory === item.name ? styles.activeCategoryText : styles.inactiveCategoryText
       ]}>
         {item.name}
       </Text>
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
   },
   locationRow: {
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchContainer: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
     marginBottom: Spacing.md,
   },
   searchBar: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
     marginTop: Spacing.lg,
     marginBottom: Spacing.md,
   },
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   categoriesList: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
   },
   categoryItem: {
     alignItems: 'center',
@@ -264,12 +264,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
+  inactiveCategoryBg: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primaryLight,
+  },
   categoryText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
   },
-  categoryTextActive: {
+  inactiveCategoryText: {
+    color: Colors.primary,
+  },
+  activeCategoryText: {
     color: Colors.primary,
     fontWeight: '700',
   },
@@ -295,6 +302,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   storesContainer: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
   },
 });

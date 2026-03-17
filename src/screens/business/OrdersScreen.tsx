@@ -372,7 +372,8 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   listContent: {
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   orderCard: {
     backgroundColor: Colors.white,

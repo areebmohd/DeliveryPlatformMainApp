@@ -251,7 +251,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -265,7 +266,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   scrollContent: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.lg,
   },
   storeHeader: {
     flexDirection: 'row',
@@ -386,7 +388,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.lg,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     alignItems: 'center',

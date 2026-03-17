@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: Spacing.lg,
+    padding: Spacing.md,
   },
   backButton: {
     marginBottom: Spacing.lg,
