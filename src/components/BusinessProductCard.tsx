@@ -85,7 +85,7 @@ export const BusinessProductCard = ({
         
         <View style={styles.actionButtons}>
           <TouchableOpacity onPress={() => onEdit(product)} style={styles.actionButton}>
-            <Icon name="pencil-outline" size={20} color={Colors.text} />
+            <Icon name="pencil-outline" size={20} color={Colors.primary} />
             <Text style={styles.actionButtonText}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onDelete(product.id)} style={[styles.actionButton, styles.deleteButton]}>
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.black,
+    color: Colors.primary,
   },
   deleteButton: {
     backgroundColor: Colors.error + '10',
