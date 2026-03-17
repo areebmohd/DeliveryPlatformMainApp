@@ -18,9 +18,9 @@ interface StoreCardProps {
     name: string;
     description: string;
     category: string;
+    sector_area?: string;
+    city?: string;
     banner_url?: string;
-    distance?: string;
-    rating?: number;
   };
   onPress: () => void;
 }
@@ -40,23 +40,28 @@ export const StoreCard = ({ store, onPress }: StoreCardProps) => {
             <Icon name="storefront-outline" size={48} color={Colors.textSecondary} />
           </View>
         )}
-        <View style={styles.distanceBadge}>
-          <Text style={styles.distanceText}>{store.distance || '2.4 km'}</Text>
-        </View>
       </View>
       
       <View style={styles.infoContainer}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>{store.name}</Text>
-          <View style={styles.ratingRow}>
-            <Icon name="star" size={16} color="#FFD700" />
-            <Text style={styles.ratingText}>{store.rating || '4.5'}</Text>
-          </View>
         </View>
         
-        <Text style={styles.category} numberOfLines={1}>
-          {store.category} • Grocery • 20-30 mins
-        </Text>
+        <View style={styles.badgeRow}>
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{store.category}</Text>
+          </View>
+          {store.sector_area && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{store.sector_area}</Text>
+            </View>
+          )}
+          {store.city && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{store.city}</Text>
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -90,22 +95,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  distanceBadge: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: Colors.glass,
-    borderRadius: borderRadius.round,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  distanceText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.text,
-  },
   infoContainer: {
     padding: Spacing.md,
   },
@@ -121,23 +110,22 @@ const styles = StyleSheet.create({
     color: Colors.text,
     flex: 1,
   },
-  ratingRow: {
+  badgeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF9E5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
   },
-  ratingText: {
-    fontSize: 12,
+  categoryBadge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  categoryText: {
+    fontSize: 10,
+    color: Colors.primary,
     fontWeight: '700',
-    color: Colors.text,
-    marginLeft: 2,
-  },
-  category: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    fontWeight: '500',
+    textTransform: 'uppercase',
   },
 });

@@ -17,6 +17,7 @@ import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { useCart } from '../../context/CartContext';
+import { StoreCard } from '../../components/StoreCard';
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +49,8 @@ export const FavouritesScreen = ({ navigation }: any) => {
             name,
             banner_url,
             category,
+            sector_area,
+            city,
             address,
             description
           )
@@ -92,7 +95,7 @@ export const FavouritesScreen = ({ navigation }: any) => {
   };
 
   const getQuantity = (productId: string) => {
-    const item = items.find(i => i.id === productId);
+    const item = items.find((i: any) => i.id === productId);
     return item ? item.quantity : 0;
   };
 
@@ -109,19 +112,10 @@ export const FavouritesScreen = ({ navigation }: any) => {
   );
 
   const renderStoreItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.storeCard}
+    <StoreCard 
+      store={item}
       onPress={() => navigation.navigate('StoreDetails', { store: item })}
-    >
-      <Image 
-        source={item.banner_url ? { uri: item.banner_url } : undefined} 
-        style={styles.storeBanner}
-      />
-      <View style={styles.storeInfo}>
-        <Text style={styles.storeName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.storeCategory} numberOfLines={1}>{item.category}</Text>
-      </View>
-    </TouchableOpacity>
+    />
   );
 
   return (
@@ -277,38 +271,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textSecondary,
     marginTop: Spacing.md,
-    fontWeight: '600',
-  },
-  storeCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    marginBottom: Spacing.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  storeBanner: {
-    width: '100%',
-    height: 120,
-    backgroundColor: Colors.surface,
-  },
-  storeInfo: {
-    padding: Spacing.md,
-  },
-  storeName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.text,
-  },
-  storeCategory: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 2,
     fontWeight: '600',
   },
 });

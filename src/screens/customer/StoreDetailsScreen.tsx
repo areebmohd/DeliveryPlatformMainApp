@@ -296,8 +296,8 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                       <Text style={styles.infoValue}>
                         {store.address_line_1 || store.address}
                         {store.sector_area ? `\n${store.sector_area}` : ''}
-                        {store.city ? `\n${store.city}` : ''}
                         {store.pincode ? ` - ${store.pincode}` : ''}
+                        {store.city ? `\n${store.city}` : ''}
                         {store.state ? `, ${store.state}` : ''}
                       </Text>
                     </View>
