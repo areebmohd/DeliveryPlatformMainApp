@@ -7,14 +7,17 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Button } from '../../components/ui/Button';
 
-export const CustomerOrdersScreen = () => {
+export const CustomerOrdersScreen = ({ navigation }: any) => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,7 +58,7 @@ export const CustomerOrdersScreen = () => {
         .select(`
           *,
           stores (name, category),
-          order_items (product_name, quantity)
+          order_items (product_name, quantity, product_price)
         `)
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false });
@@ -77,62 +80,115 @@ export const CustomerOrdersScreen = () => {
 
   const getStatusInfo = (status: string) => {
     switch (status) {
-      case 'pending_verification': 
-        return { label: 'Wait for Verification', color: Colors.warning, icon: 'clock-outline' };
-      case 'accepted': 
-        return { label: 'Order Accepted', color: Colors.secondary, icon: 'check-circle-outline' };
-      case 'preparing': 
-        return { label: 'Preparing Food', color: '#2196F3', icon: 'silverware-lean' };
-      case 'ready': 
-        return { label: 'Ready for Pickup', color: '#9C27B0', icon: 'package-variant' };
-      case 'delivered': 
-        return { label: 'Delivered', color: Colors.success, icon: 'checkbox-marked-circle' };
-      case 'cancelled': 
+      case 'pending_verification':
+      case 'accepted':
+      case 'preparing':
+      case 'ready':
+        return { label: 'Waiting for Pickup', color: Colors.warning, icon: 'clock-outline' };
+      case 'picked_up':
+        return { label: 'Picked Up', color: Colors.primary, icon: 'truck-delivery-outline' };
+      case 'delivered':
+        return { label: 'Delivered', color: Colors.success, icon: 'check-circle-outline' };
+      case 'cancelled':
         return { label: 'Cancelled', color: Colors.error, icon: 'close-circle-outline' };
-      default: 
+      default:
         return { label: status, color: Colors.textSecondary, icon: 'help-circle' };
     }
   };
 
+  const handleCancelOrder = (orderId: string, orderNumber: string) => {
+    Alert.alert(
+      'Cancel Order',
+      `Are you sure you want to cancel order #${orderNumber}?`,
+      [
+        { text: 'No', style: 'cancel' },
+        { 
+          text: 'Yes, Cancel', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('orders')
+                .update({ status: 'cancelled' })
+                .eq('id', orderId);
+              
+              if (error) throw error;
+              fetchOrders();
+            } catch (error) {
+              console.error('Error cancelling order:', error);
+              Alert.alert('Error', 'Failed to cancel order. Please try again.');
+            }
+          }
+        },
+      ]
+    );
+  };
+
   const renderOrderItem = ({ item }: { item: any }) => {
     const statusInfo = getStatusInfo(item.status);
+    const date = new Date(item.created_at);
+    const formattedDate = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     
+    // Can cancel if status is one of the "waiting" statuses
+    const canCancel = ['pending_verification', 'accepted', 'preparing', 'ready'].includes(item.status);
+
     return (
       <View style={styles.orderCard}>
+        {/* Top Row: Order ID/Date and Status */}
         <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.storeName}>{item.stores?.name}</Text>
+          <View style={styles.headerLeft}>
             <Text style={styles.orderNumber}>#{item.order_number}</Text>
+            <Text style={styles.dateTime}>{formattedDate}, {formattedTime}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '15' }]}>
-            <Icon name={statusInfo.icon} size={14} color={statusInfo.color} />
             <Text style={[styles.statusLabel, { color: statusInfo.color }]}>
               {statusInfo.label}
             </Text>
           </View>
         </View>
 
-        <View style={styles.itemsSummary}>
+        {/* Store Name Row */}
+        <Text style={styles.storeName}>{item.stores?.name}</Text>
+
+        <View style={styles.itemsList}>
           {item.order_items.map((oi: any, idx: number) => (
-            <Text key={idx} style={styles.itemText} numberOfLines={1}>
-              {oi.quantity}x {oi.product_name}
-            </Text>
+            <View key={idx} style={styles.orderItemRow}>
+              <View style={styles.itemLeft}>
+                <Text style={styles.itemQty}>{oi.quantity} x</Text>
+                <Text style={styles.itemName} numberOfLines={1}>{oi.product_name}</Text>
+              </View>
+              <Text style={styles.itemPrice}>₹{oi.product_price * oi.quantity}</Text>
+            </View>
           ))}
         </View>
 
         <View style={styles.cardFooter}>
-          <Text style={styles.orderDate}>
-            {new Date(item.created_at).toLocaleDateString()} at {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-          <Text style={styles.totalAmount}>₹{item.total_amount}</Text>
-        </View>
-
-        {item.status === 'ready' && (
-          <View style={styles.otpSection}>
-            <Icon name="shield-lock-outline" size={16} color={Colors.primary} />
-            <Text style={styles.otpText}>Delivery OTP: <Text style={styles.otpValue}>{item.delivery_otp}</Text></Text>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Grand Total</Text>
+            <Text style={styles.totalAmount}>₹{item.total_amount}</Text>
           </View>
-        )}
+          
+          {canCancel && (
+            <TouchableOpacity 
+              style={styles.cancelBtn} 
+              onPress={() => handleCancelOrder(item.id, item.order_number)}
+            >
+              <Icon name="close-circle-outline" size={18} color={Colors.error} />
+              <Text style={styles.cancelBtnText}>Cancel Order</Text>
+            </TouchableOpacity>
+          )}
+
+          {item.status === 'ready' && (
+            <View style={styles.otpSection}>
+              <Icon name="shield-lock" size={18} color={Colors.primary} />
+              <View style={styles.otpInfo}>
+                <Text style={styles.otpLabel}>Delivery OTP</Text>
+                <Text style={styles.otpValue}>{item.delivery_otp}</Text>
+              </View>
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -140,7 +196,13 @@ export const CustomerOrdersScreen = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.screenHeader}>
-        <Text style={styles.screenTitle}>My Orders</Text>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
+          <Icon name="arrow-left" size={24} color={Colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.screenTitle}>Orders</Text>
       </View>
 
       {loading ? (
@@ -152,7 +214,11 @@ export const CustomerOrdersScreen = () => {
           data={orders}
           renderItem={renderOrderItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
+          contentContainerStyle={[
+            styles.listContent, 
+            { paddingBottom: insets.bottom + 40 }
+          ]}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
           }
@@ -161,6 +227,11 @@ export const CustomerOrdersScreen = () => {
               <Icon name="shopping-outline" size={80} color={Colors.border} />
               <Text style={styles.emptyTitle}>No orders yet</Text>
               <Text style={styles.emptySubtitle}>When you place an order, it will appear here.</Text>
+              <Button 
+                title="Start Shopping" 
+                onPress={() => navigation.navigate('Home')}
+                style={{ marginTop: 24, width: '100%' }}
+              />
             </View>
           }
         />
@@ -175,13 +246,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   screenHeader: {
-    padding: Spacing.lg,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    marginRight: Spacing.md,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: Colors.text,
   },
@@ -190,11 +270,16 @@ const styles = StyleSheet.create({
   },
   orderCard: {
     backgroundColor: Colors.white,
-    borderRadius: borderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
+    borderRadius: 24,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -202,74 +287,134 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: Spacing.md,
   },
-  storeName: {
+  headerLeft: {
+    flex: 1,
+    marginRight: 10,
+  },
+  orderNumber: {
     fontSize: 16,
+    color: '#000000',
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  dateTime: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  storeName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.text,
+    marginTop: Spacing.sm,
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  statusLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  itemsList: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  orderItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  itemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  itemQty: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+    marginRight: 8,
+    width: 25,
+  },
+  itemName: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+    flex: 1,
+  },
+  itemPrice: {
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.text,
   },
-  orderNumber: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    marginLeft: 4,
-  },
-  itemsSummary: {
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    paddingTop: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  itemText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 2,
-  },
   cardFooter: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.md,
+    gap: 16,
+  },
+  totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  orderDate: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-  },
-  totalAmount: {
+  totalLabel: {
     fontSize: 16,
     fontWeight: '800',
     color: Colors.text,
   },
+  totalAmount: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: Colors.primary,
+  },
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.error + '30',
+    backgroundColor: Colors.error + '05',
+    gap: 8,
+  },
+  cancelBtnText: {
+    color: Colors.error,
+    fontSize: 15,
+    fontWeight: '700',
+  },
   otpSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.md,
-    padding: Spacing.sm,
-    backgroundColor: Colors.primary + '10',
-    borderRadius: borderRadius.sm,
+    backgroundColor: Colors.primary + '08',
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.primary + '30',
+    borderColor: Colors.primary + '20',
     borderStyle: 'dashed',
   },
-  otpText: {
-    fontSize: 14,
-    color: Colors.text,
-    marginLeft: 6,
-    fontWeight: '600',
+  otpInfo: {
+    marginLeft: 12,
+  },
+  otpLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
   },
   otpValue: {
+    fontSize: 18,
+    fontWeight: '900',
     color: Colors.primary,
-    fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 4,
   },
   center: {
     flex: 1,
@@ -282,15 +427,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: Colors.text,
     marginTop: 16,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
+    lineHeight: 22,
   },
 });
