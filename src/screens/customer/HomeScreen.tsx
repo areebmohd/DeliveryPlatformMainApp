@@ -16,6 +16,7 @@ const { width } = Dimensions.get('window');
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import LinearGradient from 'react-native-linear-gradient';
 import { StoreCard } from '../../components/StoreCard';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { supabase } from '../../api/supabase';
@@ -203,20 +204,24 @@ export const HomeScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
       
-      {/* Header */}
+      <LinearGradient 
+        colors={[Colors.primary, Colors.primary + 'CC', Colors.background]} 
+        style={[styles.headerGradient, { paddingTop: insets.top }]}
+      >
+        {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.locationContainer} 
           onPress={() => setAddressModalVisible(true)}
           activeOpacity={0.7}
         >
-          <View style={styles.locationRow}>
-            <Icon name="map-marker" size={18} color={Colors.primary} />
-            <Text style={styles.locationLabel}>Delivering to</Text>
-          </View>
+            <View style={styles.locationRow}>
+              <Icon name="map-marker" size={18} color={Colors.white} />
+              <Text style={styles.locationLabel}>Delivering to</Text>
+            </View>
           <View style={styles.addressRow}>
             <Text style={styles.locationTitle} numberOfLines={1}>
               {sessionAddress 
@@ -228,11 +233,11 @@ export const HomeScreen = ({ navigation }: any) => {
                     })()
                   : 'Select Address'}
             </Text>
-            <Icon name="chevron-down" size={20} color={Colors.text} />
+            <Icon name="chevron-down" size={20} color={Colors.white} />
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.profileButton}>
-          <Icon name="bell-outline" size={24} color={Colors.text} />
+        <TouchableOpacity style={styles.notificationButton}>
+          <Icon name="bell-outline" size={24} color={Colors.white} />
         </TouchableOpacity>
       </View>
 
@@ -249,6 +254,7 @@ export const HomeScreen = ({ navigation }: any) => {
           />
         </View>
       </View>
+      </LinearGradient>
 
       <ScrollView 
         showsVerticalScrollIndicator={false} 
@@ -411,12 +417,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  headerGradient: {
+    paddingBottom: Spacing.md,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   locationContainer: {
     flex: 1,
@@ -428,7 +437,7 @@ const styles = StyleSheet.create({
   },
   locationLabel: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '600',
     marginLeft: 4,
   },
@@ -438,38 +447,43 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   locationTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: Colors.text,
+    color: Colors.white,
     marginLeft: 2,
     maxWidth: '85%',
   },
-  profileButton: {
+  notificationButton: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   searchContainer: {
     paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    height: 50,
-    borderRadius: borderRadius.md,
+    backgroundColor: Colors.white,
+    height: 52,
+    borderRadius: 16,
     paddingHorizontal: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
   searchInput: {
     flex: 1,
     marginLeft: Spacing.sm,
-    fontSize: 15,
+    fontSize: 16,
     color: Colors.text,
   },
   scrollContent: {
