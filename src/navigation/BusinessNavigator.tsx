@@ -15,6 +15,9 @@ import { PremiumScreen } from '../screens/business/PremiumScreen';
 import { DashboardScreen } from '../screens/business/DashboardScreen';
 import { ProductFormScreen } from '../screens/business/ProductFormScreen';
 import { StoreDetailsFormScreen } from '../screens/business/StoreDetailsFormScreen';
+import { PaymentsScreen } from '../screens/business/PaymentsScreen';
+import { SupportScreen } from '../screens/business/SupportScreen';
+import { AdvertiseScreen } from '../screens/business/AdvertiseScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -37,6 +40,9 @@ const AccountStack = () => {
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Premium" component={PremiumScreen} />
       <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      <Stack.Screen name="Payments" component={PaymentsScreen} />
+      <Stack.Screen name="Support" component={SupportScreen} />
+      <Stack.Screen name="Advertise" component={AdvertiseScreen} />
     </Stack.Navigator>
   );
 };

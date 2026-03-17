@@ -141,6 +141,27 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
             onPress={() => navigation.navigate('Dashboard')} 
             color={Colors.secondary}
           />
+          <View style={styles.separator} />
+          <AccountOption 
+            icon="credit-card-outline" 
+            title="Payments" 
+            onPress={() => navigation.navigate('Payments')} 
+            color="#4CAF50"
+          />
+          <View style={styles.separator} />
+          <AccountOption 
+            icon="chat-question-outline" 
+            title="Business Support" 
+            onPress={() => navigation.navigate('Support')} 
+            color="#2196F3"
+          />
+          <View style={styles.separator} />
+          <AccountOption 
+            icon="bullhorn-outline" 
+            title="Advertise" 
+            onPress={() => navigation.navigate('Advertise')} 
+            color="#FF5722"
+          />
         </View>
 
         {/* Box 3: Account */}
