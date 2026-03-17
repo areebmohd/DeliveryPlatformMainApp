@@ -6,6 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -17,12 +20,27 @@ import { AlertModal } from '../../components/ui/AlertModal';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import RNUpiPayment from 'react-native-upi-payment';
+import Geolocation from '@react-native-community/geolocation';
+
+const { width, height } = Dimensions.get('window');
 
 export const CartScreen = ({ navigation }: any) => {
   const { items, updateQuantity, subtotal, totalItems, clearCart } = useCart();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [address, setAddress] = useState('');
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [addressModalVisible, setAddressModalVisible] = useState(false);
+  const [receiverInfoVisible, setReceiverInfoVisible] = useState(false);
+  const [receiverName, setReceiverName] = useState('');
+  const [receiverPhone, setReceiverPhone] = useState('');
+  const [tempLocation, setTempLocation] = useState<any>(null);
+  const [infoModal, setInfoModal] = useState<{ visible: boolean, title: string, content: string }>({
+    visible: false,
+    title: '',
+    content: ''
+  });
+
   const insets = useSafeAreaInsets();
 
   // Alert Modal state
@@ -44,121 +62,76 @@ export const CartScreen = ({ navigation }: any) => {
   const showAlert = (title: string, message: string, type: any = 'info', primaryAction?: any, showCancel: boolean = true) => {
     setAlertConfig({ visible: true, title, message, type, primaryAction, showCancel });
   };
-  
-  const deliveryFee = totalItems > 0 ? 25 : 0; 
-  const platformFee = totalItems > 0 ? 2 : 0;
-  const total = subtotal + deliveryFee + platformFee;
 
-  const handleCheckout = async () => {
-    if (items.length === 0) return;
-    if (!address.trim()) {
-      showAlert('Address Required', 'Please enter your delivery address', 'warning');
+  useEffect(() => {
+    if (user) {
+      fetchAddresses();
+    }
+  }, [user]);
+
+  const fetchAddresses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('addresses')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('is_default', { ascending: false });
+
+      if (error) throw error;
+      setSavedAddresses(data || []);
+      if (data && data.length > 0 && !selectedAddress) {
+        setSelectedAddress(data[0]);
+      }
+    } catch (e) {
+      console.error('Error fetching addresses:', e);
+    }
+  };
+
+  const handleUseCurrentLocation = () => {
+    Geolocation.getCurrentPosition(
+      (position) => {
+        setTempLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setAddressModalVisible(false);
+        setReceiverInfoVisible(true);
+      },
+      (error) => {
+        showAlert('Location Error', 'Could not get your current location. Please check permissions.', 'error');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+  };
+
+  const handleSaveReceiverInfo = async () => {
+    if (!receiverName.trim() || !receiverPhone.trim()) {
+      showAlert('Required', 'Please enter receiver name and phone number', 'warning');
       return;
     }
-    
+
     try {
       setLoading(true);
-      
-      // 1. Fetch store's UPI ID
-      const { data: store, error: storeError } = await supabase
-        .from('stores')
-        .select('upi_id, name')
-        .eq('id', items[0].store_id)
-        .single();
-      
-      if (storeError || !store.upi_id) {
-        throw new Error('Store UPI ID not found. Please contact support.');
-      }
-
-      // 2. Save Address first
-      const { data: addrData, error: addrError } = await supabase
+      const { data, error } = await supabase
         .from('addresses')
         .insert({
           user_id: user?.id,
-          address_line: address,
-          city: 'Gurugram',
-          pincode: '122001', // Default for MVP
-          // Dummy point for MVP
-          location: 'SRID=4326;POINT(77.0266 28.4595)' 
+          address_line: 'Current Location', 
+          city: 'Gurugram', 
+          pincode: '122001',
+          location: `SRID=4326;POINT(${tempLocation.longitude} ${tempLocation.latitude})`,
+          label: `${receiverName} (${receiverPhone})`
         })
         .select()
         .single();
- 
-      if (addrError) throw addrError;
- 
-      // 3. Create Order with address_id
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          customer_id: user?.id,
-          store_id: items[0].store_id,
-          delivery_address_id: addrData.id,
-          subtotal: subtotal,
-          total_amount: total,
-          delivery_fee: deliveryFee,
-          platform_fee: platformFee,
-          status: 'pending_verification',
-          payment_method: 'pay_now',
-          payment_status: 'pending'
-        })
-        .select()
-        .single();
- 
-      if (orderError) throw orderError;
- 
-      // 4. Create Order Items
-      const orderItems = items.map(item => ({
-        order_id: order.id,
-        product_id: item.id,
-        product_name: item.name,
-        product_price: item.price,
-        quantity: item.quantity
-      }));
- 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
- 
-      if (itemsError) throw itemsError;
- 
-      // 5. Trigger UPI Payment
-      if (!RNUpiPayment || !RNUpiPayment.initializePayment) {
-        showAlert(
-          'Note', 
-          'UPI Payment module not linked. If you just installed it, please restart the app with "npm run android".\n\nOrder saved as Waiting for Pickup.',
-          'info',
-          { text: 'OK', onPress: () => navigation.navigate('Home') },
-          false
-        );
-        clearCart();
-        return;
-      }
- 
-      RNUpiPayment.initializePayment(
-        {
-          vpa: store.upi_id,
-          payeeName: store.name,
-          amount: total.toFixed(2),
-          transactionNote: `Order #${order.order_number} for ${store.name}`,
-          transactionRef: order.id,
-        },
-        (success) => {
-          showAlert('Success', 'Payment initiated! We will verify and process your order.', 'success', {
-            text: 'OK',
-            onPress: () => {
-              clearCart();
-              navigation.navigate('Orders');
-            }
-          }, false);
-        },
-        (error) => {
-          showAlert('Payment Failed', 'If money was deducted, please contact support with Order ID.', 'error', {
-            text: 'View Orders',
-            onPress: () => navigation.navigate('Orders')
-          }, false);
-        }
-      );
- 
+
+      if (error) throw error;
+      
+      setSelectedAddress(data);
+      fetchAddresses();
+      setReceiverInfoVisible(false);
+      setReceiverName('');
+      setReceiverPhone('');
     } catch (e: any) {
       showAlert('Error', e.message, 'error');
     } finally {
@@ -166,19 +139,128 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
+  // Fees Logic
+  const platformFee = subtotal >= 500 ? (subtotal * 0.01) : 5;
+  const deliveryFee = totalItems > 0 ? 30 : 0; 
+  const grandTotal = subtotal + deliveryFee + platformFee;
+
+  const handleCheckout = async () => {
+    if (items.length === 0) return;
+    if (!selectedAddress) {
+      showAlert('Address Required', 'Please select a delivery address', 'warning');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // Group items by store for orders
+      const storesInCart = [...new Set(items.map(i => i.store_id))];
+      
+      for (const storeId of storesInCart) {
+        const storeItems = items.filter(i => i.store_id === storeId);
+        const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+        
+        const { data: store, error: storeError } = await supabase
+          .from('stores')
+          .select('upi_id, name')
+          .eq('id', storeId)
+          .single();
+        
+        if (storeError || !store.upi_id) {
+          throw new Error(`Store ${storeId} UPI ID not found.`);
+        }
+
+        const { data: order, error: orderError } = await supabase
+          .from('orders')
+          .insert({
+            customer_id: user?.id,
+            store_id: storeId,
+            delivery_address_id: selectedAddress.id,
+            subtotal: storeSubtotal,
+            total_amount: grandTotal, 
+            delivery_fee: deliveryFee,
+            platform_fee: platformFee,
+            status: 'pending_verification',
+            payment_method: 'pay_now',
+            payment_status: 'pending'
+          })
+          .select()
+          .single();
+
+        if (orderError) throw orderError;
+
+        const orderItems = storeItems.map(item => ({
+          order_id: order.id,
+          product_id: item.id,
+          product_name: item.name,
+          product_price: item.price,
+          quantity: item.quantity
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
+
+        if (itemsError) throw itemsError;
+
+        // UPI Payment
+        if (RNUpiPayment && RNUpiPayment.initializePayment) {
+          RNUpiPayment.initializePayment(
+            {
+              vpa: store.upi_id,
+              payeeName: store.name,
+              amount: grandTotal.toFixed(2),
+              transactionNote: `Order #${order.order_number}`,
+              transactionRef: order.id,
+            },
+            () => {
+              clearCart();
+              navigation.navigate('Orders');
+            },
+            () => {
+              showAlert('Payment Failed', 'Order saved. Please pay on delivery or try again.', 'error');
+            }
+          );
+        } else {
+          clearCart();
+          navigation.navigate('Orders');
+        }
+      }
+
+    } catch (e: any) {
+      showAlert('Error', e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Group items by store
+  const groupedItems = items.reduce((acc: any, item: any) => {
+    if (!acc[item.store_id]) {
+      acc[item.store_id] = {
+        name: item.store_name,
+        items: []
+      };
+    }
+    acc[item.store_id].items.push(item);
+    return acc;
+  }, {});
+
   if (items.length === 0) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
         <View style={styles.emptyContainer}>
-          <Icon name="cart-off" size={80} color={Colors.border} />
-          <Text style={styles.emptyTitle}>Your cart is empty</Text>
-          <Text style={styles.emptySubtitle}>Add some items from your favorite store!</Text>
-          <Button 
-            title="Browse Stores" 
-            onPress={() => navigation.navigate('Home')} 
+          <Icon name="cart-outline" size={80} color={Colors.border} />
+          <Text style={styles.emptyTitle}>Cart is empty</Text>
+          <Text style={styles.emptySubtitle}>Look around and add some items!</Text>
+          <TouchableOpacity 
             style={styles.browseBtn}
-          />
+            onPress={() => navigation.navigate('Home')}
+          >
+            <Text style={styles.browseBtnText}>Browse Stores</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -186,80 +268,123 @@ export const CartScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Review Cart</Text>
-        <TouchableOpacity onPress={clearCart}>
-          <Text style={styles.clearText}>Clear All</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}>
-        <View style={styles.storeHeader}>
-          <Icon name="storefront" size={20} color={Colors.primary} />
-          <Text style={styles.storeName}>{items[0]?.store_name}</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      
+      <ScrollView 
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 150 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Your Cart</Text>
+          <TouchableOpacity 
+            style={styles.clearBtn} 
+            onPress={() => showAlert(
+              'Clear Cart?', 
+              'Are you sure you want to remove all items from your cart?', 
+              'warning',
+              { text: 'Yes, Clear', onPress: clearCart, variant: 'destructive' }
+            )}
+          >
+            <Text style={styles.clearText}>Clear</Text>
+          </TouchableOpacity>
         </View>
 
-        {items.map((item) => (
-          <View key={item.id} style={styles.itemCard}>
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={styles.itemPrice}>₹{item.price}</Text>
+        {/* Store-wise Items */}
+        {Object.entries(groupedItems).map(([storeId, storeData]: [string, any]) => (
+          <View key={storeId} style={styles.storeSection}>
+            <View style={styles.storeHeader}>
+              <Icon name="storefront-outline" size={20} color={Colors.text} />
+              <Text style={styles.storeName}>{storeData.name}</Text>
             </View>
-            <View style={styles.quantityControls}>
-              <TouchableOpacity onPress={() => updateQuantity(item.id, -1)} style={styles.qtyBtn}>
-                <Icon name="minus" size={18} color={Colors.primary} />
-              </TouchableOpacity>
-              <Text style={styles.quantity}>{item.quantity}</Text>
-              <TouchableOpacity onPress={() => updateQuantity(item.id, 1)} style={styles.qtyBtn}>
-                <Icon name="plus" size={18} color={Colors.primary} />
-              </TouchableOpacity>
-            </View>
+            {storeData.items.map((item: any) => (
+              <View key={item.id} style={styles.itemCard}>
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  <Text style={styles.itemPrice}>₹{item.price}</Text>
+                </View>
+                <View style={styles.quantityControls}>
+                  <TouchableOpacity onPress={() => updateQuantity(item.id, -1)} style={styles.qtyBtn}>
+                    <Icon name="minus" size={18} color={Colors.primary} />
+                  </TouchableOpacity>
+                  <Text style={styles.quantity}>{item.quantity}</Text>
+                  <TouchableOpacity onPress={() => updateQuantity(item.id, 1)} style={styles.qtyBtn}>
+                    <Icon name="plus" size={18} color={Colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
           </View>
         ))}
 
+        {/* Address Selection */}
         <View style={styles.addressSection}>
-          <Text style={styles.billTitle}>Delivery Address</Text>
-          <Input
-            placeholder="Enter your full address in Gurugram"
-            value={address}
-            onChangeText={setAddress}
-            multiline
-            style={styles.addressInput}
-          />
+          <Text style={styles.sectionTitle}>Delivery Address</Text>
+          <TouchableOpacity 
+            style={styles.addressBox} 
+            onPress={() => setAddressModalVisible(true)}
+          >
+            <Icon name="map-marker-outline" size={24} color={Colors.primary} />
+            <View style={styles.addressInfo}>
+              <Text style={styles.addressLabel}>
+                {selectedAddress ? selectedAddress.label : 'Select Address'}
+              </Text>
+              <Text style={styles.addressText} numberOfLines={1}>
+                {selectedAddress ? selectedAddress.address_line : 'Where should we deliver?'}
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={Colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
+        {/* Bill Details */}
         <View style={styles.billDetails}>
-          <Text style={styles.billTitle}>Bill Details</Text>
+          <Text style={styles.sectionTitle}>Bill Details</Text>
+          
           <View style={styles.billRow}>
             <Text style={styles.billLabel}>Item Total</Text>
             <Text style={styles.billValue}>₹{subtotal.toFixed(2)}</Text>
           </View>
+
           <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Delivery Fee</Text>
+            <View style={styles.labelWithInfo}>
+              <Text style={styles.billLabel}>Delivery Fee</Text>
+              <TouchableOpacity onPress={() => setInfoModal({
+                visible: true,
+                title: 'Delivery Fee',
+                content: 'Pickup Fee: ₹20\nPer KM Fee: ₹5\n(Approximate based on distance)'
+              })}>
+                <Icon name="information-outline" size={16} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
           </View>
+
           <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Platform Fee</Text>
+            <View style={styles.labelWithInfo}>
+              <Text style={styles.billLabel}>Platform Fee</Text>
+              <TouchableOpacity onPress={() => setInfoModal({
+                visible: true,
+                title: 'Platform Fee',
+                content: 'Orders below ₹500: ₹5\nOrders above ₹500: 1% of subtotal'
+              })}>
+                <Icon name="information-outline" size={16} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <Text style={styles.billValue}>₹{platformFee.toFixed(2)}</Text>
           </View>
+
           <View style={[styles.billRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Grand Total</Text>
-            <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
           </View>
-        </View>
-
-        <View style={styles.paymentNotice}>
-          <Icon name="shield-check" size={20} color={Colors.secondary} />
-          <Text style={styles.noticeText}>
-            Secure payments via UPI mobile apps.
-          </Text>
         </View>
       </ScrollView>
 
+      {/* Place Order Box - Fixed Footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.lg }]}>
         <View style={styles.checkoutInfo}>
-          <Text style={styles.checkoutTotal}>₹{total.toFixed(2)}</Text>
+          <Text style={styles.checkoutTotal}>₹{grandTotal.toFixed(2)}</Text>
           <Text style={styles.checkoutLabel}>Total Payable</Text>
         </View>
         <Button 
@@ -270,15 +395,130 @@ export const CartScreen = ({ navigation }: any) => {
         />
       </View>
 
+      {/* Address Selection Modal */}
+      <Modal
+        visible={addressModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setAddressModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Delivery Address</Text>
+              <TouchableOpacity onPress={() => setAddressModalVisible(false)}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalScroll}>
+              <TouchableOpacity style={styles.modalOption} onPress={handleUseCurrentLocation}>
+                <Icon name="crosshairs-gps" size={24} color={Colors.primary} />
+                <Text style={styles.modalOptionText}>Use current location</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalOption} 
+                onPress={() => {
+                  setAddressModalVisible(false);
+                  navigation.navigate('AddAddress'); 
+                }}
+              >
+                <Icon name="plus" size={24} color={Colors.primary} />
+                <Text style={styles.modalOptionText}>Add new address</Text>
+              </TouchableOpacity>
+
+              <View style={styles.savedAddressesHeader}>
+                <Text style={styles.savedAddressesTitle}>Saved Addresses</Text>
+              </View>
+
+              {savedAddresses.map((addr) => (
+                <TouchableOpacity 
+                  key={addr.id} 
+                  style={[styles.savedAddressItem, selectedAddress?.id === addr.id && styles.selectedAddressItem]}
+                  onPress={() => {
+                    setSelectedAddress(addr);
+                    setAddressModalVisible(false);
+                  }}
+                >
+                  <Icon 
+                    name={addr.label.toLowerCase().includes('home') ? 'home-outline' : 'map-marker-outline'} 
+                    size={20} 
+                    color={selectedAddress?.id === addr.id ? Colors.primary : Colors.textSecondary} 
+                  />
+                  <View style={styles.savedAddressInfo}>
+                    <Text style={styles.savedAddressLabel}>{addr.label}</Text>
+                    <Text style={styles.savedAddressText} numberOfLines={1}>{addr.address_line}</Text>
+                  </View>
+                  {selectedAddress?.id === addr.id && (
+                    <Icon name="check-circle" size={20} color={Colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Receiver Info Modal - using generic AlertModal for simplicity if possible, or another standard Modal */}
+      <Modal
+        visible={receiverInfoVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setReceiverInfoVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.receiverModalContent}>
+            <Text style={[styles.modalTitle, { marginBottom: 8 }]}>Receiver Details</Text>
+            <Text style={{ color: Colors.textSecondary, marginBottom: 20 }}>Enter details of the person receiving the order</Text>
+            
+            <Input
+              placeholder="Receiver Name"
+              value={receiverName}
+              onChangeText={setReceiverName}
+            />
+            <View style={{ height: 12 }} />
+            <Input
+              placeholder="Phone Number"
+              value={receiverPhone}
+              onChangeText={setReceiverPhone}
+              keyboardType="phone-pad"
+            />
+            
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity 
+                style={[styles.modalActionBtn, { backgroundColor: Colors.surface }]} 
+                onPress={() => setReceiverInfoVisible(false)}
+              >
+                <Text style={{ color: Colors.textSecondary, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalActionBtn, { backgroundColor: Colors.primary }]} 
+                onPress={handleSaveReceiverInfo}
+              >
+                <Text style={{ color: Colors.white, fontWeight: '700' }}>Save & Proceed</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <AlertModal
+        visible={infoModal.visible}
+        title={infoModal.title}
+        message={infoModal.content}
+        type="info"
+        onClose={() => setInfoModal({ ...infoModal, visible: false })}
+        showCancel={true}
+        cancelText="Close"
+      />
+
       <AlertModal
         visible={alertConfig.visible}
         title={alertConfig.title}
         message={alertConfig.message}
         type={alertConfig.type}
-        onClose={() => {
-          setAlertConfig(prev => ({ ...prev, visible: false }));
-          if (alertConfig.onClose) alertConfig.onClose();
-        }}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
         primaryAction={alertConfig.primaryAction}
         showCancel={alertConfig.showCancel}
       />
@@ -289,41 +529,57 @@ export const CartScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.md,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: Colors.text,
   },
+  clearBtn: {
+    backgroundColor: '#FFF1F2', // Very light red
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FECACA', // Light red border
+  },
   clearText: {
     color: Colors.error,
-    fontWeight: '600',
+    fontWeight: '800',
+    fontSize: 14,
+    textTransform: 'uppercase',
   },
   scrollContent: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
+    paddingBottom: Spacing.lg,
+  },
+  storeSection: {
+    marginBottom: Spacing.xl,
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   storeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.lg,
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: borderRadius.md,
+    marginBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingBottom: Spacing.sm,
   },
   storeName: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: Colors.text,
     marginLeft: 8,
   },
@@ -331,73 +587,98 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   itemInfo: {
     flex: 1,
   },
   itemName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.text,
   },
   itemPrice: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: Colors.primary,
+    fontWeight: '800',
     marginTop: 2,
   },
   quantityControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: borderRadius.sm,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 12,
     padding: 2,
   },
   qtyBtn: {
-    padding: 4,
+    padding: 6,
   },
   quantity: {
-    paddingHorizontal: 10,
-    fontSize: 15,
+    paddingHorizontal: 12,
+    fontSize: 16,
     fontWeight: '800',
     color: Colors.primary,
   },
   addressSection: {
-    marginTop: Spacing.lg,
-    paddingTop: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  addressInput: {
     marginTop: Spacing.sm,
+    marginBottom: Spacing.xl,
   },
-  billDetails: {
-    marginTop: Spacing.xl,
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: borderRadius.md,
-  },
-  billTitle: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: '800',
     color: Colors.text,
     marginBottom: Spacing.md,
   },
+  addressBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    padding: Spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  addressInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  addressLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  addressText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  billDetails: {
+    backgroundColor: Colors.white,
+    padding: Spacing.md,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
   billRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: Spacing.sm,
+  },
+  labelWithInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   billLabel: {
     color: Colors.textSecondary,
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '600',
   },
   billValue: {
     color: Colors.text,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
   totalRow: {
     marginTop: Spacing.md,
@@ -406,54 +687,49 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.border,
   },
   totalLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     color: Colors.text,
   },
   totalValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
     color: Colors.text,
   },
-  paymentNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: Spacing.xl,
-    padding: Spacing.md,
-    backgroundColor: Colors.secondary + '10',
-    borderRadius: borderRadius.md,
-  },
-  noticeText: {
-    fontSize: 13,
-    color: Colors.secondary,
-    fontWeight: '600',
-    marginLeft: 8,
-    flex: 1,
-  },
   footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
+    paddingTop: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     alignItems: 'center',
     backgroundColor: Colors.white,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
   },
   checkoutInfo: {
     flex: 1,
   },
   checkoutTotal: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     color: Colors.text,
   },
   checkoutLabel: {
     fontSize: 12,
     color: Colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   checkoutBtn: {
-    width: '60%',
+    width: '55%',
   },
   emptyContainer: {
     flex: 1,
@@ -462,19 +738,123 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     color: Colors.text,
     marginTop: 20,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
   },
   browseBtn: {
     marginTop: 30,
-    width: '100%',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 30,
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  browseBtnText: {
+    color: Colors.white,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: height * 0.8,
+    paddingBottom: Spacing.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  modalScroll: {
+    padding: Spacing.md,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    marginBottom: Spacing.sm,
+  },
+  modalOptionText: {
+    marginLeft: 12,
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  savedAddressesHeader: {
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  savedAddressesTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+  },
+  savedAddressItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.sm,
+  },
+  selectedAddressItem: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  savedAddressInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  savedAddressLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  savedAddressText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  receiverModalContent: {
+    backgroundColor: Colors.white,
+    margin: Spacing.xl,
+    padding: Spacing.xl,
+    borderRadius: 24,
+    elevation: 10,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 24,
+  },
+  modalActionBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
 });
