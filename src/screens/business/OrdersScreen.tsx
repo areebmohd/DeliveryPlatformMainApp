@@ -122,7 +122,7 @@ export const OrdersScreen = () => {
         title: 'Status Updated', 
         message: `Order is now ${newStatus.replace('_', ' ')}`,
         type: 'success',
-        showCancel: false
+        cancelText: 'OK'
       });
       fetchOrders();
     } catch (e: any) {
@@ -172,7 +172,7 @@ export const OrdersScreen = () => {
                 .eq('id', order.id);
 
               if (orderError) throw orderError;
-              showAlert({ title: 'Success', message: 'Item removed and total updated.', type: 'success', showCancel: false });
+              showAlert({ title: 'Success', message: 'Item removed and total updated.', type: 'success', cancelText: 'OK' });
             }
             fetchOrders();
           } catch (e: any) {
@@ -302,10 +302,8 @@ export const OrdersScreen = () => {
         </View>
 
         <View style={styles.orderFooter}>
-          <View>
-            <Text style={styles.amountLabel}>Grand Total</Text>
-            <Text style={styles.amountValue}>₹{item.total_amount}</Text>
-          </View>
+          <Text style={styles.amountLabel}>Grand Total</Text>
+          <Text style={styles.amountValue}>₹{item.total_amount}</Text>
         </View>
       </View>
     );

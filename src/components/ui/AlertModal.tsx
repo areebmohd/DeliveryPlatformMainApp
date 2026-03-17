@@ -45,6 +45,10 @@ export const AlertModal = ({
   verticalButtons = false,
 }: AlertModalProps) => {
   const scaleValue = useRef(new Animated.Value(0)).current;
+  const actions = [tertiaryAction, secondaryAction, primaryAction].filter(Boolean) as AlertAction[];
+  
+  // Safety: If no actions are provided, force showCancel to true so the modal can be closed
+  const finalShowCancel = showCancel || actions.length === 0;
 
   useEffect(() => {
     if (visible) {
@@ -106,8 +110,6 @@ export const AlertModal = ({
     </TouchableOpacity>
   );
 
-  const actions = [tertiaryAction, secondaryAction, primaryAction].filter(Boolean) as AlertAction[];
-
   return (
     <Modal
       transparent
@@ -125,7 +127,7 @@ export const AlertModal = ({
           <Text style={styles.message}>{message}</Text>
 
           <View style={[styles.buttonContainer, verticalButtons && styles.verticalButtonContainer]}>
-            {showCancel && actions.length === 0 && (
+            {finalShowCancel && actions.length === 0 && (
               <TouchableOpacity 
                 style={[styles.button, styles.secondaryButton, { flex: 1 }]} 
                 onPress={onClose}
@@ -136,7 +138,7 @@ export const AlertModal = ({
             
             {actions.map(renderButton)}
 
-            {showCancel && actions.length > 0 && !verticalButtons && (
+            {finalShowCancel && actions.length > 0 && !verticalButtons && (
               <TouchableOpacity 
                 style={[styles.button, styles.secondaryButton, { flex: 1 }]} 
                 onPress={onClose}
@@ -145,7 +147,7 @@ export const AlertModal = ({
               </TouchableOpacity>
             )}
 
-            {showCancel && verticalButtons && (
+            {finalShowCancel && verticalButtons && (
               <TouchableOpacity 
                 style={[styles.button, styles.secondaryButton, styles.verticalButton]} 
                 onPress={onClose}
