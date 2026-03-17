@@ -49,7 +49,6 @@ export const CustomerNavigator = () => {
         tabBarIcon: ({ focused, size }) => {
           let iconName = '';
           if (route.name === 'Home') iconName = 'home-variant';
-          else if (route.name === 'Orders') iconName = 'clipboard-list';
           else if (route.name === 'Cart') iconName = 'cart';
           else if (route.name === 'Account') iconName = 'account';
 
@@ -64,7 +63,6 @@ export const CustomerNavigator = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} />
-      <Tab.Screen name="Orders" component={CustomerOrdersScreen} />
       <Tab.Screen name="Cart" component={CartScreen} />
       <Tab.Screen name="Account" component={AccountScreen} />
     </Tab.Navigator>

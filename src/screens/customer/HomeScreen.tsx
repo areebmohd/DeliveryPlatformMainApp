@@ -30,9 +30,12 @@ export const HomeScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [bestSellers, setBestSellers] = useState<any[]>([]);
+  const [bestSellersLoading, setBestSellersLoading] = useState(false);
 
   useEffect(() => {
     fetchStores();
+    fetchBestSellers();
   }, []);
 
   const fetchStores = async () => {
@@ -49,6 +52,24 @@ export const HomeScreen = ({ navigation }: any) => {
       console.error('Error fetching stores:', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBestSellers = async () => {
+    try {
+      setBestSellersLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, stores(*)')
+        .eq('in_stock', true)
+        .limit(10);
+
+      if (error) throw error;
+      setBestSellers(data || []);
+    } catch (e) {
+      console.error('Error fetching best sellers:', e);
+    } finally {
+      setBestSellersLoading(false);
     }
   };
 
@@ -76,6 +97,23 @@ export const HomeScreen = ({ navigation }: any) => {
       ]}>
         {item.name}
       </Text>
+    </TouchableOpacity>
+  );
+
+  const renderBestSeller = ({ item }: { item: any }) => (
+    <TouchableOpacity 
+      style={styles.bestSellerCard}
+      onPress={() => (navigation as any).navigate('StoreDetails', { store: item.stores })}
+      activeOpacity={0.9}
+    >
+      <View style={styles.bestSellerImagePlaceholder}>
+        <Icon name="package-variant" size={30} color={Colors.border} />
+      </View>
+      <View style={styles.bestSellerInfo}>
+        <Text style={styles.bestSellerName} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.bestSellerStore} numberOfLines={1}>{item.stores?.name}</Text>
+        <Text style={styles.bestSellerPrice}>₹{item.price}</Text>
+      </View>
     </TouchableOpacity>
   );
 
@@ -132,6 +170,23 @@ export const HomeScreen = ({ navigation }: any) => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesList}
         />
+
+        {/* Best Sellers */}
+        {bestSellers.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Best Sellers</Text>
+            </View>
+            <FlatList
+              data={bestSellers}
+              renderItem={renderBestSeller}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.bestSellersList}
+            />
+          </>
+        )}
 
         {/* Featured Stores */}
         <View style={styles.sectionHeader}>
@@ -303,5 +358,49 @@ const styles = StyleSheet.create({
   },
   storesContainer: {
     paddingHorizontal: Spacing.md,
+  },
+  bestSellersList: {
+    paddingHorizontal: Spacing.md,
+  },
+  bestSellerCard: {
+    width: 140,
+    backgroundColor: Colors.white,
+    borderRadius: borderRadius.lg,
+    marginRight: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+  },
+  bestSellerImagePlaceholder: {
+    width: '100%',
+    height: 100,
+    borderRadius: borderRadius.md,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bestSellerInfo: {
+    marginTop: 8,
+  },
+  bestSellerName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  bestSellerStore: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  bestSellerPrice: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.primary,
+    marginTop: 4,
   },
 });
