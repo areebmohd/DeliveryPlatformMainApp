@@ -98,9 +98,9 @@ export const OrdersScreen = () => {
 
     if (error) console.error('Error fetching orders:', error);
     else {
-      // Filter for active orders only
-      const activeOrders = (data || []).filter((o: any) => !['delivered', 'cancelled'].includes(o.status));
-      setOrders(activeOrders);
+      // Filter out only completed (delivered) orders, keep cancelled and others
+      const visibleOrders = (data || []).filter((o: any) => o.status !== 'delivered');
+      setOrders(visibleOrders);
     }
   };
 
