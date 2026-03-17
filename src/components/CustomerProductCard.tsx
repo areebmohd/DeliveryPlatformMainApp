@@ -13,15 +13,18 @@ interface CustomerProductCardProps {
   product: {
     id: string;
     name: string;
-    description: string;
+    description?: string;
     price: number;
     weight_kg?: number;
     category?: string;
+    image_url?: string;
   };
-  onAdd: (product: any) => void;
+  onAdd?: (product: any) => void;
   quantity?: number;
   onIncrease?: () => void;
   onDecrease?: () => void;
+  onPress?: () => void;
+  width?: any;
 }
 
 export const CustomerProductCard = ({ 
@@ -29,132 +32,156 @@ export const CustomerProductCard = ({
   onAdd,
   quantity = 0,
   onIncrease,
-  onDecrease 
+  onDecrease,
+  onPress,
+  width = '100%',
 }: CustomerProductCardProps) => {
   return (
-    <View style={styles.container}>
-      <View style={styles.info}>
-        <Text style={styles.name}>{product.name}</Text>
-        {product.description ? (
-          <Text style={styles.description} numberOfLines={2}>{product.description}</Text>
-        ) : null}
-        <View style={styles.metaRow}>
+    <TouchableOpacity 
+      style={[styles.container, { width }]} 
+      onPress={onPress}
+      activeOpacity={onPress ? 0.9 : 1}
+      disabled={!onPress}
+    >
+      <View style={styles.imageContainer}>
+        {product.image_url ? (
+          <Image source={{ uri: product.image_url }} style={styles.image} />
+        ) : (
+          <View style={[styles.image, styles.imagePlaceholder]}>
+            <Icon name="package-variant" size={30} color={Colors.border} />
+          </View>
+        )}
+        
+        {/* Integrated Controls on Image */}
+        {onAdd && (
+          <View style={styles.controlsLayer}>
+            {quantity > 0 ? (
+              <View style={styles.quantityControls}>
+                <TouchableOpacity onPress={onDecrease} style={styles.controlBtn}>
+                  <Icon name="minus" size={14} color={Colors.white} />
+                </TouchableOpacity>
+                <Text style={styles.quantityText}>{quantity}</Text>
+                <TouchableOpacity onPress={onIncrease} style={styles.controlBtn}>
+                  <Icon name="plus" size={14} color={Colors.white} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity 
+                style={styles.addButton} 
+                onPress={() => onAdd(product)}
+                activeOpacity={0.8}
+              >
+                <Icon name="plus" size={18} color={Colors.white} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.content}>
+        <Text style={styles.name} numberOfLines={1}>{product.name}</Text>
+        <View style={styles.priceRow}>
           <Text style={styles.price}>₹{product.price}</Text>
           {product.weight_kg ? (
             <Text style={styles.weight}>
-              • {product.weight_kg < 1 ? `${product.weight_kg * 1000} gm` : `${product.weight_kg} kg`}
+               / {product.weight_kg < 1 ? `${product.weight_kg * 1000}gm` : `${product.weight_kg}kg`}
             </Text>
           ) : null}
         </View>
       </View>
-      
-      <View style={styles.actionContainer}>
-        {quantity > 0 ? (
-          <View style={styles.quantityControls}>
-            <TouchableOpacity onPress={onDecrease} style={styles.qtyBtn}>
-              <Icon name="minus" size={18} color={Colors.primary} />
-            </TouchableOpacity>
-            <Text style={styles.quantity}>{quantity}</Text>
-            <TouchableOpacity onPress={onIncrease} style={styles.qtyBtn}>
-              <Icon name="plus" size={18} color={Colors.primary} />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity 
-            style={styles.addButton} 
-            onPress={() => onAdd(product)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.addButtonText}>ADD</Text>
-            <Icon name="plus" size={16} color={Colors.primary} style={styles.addIcon} />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    backgroundColor: Colors.white,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    borderRadius: borderRadius.md,
+    flexDirection: 'column',
+    backgroundColor: Colors.primaryLight,
+    padding: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.border,
-    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  imageContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  image: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    backgroundColor: Colors.white,
+  },
+  imagePlaceholder: {
+    justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
   },
-  info: {
-    flex: 1,
-    marginRight: Spacing.md,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  description: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    lineHeight: 16,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  price: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: Colors.text,
-  },
-  weight: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  actionContainer: {
-    width: 100,
-    alignItems: 'center',
+  controlsLayer: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
   },
   addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    minWidth: 80,
-  },
-  addButtonText: {
-    color: Colors.primary,
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  addIcon: {
-    marginLeft: 4,
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   quantityControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: borderRadius.sm,
-    padding: 2,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    padding: 3,
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  qtyBtn: {
-    padding: 4,
+  controlBtn: {
+    padding: 3,
   },
-  quantity: {
-    paddingHorizontal: 10,
-    fontSize: 15,
+  quantityText: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '800',
+    paddingHorizontal: 6,
+  },
+  content: {
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
+  name: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.black,
+    marginBottom: 2,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  price: {
+    fontSize: 14,
     fontWeight: '800',
     color: Colors.primary,
+  },
+  weight: {
+    fontSize: 11,
+    color: Colors.primary,
+    opacity: 0.8,
+    marginLeft: 2,
   },
 });

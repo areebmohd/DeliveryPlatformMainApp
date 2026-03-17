@@ -16,7 +16,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StoreCard } from '../../components/StoreCard';
+import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { supabase } from '../../api/supabase';
+import { useCart } from '../../context/CartContext';
 
 const CATEGORIES = [
   { id: '1', name: 'Grocery', icon: 'cart-outline' },
@@ -36,6 +38,12 @@ export const HomeScreen = ({ navigation }: any) => {
   const [bestSellersLoading, setBestSellersLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const { addItem, updateQuantity, items } = useCart();
+
+  const getQuantity = (productId: string) => {
+    const item = items.find(i => i.id === productId);
+    return item ? item.quantity : 0;
+  };
 
   useEffect(() => {
     fetchStores();
@@ -125,37 +133,30 @@ export const HomeScreen = ({ navigation }: any) => {
   );
 
   const renderBestSeller = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.bestSellerCard}
-      onPress={() => (navigation as any).navigate('StoreDetails', { store: item.stores })}
-      activeOpacity={0.9}
-    >
-      <View style={styles.bestSellerImagePlaceholder}>
-        <Icon name="package-variant" size={30} color={Colors.border} />
-      </View>
-      <View style={styles.bestSellerInfo}>
-        <Text style={styles.bestSellerName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.bestSellerStore} numberOfLines={1}>{item.stores?.name}</Text>
-        <Text style={styles.bestSellerPrice}>₹{item.price}</Text>
-      </View>
-    </TouchableOpacity>
+    <View style={{ marginRight: Spacing.sm }}>
+      <CustomerProductCard 
+        product={item}
+        onPress={() => (navigation as any).navigate('StoreDetails', { store: item.stores })}
+        onAdd={() => addItem(item, item.stores)}
+        quantity={getQuantity(item.id)}
+        onIncrease={() => updateQuantity(item.id, 1)}
+        onDecrease={() => updateQuantity(item.id, -1)}
+        width={140}
+      />
+    </View>
   );
 
   const renderSuggestion = (item: any) => (
-    <TouchableOpacity 
+    <CustomerProductCard 
       key={item.id}
-      style={styles.suggestionCard}
+      product={item}
       onPress={() => (navigation as any).navigate('StoreDetails', { store: item.stores })}
-      activeOpacity={0.8}
-    >
-      <View style={styles.suggestionImagePlaceholder}>
-        <Icon name="package-variant" size={24} color={Colors.border} />
-      </View>
-      <View style={styles.suggestionInfo}>
-        <Text style={styles.suggestionName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.suggestionPrice}>₹{item.price}</Text>
-      </View>
-    </TouchableOpacity>
+      onAdd={() => addItem(item, item.stores)}
+      quantity={getQuantity(item.id)}
+      onIncrease={() => updateQuantity(item.id, 1)}
+      onDecrease={() => updateQuantity(item.id, -1)}
+      width={(width - Spacing.md * 2 - 20) / 3}
+    />
   );
 
   const insets = useSafeAreaInsets();
@@ -415,83 +416,11 @@ const styles = StyleSheet.create({
   bestSellersList: {
     paddingHorizontal: Spacing.md,
   },
-  bestSellerCard: {
-    width: 140,
-    backgroundColor: Colors.white,
-    borderRadius: borderRadius.lg,
-    marginRight: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-  },
-  bestSellerImagePlaceholder: {
-    width: '100%',
-    height: 100,
-    borderRadius: borderRadius.md,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bestSellerInfo: {
-    marginTop: 8,
-  },
-  bestSellerName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  bestSellerStore: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  bestSellerPrice: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: Colors.primary,
-    marginTop: 4,
-  },
   suggestionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: Spacing.md,
     justifyContent: 'flex-start',
     gap: 10,
-  },
-  suggestionCard: {
-    width: (width - Spacing.md * 2 - 20) / 3,
-    backgroundColor: Colors.white,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 6,
-    marginBottom: 4,
-  },
-  suggestionImagePlaceholder: {
-    width: '100%',
-    height: 70,
-    borderRadius: borderRadius.sm,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  suggestionInfo: {
-    marginTop: 6,
-  },
-  suggestionName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  suggestionPrice: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: Colors.primary,
-    marginTop: 2,
   },
 });

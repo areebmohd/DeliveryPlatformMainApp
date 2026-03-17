@@ -162,7 +162,8 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
               {loading ? (
                 <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
               ) : products.length > 0 ? (
-                products.map((product) => (
+              <View style={styles.productsGrid}>
+                {products.map((product) => (
                   <CustomerProductCard
                     key={product.id}
                     product={product}
@@ -170,8 +171,10 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                     quantity={getQuantity(product.id)}
                     onIncrease={() => updateQuantity(product.id, 1)}
                     onDecrease={() => updateQuantity(product.id, -1)}
+                    width="48.5%"
                   />
-                ))
+                ))}
+              </View>
               ) : (
                 <View style={styles.emptyContainer}>
                   <Icon name="package-variant" size={64} color={Colors.border} />
@@ -398,6 +401,12 @@ const styles = StyleSheet.create({
   tabContent: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  productsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: Spacing.md,
   },
   productsSection: {
     flex: 1,
