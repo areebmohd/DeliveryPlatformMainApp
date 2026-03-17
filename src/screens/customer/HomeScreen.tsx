@@ -162,7 +162,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
       
       {/* Header */}
       <View style={styles.header}>
@@ -261,7 +261,7 @@ export const HomeScreen = ({ navigation }: any) => {
           {suggestions.length > 0 && (
             <>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Suggestions</Text>
+                <Text style={styles.sectionTitle}>Suggested Products</Text>
               </View>
               <View style={styles.suggestionsGrid}>
                 {suggestions.map((item) => renderSuggestion(item))}
@@ -276,7 +276,7 @@ export const HomeScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   header: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
@@ -42,6 +42,7 @@ export const AccountScreen = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
       <View style={styles.content}>
         <Text style={styles.title}>Account</Text>
         <Text style={styles.userName}>{profile?.full_name || 'User'}</Text>
@@ -71,7 +72,7 @@ export const AccountScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   content: {
     padding: Spacing.lg,

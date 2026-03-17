@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -168,6 +169,7 @@ export const CartScreen = ({ navigation }: any) => {
   if (items.length === 0) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
         <View style={styles.emptyContainer}>
           <Icon name="cart-off" size={80} color={Colors.border} />
           <Text style={styles.emptyTitle}>Your cart is empty</Text>
@@ -184,6 +186,7 @@ export const CartScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Review Cart</Text>
         <TouchableOpacity onPress={clearCart}>
@@ -286,7 +289,7 @@ export const CartScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   header: {
     flexDirection: 'row',
