@@ -216,6 +216,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         message={alertConfig.message}
         type={alertConfig.type}
         onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        showCancel={alertConfig.type !== 'success'}
         primaryAction={alertConfig.onConfirm ? {
           text: 'Confirm',
           onPress: alertConfig.onConfirm,

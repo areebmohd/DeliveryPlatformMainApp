@@ -143,7 +143,8 @@ export const OrdersScreen = () => {
       showAlert({ 
         title: 'Status Updated', 
         message: `Order is now ${newStatus.replace('_', ' ')}`,
-        type: 'success'
+        type: 'success',
+        showCancel: false
       });
       fetchOrders();
     } catch (e: any) {
@@ -199,7 +200,7 @@ export const OrdersScreen = () => {
                 .eq('id', order.id);
 
               if (orderError) throw orderError;
-              showAlert({ title: 'Success', message: 'Item removed and total updated.', type: 'success' });
+              showAlert({ title: 'Success', message: 'Item removed and total updated.', type: 'success', showCancel: false });
             }
             fetchOrders();
           } catch (e: any) {
@@ -347,6 +348,7 @@ export const OrdersScreen = () => {
         onClose={closeAlert}
         primaryAction={alertConfig.primaryAction}
         secondaryAction={alertConfig.secondaryAction}
+        showCancel={alertConfig.showCancel !== undefined ? alertConfig.showCancel : alertConfig.type !== 'success'}
       />
     </View>
 );

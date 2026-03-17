@@ -416,6 +416,54 @@ export const StoreScreen = ({ navigation }: any) => {
                     </Text>
                   </View>
                 </View>
+
+                {(store?.phone || store?.email || store?.whatsapp_number) && (
+                  <>
+                    <View style={styles.infoDivider} />
+                    <View style={styles.infoSection}>
+                      <Text style={styles.infoLabel}>Contact Information</Text>
+                      {store?.phone && (
+                        <View style={styles.hoursRow}>
+                          <Icon name="phone-outline" size={18} color={Colors.primary} />
+                          <Text style={styles.infoValue}>{store.phone}</Text>
+                        </View>
+                      )}
+                      {store?.email && (
+                        <View style={[styles.hoursRow, { marginTop: 8 }]}>
+                          <Icon name="email-outline" size={18} color={Colors.primary} />
+                          <Text style={styles.infoValue}>{store.email}</Text>
+                        </View>
+                      )}
+                      {store?.whatsapp_number && (
+                        <View style={[styles.hoursRow, { marginTop: 8 }]}>
+                          <Icon name="whatsapp" size={18} color={Colors.success} />
+                          <Text style={styles.infoValue}>{store.whatsapp_number}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </>
+                )}
+
+                {(store?.instagram_url || store?.facebook_url) && (
+                  <>
+                    <View style={styles.infoDivider} />
+                    <View style={styles.infoSection}>
+                      <Text style={styles.infoLabel}>Social Media</Text>
+                      {store?.instagram_url && (
+                        <View style={styles.hoursRow}>
+                          <Icon name="instagram" size={18} color="#E4405F" />
+                          <Text style={styles.infoValue}>{store.instagram_url}</Text>
+                        </View>
+                      )}
+                      {store?.facebook_url && (
+                        <View style={[styles.hoursRow, { marginTop: 8 }]}>
+                          <Icon name="facebook" size={18} color="#1877F2" />
+                          <Text style={styles.infoValue}>{store.facebook_url}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </>
+                )}
               </View>
             </View>
           )}

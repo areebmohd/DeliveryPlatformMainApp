@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -13,6 +12,7 @@ import { useCart } from '../../context/CartContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { AlertModal } from '../../components/ui/AlertModal';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import RNUpiPayment from 'react-native-upi-payment';
@@ -23,6 +23,26 @@ export const CartScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [address, setAddress] = useState('');
   const insets = useSafeAreaInsets();
+
+  // Alert Modal state
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    primaryAction?: any;
+    showCancel?: boolean;
+    onClose?: () => void;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  const showAlert = (title: string, message: string, type: any = 'info', primaryAction?: any, showCancel: boolean = true) => {
+    setAlertConfig({ visible: true, title, message, type, primaryAction, showCancel });
+  };
   
   const deliveryFee = totalItems > 0 ? 25 : 0; 
   const platformFee = totalItems > 0 ? 2 : 0;
@@ -31,7 +51,7 @@ export const CartScreen = ({ navigation }: any) => {
   const handleCheckout = async () => {
     if (items.length === 0) return;
     if (!address.trim()) {
-      Alert.alert('Address Required', 'Please enter your delivery address');
+      showAlert('Address Required', 'Please enter your delivery address', 'warning');
       return;
     }
     
@@ -102,10 +122,12 @@ export const CartScreen = ({ navigation }: any) => {
  
       // 5. Trigger UPI Payment
       if (!RNUpiPayment || !RNUpiPayment.initializePayment) {
-        Alert.alert(
+        showAlert(
           'Note', 
           'UPI Payment module not linked. If you just installed it, please restart the app with "npm run android".\n\nOrder saved as Waiting for Pickup.',
-          [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
+          'info',
+          { text: 'OK', onPress: () => navigation.navigate('Home') },
+          false
         );
         clearCart();
         return;
@@ -120,18 +142,24 @@ export const CartScreen = ({ navigation }: any) => {
           transactionRef: order.id,
         },
         (success) => {
-          Alert.alert('Success', 'Payment initiated! We will verify and process your order.');
-          clearCart();
-          navigation.navigate('Orders');
+          showAlert('Success', 'Payment initiated! We will verify and process your order.', 'success', {
+            text: 'OK',
+            onPress: () => {
+              clearCart();
+              navigation.navigate('Orders');
+            }
+          }, false);
         },
         (error) => {
-          Alert.alert('Payment Failed', 'If money was deducted, please contact support with Order ID.');
-          navigation.navigate('Orders');
+          showAlert('Payment Failed', 'If money was deducted, please contact support with Order ID.', 'error', {
+            text: 'View Orders',
+            onPress: () => navigation.navigate('Orders')
+          }, false);
         }
       );
  
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showAlert('Error', e.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -238,6 +266,19 @@ export const CartScreen = ({ navigation }: any) => {
           loading={loading}
         />
       </View>
+
+      <AlertModal
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => {
+          setAlertConfig(prev => ({ ...prev, visible: false }));
+          if (alertConfig.onClose) alertConfig.onClose();
+        }}
+        primaryAction={alertConfig.primaryAction}
+        showCancel={alertConfig.showCancel}
+      />
     </View>
   );
 };

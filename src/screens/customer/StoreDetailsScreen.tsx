@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -48,6 +49,40 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const getQuantity = (productId: string) => {
     const item = items.find(i => i.id === productId);
     return item ? item.quantity : 0;
+  };
+
+  const handleContact = (type: string, value: string) => {
+    let url = '';
+    switch (type) {
+      case 'tel':
+        url = `tel:${value}`;
+        break;
+      case 'mailto':
+        url = `mailto:${value}`;
+        break;
+      case 'whatsapp':
+        // Remove non-numeric characters for WhatsApp
+        const cleanedNumber = value.replace(/\D/g, '');
+        url = `whatsapp://send?phone=${cleanedNumber}`;
+        break;
+      case 'browser':
+        url = value.startsWith('http') ? value : `https://${value}`;
+        break;
+    }
+    
+    if (url) {
+      Linking.canOpenURL(url).then(supported => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          console.warn('Cannot open URL:', url);
+          // Fallback for WhatsApp if the protocol isn't supported (e.g. web fallback)
+          if (type === 'whatsapp') {
+             Linking.openURL(`https://wa.me/${value.replace(/\D/g, '')}`);
+          }
+        }
+      });
+    }
   };
 
   return (
@@ -93,6 +128,80 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                 <Text style={styles.statText}>2.4 km</Text>
               </View>
             </View>
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Store Information</Text>
+          </View>
+
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Icon name="clock-outline" size={20} color={Colors.primary} />
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.infoLabel}>Opening Hours</Text>
+                <Text style={styles.infoText}>{store.opening_hours || 'Contact store for timings'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Icon name="map-marker-outline" size={20} color={Colors.primary} />
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.infoLabel}>Address</Text>
+                <Text style={styles.infoText}>{store.address}</Text>
+              </View>
+            </View>
+
+            {(store.phone || store.email || store.whatsapp_number) && (
+              <View style={styles.contactActions}>
+                {store.phone && (
+                  <TouchableOpacity 
+                    style={styles.contactButton} 
+                    onPress={() => handleContact('tel', store.phone)}
+                  >
+                    <Icon name="phone" size={20} color={Colors.white} />
+                    <Text style={styles.contactButtonText}>Call</Text>
+                  </TouchableOpacity>
+                )}
+                {store.whatsapp_number && (
+                  <TouchableOpacity 
+                    style={[styles.contactButton, { backgroundColor: '#25D366' }]} 
+                    onPress={() => handleContact('whatsapp', store.whatsapp_number)}
+                  >
+                    <Icon name="whatsapp" size={20} color={Colors.white} />
+                    <Text style={styles.contactButtonText}>WhatsApp</Text>
+                  </TouchableOpacity>
+                )}
+                {store.email && (
+                  <TouchableOpacity 
+                    style={[styles.contactButton, { backgroundColor: Colors.textSecondary }]} 
+                    onPress={() => handleContact('mailto', store.email)}
+                  >
+                    <Icon name="email" size={20} color={Colors.white} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {(store.instagram_url || store.facebook_url) && (
+              <View style={styles.socialRow}>
+                {store.instagram_url && (
+                  <TouchableOpacity 
+                    style={styles.socialButton}
+                    onPress={() => handleContact('browser', store.instagram_url)}
+                  >
+                    <Icon name="instagram" size={24} color="#E4405F" />
+                  </TouchableOpacity>
+                )}
+                {store.facebook_url && (
+                  <TouchableOpacity 
+                    style={styles.socialButton}
+                    onPress={() => handleContact('browser', store.facebook_url)}
+                  >
+                    <Icon name="facebook" size={24} color="#1877F2" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
 
           <View style={styles.sectionHeader}>
@@ -247,6 +356,74 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     fontWeight: '600',
+  },
+  infoCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.md,
+  },
+  infoTextContainer: {
+    marginLeft: Spacing.sm,
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  infoText: {
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+  },
+  contactActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  contactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  contactButtonText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: Spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.md,
+  },
+  socialButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   emptyContainer: {
     marginTop: 40,

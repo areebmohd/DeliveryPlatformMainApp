@@ -8,11 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { Colors, Spacing } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { AlertModal } from '../../components/ui/AlertModal';
 import { supabase } from '../../api/supabase';
 
 export const RegisterScreen = ({ navigation }: any) => {
@@ -22,6 +22,24 @@ export const RegisterScreen = ({ navigation }: any) => {
   const [role, setRole] = useState<'customer' | 'store'>('customer');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    primaryAction?: any;
+    showCancel?: boolean;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  const showAlert = (title: string, message: string, type: any = 'info', primaryAction?: any, showCancel: boolean = true) => {
+    setAlertConfig({ visible: true, title, message, type, primaryAction, showCancel });
+  };
 
   const handleRegister = async () => {
     if (!fullName || !email || !password) {
@@ -45,11 +63,13 @@ export const RegisterScreen = ({ navigation }: any) => {
       });
 
       if (signUpError) throw signUpError;
-
-      Alert.alert(
+      
+      showAlert(
         'Success',
         'Registration successful! Please check your email for verification.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+        'success',
+        { text: 'OK', onPress: () => navigation.navigate('Login') },
+        false
       );
     } catch (e: any) {
       setError(e.message || 'An error occurred during registration');
@@ -137,6 +157,16 @@ export const RegisterScreen = ({ navigation }: any) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <AlertModal
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+        primaryAction={alertConfig.primaryAction}
+        showCancel={alertConfig.showCancel}
+      />
     </SafeAreaView>
   );
 };

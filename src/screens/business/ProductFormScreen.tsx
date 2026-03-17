@@ -320,6 +320,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             alertConfig.onConfirm();
           }
         }}
+        showCancel={alertConfig.type !== 'success'}
         primaryAction={alertConfig.onConfirm ? {
           text: alertConfig.type === 'success' ? 'OK' : 'Confirm',
           onPress: alertConfig.onConfirm,
