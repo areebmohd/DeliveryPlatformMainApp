@@ -96,7 +96,7 @@ export const HomeScreen = ({ navigation }: any) => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('stores')
+        .from('stores_view')
         .select('*')
         .eq('is_active', true);
 
@@ -114,7 +114,7 @@ export const HomeScreen = ({ navigation }: any) => {
       setBestSellersLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('*, stores(*)')
+        .select('*, stores:stores_view(*)')
         .eq('in_stock', true)
         .limit(10);
 
@@ -132,7 +132,7 @@ export const HomeScreen = ({ navigation }: any) => {
       setSuggestionsLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('*, stores(*)')
+        .select('*, stores:stores_view(*)')
         .eq('in_stock', true)
         .order('id', { ascending: false })
         .limit(12);

@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Image,
   Dimensions,
+  Platform,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -118,7 +120,7 @@ export const StoreScreen = ({ navigation }: any) => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('stores')
+        .from('stores_view')
         .select('*')
         .eq('owner_id', user?.id)
         .single();
@@ -404,10 +406,47 @@ export const StoreScreen = ({ navigation }: any) => {
                       size={18}
                       color={Colors.error}
                     />
-                    <Text style={styles.infoValue}>
-                      {store?.address || 'Location required for deliveries'}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.infoValue}>
+                        {store?.address_line_1 ||
+                          store?.address ||
+                          'Location required for deliveries'}
+                        {store?.sector_area ? `\n${store.sector_area}` : ''}
+                        {store?.pincode ? ` - ${store.pincode}` : ''}
+                        {store?.city ? `\n${store.city}` : ''}
+                        {store?.state ? `, ${store.state}` : ''}
+                      </Text>
+                    </View>
                   </View>
+
+                  {store?.location_wkt && (
+                    <TouchableOpacity
+                      style={styles.mapLink}
+                      onPress={() => {
+                        const match = store.location_wkt.match(
+                          /POINT\(([-\d.]+) ([-\d.]+)\)/,
+                        );
+                        if (match) {
+                          const lng = match[1];
+                          const lat = match[2];
+                          const url = Platform.select({
+                            ios: `maps:0,0?q=${store.name}@${lat},${lng}`,
+                            android: `geo:0,0?q=${lat},${lng}(${store.name})`,
+                          });
+                          if (url) Linking.openURL(url);
+                        }
+                      }}
+                    >
+                      <Icon
+                        name="google-maps"
+                        size={16}
+                        color={Colors.primary}
+                      />
+                      <Text style={styles.mapLinkText}>
+                        View GPS Coordinates
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {(store?.phone || store?.email || store?.whatsapp_number) && (
@@ -417,20 +456,34 @@ export const StoreScreen = ({ navigation }: any) => {
                       <Text style={styles.infoLabel}>Contact Information</Text>
                       {store?.phone && (
                         <View style={styles.hoursRow}>
-                          <Icon name="phone-outline" size={18} color={Colors.primary} />
+                          <Icon
+                            name="phone-outline"
+                            size={18}
+                            color={Colors.primary}
+                          />
                           <Text style={styles.infoValue}>{store.phone}</Text>
                         </View>
                       )}
                       {store?.email && (
                         <View style={[styles.hoursRow, { marginTop: 8 }]}>
-                          <Icon name="email-outline" size={18} color={Colors.primary} />
+                          <Icon
+                            name="email-outline"
+                            size={18}
+                            color={Colors.primary}
+                          />
                           <Text style={styles.infoValue}>{store.email}</Text>
                         </View>
                       )}
                       {store?.whatsapp_number && (
                         <View style={[styles.hoursRow, { marginTop: 8 }]}>
-                          <Icon name="whatsapp" size={18} color={Colors.success} />
-                          <Text style={styles.infoValue}>{store.whatsapp_number}</Text>
+                          <Icon
+                            name="whatsapp"
+                            size={18}
+                            color={Colors.success}
+                          />
+                          <Text style={styles.infoValue}>
+                            {store.whatsapp_number}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -445,13 +498,17 @@ export const StoreScreen = ({ navigation }: any) => {
                       {store?.instagram_url && (
                         <View style={styles.hoursRow}>
                           <Icon name="instagram" size={18} color="#E4405F" />
-                          <Text style={styles.infoValue}>{store.instagram_url}</Text>
+                          <Text style={styles.infoValue}>
+                            {store.instagram_url}
+                          </Text>
                         </View>
                       )}
                       {store?.facebook_url && (
                         <View style={[styles.hoursRow, { marginTop: 8 }]}>
                           <Icon name="facebook" size={18} color="#1877F2" />
-                          <Text style={styles.infoValue}>{store.facebook_url}</Text>
+                          <Text style={styles.infoValue}>
+                            {store.facebook_url}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -467,14 +524,18 @@ export const StoreScreen = ({ navigation }: any) => {
 
       <TouchableOpacity
         style={[styles.fab, { bottom: 20 + insets.bottom }]}
-        onPress={() => activeTab === 'products' ? handleNavigateToProductForm() : handleNavigateToStoreForm()}
+        onPress={() =>
+          activeTab === 'products'
+            ? handleNavigateToProductForm()
+            : handleNavigateToStoreForm()
+        }
         activeOpacity={0.9}
       >
         <View style={styles.fabGradient}>
-          <Icon 
-            name={activeTab === 'products' ? "plus" : "pencil-outline"} 
-            size={activeTab === 'products' ? 30 : 24} 
-            color={Colors.white} 
+          <Icon
+            name={activeTab === 'products' ? 'plus' : 'pencil-outline'}
+            size={activeTab === 'products' ? 30 : 24}
+            color={Colors.white}
           />
           <Text style={styles.fabText}>
             {activeTab === 'products' ? 'Add Product' : 'Edit Info'}
@@ -681,6 +742,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  mapLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginLeft: 28,
+    gap: 4,
+  },
+  mapLinkText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: '700',
   },
   infoDivider: {
     height: 1,

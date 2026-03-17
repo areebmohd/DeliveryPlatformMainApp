@@ -10,6 +10,7 @@ import {
   StatusBar,
   Linking,
   Image,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -279,8 +280,38 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                   <Text style={styles.infoLabel}>Address</Text>
                   <View style={styles.infoRow}>
                     <Icon name="map-marker-outline" size={18} color={Colors.error} />
-                    <Text style={styles.infoValue}>{store.address}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.infoValue}>
+                        {store.address_line_1 || store.address}
+                        {store.sector_area ? `\n${store.sector_area}` : ''}
+                        {store.city ? `\n${store.city}` : ''}
+                        {store.pincode ? ` - ${store.pincode}` : ''}
+                        {store.state ? `, ${store.state}` : ''}
+                      </Text>
+                    </View>
                   </View>
+                  
+                  {store.location_wkt && (
+                    <TouchableOpacity 
+                      style={styles.mapLink}
+                      onPress={() => {
+                        // Extract coordinates from Point string: POINT(lng lat)
+                        const match = store.location_wkt.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+                        if (match) {
+                          const lng = match[1];
+                          const lat = match[2];
+                          const url = Platform.select({
+                            ios: `maps:0,0?q=${store.name}@${lat},${lng}`,
+                            android: `geo:0,0?q=${lat},${lng}(${store.name})`
+                          });
+                          if (url) Linking.openURL(url);
+                        }
+                      }}
+                    >
+                      <Icon name="google-maps" size={16} color={Colors.primary} />
+                      <Text style={styles.mapLinkText}>View on Map</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {(store.phone || store.email || store.whatsapp_number) && (
@@ -526,6 +557,18 @@ const styles = StyleSheet.create({
     color: Colors.text,
     lineHeight: 22,
     fontWeight: '500',
+  },
+  mapLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginLeft: 28,
+    gap: 4,
+  },
+  mapLinkText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: '700',
   },
   infoRow: {
     flexDirection: 'row',
