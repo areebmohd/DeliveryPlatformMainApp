@@ -20,9 +20,12 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useAuth } from '../../context/AuthContext';
 
 export const ProductFormScreen = ({ route, navigation }: any) => {
-  const { storeId, product, mode } = route.params || {};
+  const { storeId, product, selectedType, initialType, mode } = route.params || {};
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+
+  // Product Type state
+  const [productType, setProductType] = useState<string>(product?.product_type || selectedType || initialType || mode || 'barcode');
   
   const [name, setName] = useState(product?.name || '');
   const [description, setDescription] = useState(product?.description || '');
@@ -33,6 +36,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [stockQuantity, setStockQuantity] = useState(product?.stock_quantity?.toString() || '0');
   const [inStock, setInStock] = useState(product?.in_stock !== false);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Barcode & Stock states
   const [barcode, setBarcode] = useState(product?.barcode || '');
@@ -59,7 +63,30 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   };
 
   const isEditing = !!product;
-  const isBarcodeMode = mode === 'barcode';
+  const isBarcodeMode = productType === 'barcode';
+  const isCommonMode = productType === 'common';
+  const isPersonalMode = productType === 'personal';
+
+  // Update productType if it changes in params (initially)
+  useEffect(() => {
+    const passedType = route.params?.selectedType || route.params?.initialType || route.params?.type || route.params?.mode;
+    if (passedType && !isEditing) {
+      setProductType(passedType);
+    }
+  }, [route.params?.selectedType, route.params?.initialType, route.params?.type, route.params?.mode]);
+
+  const getProductTypeDescription = () => {
+    switch (productType) {
+      case 'barcode':
+        return 'For items with manufacturer barcodes. Speedy scanning for everyone.';
+      case 'common':
+        return 'Standard items like fruits, vegetables, etc. sold by many stores.';
+      case 'personal':
+        return 'Unique items made specifically by your store. You can add your own photos.';
+      default:
+        return '';
+    }
+  };
 
   const handleBarcodeLookup = async () => {
     if (!barcode) return;
@@ -95,9 +122,30 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const canEditDetails = isEditing || !isBarcodeMode || (hasSearchedBarcode && !isBarcodeMatched);
+  const canEditDetails = isEditing || isPersonalMode || (isBarcodeMode && hasSearchedBarcode && !isBarcodeMatched) || isCommonMode;
 
-  // Removed pickImage function
+  const pickImage = async () => {
+    if (!isPersonalMode) return;
+    
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+    });
+
+    if (result.assets && result.assets[0].uri && user) {
+      try {
+        setUploading(true);
+        const fileName = `products/${user.id}/${Date.now()}.jpg`;
+        const publicUrl = await uploadImage('store-logos', fileName, result.assets[0].uri);
+        setImageUrl(publicUrl);
+        showAlert('Success', 'Image uploaded successfully!', 'success');
+      } catch (error: any) {
+        showAlert('Error', error.message, 'error');
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
 
   const handleSaveProduct = async () => {
     if (!name || !price) {
@@ -153,6 +201,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         category: category.trim(),
         image_url: finalImageUrl,
         barcode: barcode.trim() || null,
+        product_type: productType,
         stock_quantity: parseInt(stockQuantity),
         in_stock: inStock,
         updated_at: new Date().toISOString(),
@@ -193,15 +242,42 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {isEditing ? 'Edit Product' : 'Add Product'}
+          {isEditing ? 'Edit Product' : `Add ${productType.charAt(0).toUpperCase() + productType.slice(1)} Product`}
         </Text>
         <View style={{ width: 40 }} /> 
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Product Type Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Product Type</Text>
+          <View style={styles.typeSelectorContainer}>
+            {['barcode', 'common', 'personal'].map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.typeChip,
+                  productType === type && styles.activeTypeChip,
+                  isEditing && styles.disabledChip
+                ]}
+                onPress={() => !isEditing && setProductType(type)}
+                disabled={isEditing}
+              >
+                <Text style={[
+                  styles.typeChipText,
+                  productType === type && styles.activeTypeChipText
+                ]}>
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.typeDescription}>{getProductTypeDescription()}</Text>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Identification</Text>
-          {(isBarcodeMode || barcode) && (
+          {isBarcodeMode && (
             <View style={styles.barcodeWrapper}>
               <Input
                 label="Barcode"
@@ -224,23 +300,41 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           )}
 
           <View style={styles.inputContainer}>
-          <Text style={styles.label}>Product Image</Text>
-          <View style={[styles.imagePreviewContainer, !canEditDetails && styles.disabledInput]}>
-            {imageUrl ? (
-              <Image source={{ uri: imageUrl }} style={styles.previewImage} />
-            ) : (
-              <View style={styles.placeholderContainer}>
-                <Icon name="image-search" size={40} color={Colors.textSecondary} />
-                <Text style={styles.placeholderText}>
-                  {name ? `Searching library for "${name}"...` : "Image will be added by Admin"}
-                </Text>
-              </View>
-            )}
+            <Text style={styles.label}>Product Image</Text>
+            <TouchableOpacity 
+              style={[
+                styles.imagePreviewContainer, 
+                !isPersonalMode && styles.disabledInput,
+                uploading && styles.uploadingContainer
+              ]}
+              onPress={pickImage}
+              disabled={!isPersonalMode || uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator size="large" color={Colors.primary} />
+              ) : imageUrl ? (
+                <Image source={{ uri: imageUrl }} style={styles.previewImage} />
+              ) : (
+                <View style={styles.placeholderContainer}>
+                  <Icon 
+                    name={isPersonalMode ? "camera-plus" : "image-search"} 
+                    size={40} 
+                    color={Colors.textSecondary} 
+                  />
+                  <Text style={styles.placeholderText}>
+                    {isPersonalMode 
+                      ? "Tap to upload product photo" 
+                      : name ? `Searching library for "${name}"...` : "Image will be added by Admin"}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.helperText}>
+              {isPersonalMode 
+                ? "Upload a clear photo of your unique product." 
+                : "Images are managed globally. If a matching product image is found in our library, it will be added automatically."}
+            </Text>
           </View>
-          <Text style={styles.helperText}>
-            Images are managed globally. If a matching product image is found in our library, it will be added automatically.
-          </Text>
-        </View>
         </View>
 
         <View style={styles.section}>
@@ -376,12 +470,50 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
     color: Colors.text,
     marginBottom: Spacing.md,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  typeSelectorContainer: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  typeChip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
+  },
+  activeTypeChip: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + '10',
+  },
+  disabledChip: {
+    opacity: 0.6,
+  },
+  typeChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  activeTypeChipText: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  typeDescription: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+    lineHeight: 18,
+    marginTop: Spacing.xs,
   },
   inputContainer: {
     marginBottom: Spacing.md,
@@ -426,7 +558,10 @@ const styles = StyleSheet.create({
   },
   disabledInput: {
     backgroundColor: '#F1F3F5',
-    opacity: 0.7,
+    opacity: 0.8,
+  },
+  uploadingContainer: {
+    opacity: 0.6,
   },
   row: {
     flexDirection: 'row',

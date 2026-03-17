@@ -32,6 +32,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
     type: 'success' | 'error' | 'warning' | 'info';
     primaryAction?: any;
     secondaryAction?: any;
+    tertiaryAction?: any;
     verticalButtons?: boolean;
     showCancel?: boolean;
   }>({
@@ -41,8 +42,21 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
     type: 'info',
   });
 
+  // Verify no other showAlert calls exist for the add flow
+
   const showAlert = (config: any) => {
-    setAlertConfig({ visible: true, ...config });
+    // Reset state before showing to prevent leakage from previous alerts
+    setAlertConfig({
+      visible: true,
+      title: config.title || '',
+      message: config.message || '',
+      type: config.type || 'info',
+      primaryAction: config.primaryAction,
+      secondaryAction: config.secondaryAction,
+      tertiaryAction: config.tertiaryAction,
+      verticalButtons: config.verticalButtons,
+      showCancel: config.showCancel !== false,
+    });
   };
 
   const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
@@ -97,28 +111,9 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   };
 
   const handleNavigateToForm = (product?: any) => {
-    if (product) {
-      navigation.navigate('ProductForm', { 
-        storeId,
-        product 
-      });
-      return;
-    }
-
-    showAlert({
-      title: 'Add Product',
-      message: 'Choose how to add your product. Scanning a barcode is faster!',
-      type: 'info',
-      verticalButtons: true,
-      primaryAction: {
-        text: 'Barcode Product',
-        onPress: () => navigation.navigate('ProductForm', { storeId, mode: 'barcode' }),
-      },
-      secondaryAction: {
-        text: 'Manual Product',
-        onPress: () => navigation.navigate('ProductForm', { storeId, mode: 'manual' }),
-        variant: 'outline',
-      },
+    navigation.navigate('ProductForm', { 
+      storeId,
+      product 
     });
   };
 
@@ -214,7 +209,9 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
         onClose={closeAlert}
         primaryAction={alertConfig.primaryAction}
         secondaryAction={alertConfig.secondaryAction}
+        tertiaryAction={alertConfig.tertiaryAction}
         verticalButtons={alertConfig.verticalButtons}
+        showCancel={alertConfig.showCancel}
       />
     </View>
   );

@@ -158,37 +158,10 @@ export const StoreScreen = ({ navigation }: any) => {
   };
 
   const handleNavigateToProductForm = (product?: any) => {
-    if (product) {
-      navigation.navigate('ProductForm', {
-        storeId: store.id,
-        product,
-      });
-      return;
-    }
-
-    showAlert({
-      title: 'Add Product',
-      message:
-        'Select how you want to add this product. Barcode products pre-fill details automatically.',
-      type: 'info',
-      verticalButtons: true,
-      primaryAction: {
-        text: 'Barcode Product',
-        onPress: () =>
-          navigation.navigate('ProductForm', {
-            storeId: store.id,
-            mode: 'barcode',
-          }),
-      },
-      secondaryAction: {
-        text: 'Manual Product',
-        onPress: () =>
-          navigation.navigate('ProductForm', {
-            storeId: store.id,
-            mode: 'manual',
-          }),
-        variant: 'outline',
-      },
+    navigation.navigate('ProductForm', {
+      storeId: store.id,
+      product,
+      initialType: 'barcode',
     });
   };
 

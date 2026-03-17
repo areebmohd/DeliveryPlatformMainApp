@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 
 interface AlertAction {
   text: string;
+  description?: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'destructive' | 'outline';
 }
@@ -23,6 +25,7 @@ interface AlertModalProps {
   message: string;
   type?: 'success' | 'error' | 'warning' | 'info';
   onClose: () => void;
+  actions?: AlertAction[];
   primaryAction?: AlertAction;
   secondaryAction?: AlertAction;
   tertiaryAction?: AlertAction;
@@ -45,10 +48,20 @@ export const AlertModal = ({
   verticalButtons = false,
 }: AlertModalProps) => {
   const scaleValue = useRef(new Animated.Value(0)).current;
-  const actions = [tertiaryAction, secondaryAction, primaryAction].filter(Boolean) as AlertAction[];
+
+  // Combine actions into a single array  // Combine actions into a single array for rendering
+  const finalActions: AlertAction[] = [];
+  if (primaryAction) finalActions.push(primaryAction);
+  if (secondaryAction) finalActions.push(secondaryAction);
+  if (tertiaryAction) finalActions.push(tertiaryAction);
+
+  // Horizontal reversal for design (Primary on right)
+  if (!verticalButtons) {
+    finalActions.reverse();
+  }
   
-  // Safety: If no actions are provided, force showCancel to true so the modal can be closed
-  const finalShowCancel = showCancel || actions.length === 0;
+  // Safety: If no actions are provided, force showCancel to true
+  const finalShowCancel = showCancel || finalActions.length === 0;
 
   useEffect(() => {
     if (visible) {
@@ -97,6 +110,7 @@ export const AlertModal = ({
       style={[
         styles.button, 
         verticalButtons ? styles.verticalButton : { flex: 1 },
+        action.description && styles.buttonWithDescription,
         getActionStyle(action.variant, icon.color)
       ]} 
       onPress={() => {
@@ -104,9 +118,16 @@ export const AlertModal = ({
         onClose();
       }}
     >
-      <Text style={[styles.buttonText, getActionTextStyle(action.variant, icon.color)]}>
-        {action.text}
-      </Text>
+      <View style={styles.buttonContent}>
+        <Text style={[styles.buttonText, getActionTextStyle(action.variant, icon.color)]}>
+          {action.text}
+        </Text>
+        {action.description && (
+          <Text style={[styles.buttonDescription, getActionTextStyle(action.variant, icon.color), { opacity: 0.8 }]}>
+            {action.description}
+          </Text>
+        )}
+      </View>
     </TouchableOpacity>
   );
 
@@ -118,45 +139,38 @@ export const AlertModal = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <Animated.View style={[styles.modalContainer, { transform: [{ scale: scaleValue }] }]}>
-          <View style={[styles.iconContainer, { backgroundColor: icon.color + '15' }]}>
-            <Icon name={icon.name} size={40} color={icon.color} />
-          </View>
-          
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
-
-          <View style={[styles.buttonContainer, verticalButtons && styles.verticalButtonContainer]}>
-            {finalShowCancel && actions.length === 0 && (
-              <TouchableOpacity 
-                style={[styles.button, styles.secondaryButton, { flex: 1 }]} 
-                onPress={onClose}
-              >
-                <Text style={styles.secondaryButtonText}>{cancelText}</Text>
-              </TouchableOpacity>
-            )}
+        <View style={styles.modalContainer}>
+          <ScrollView 
+            style={styles.scrollView} 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={true}
+          >
+            <Text style={{ position: 'absolute', top: 0, opacity: 0 }}>DEBUG: {finalActions.length} actions</Text>
+            <View style={[styles.iconContainer, { backgroundColor: icon.color + '15' }]}>
+              <Icon name={icon.name} size={40} color={icon.color} />
+            </View>
             
-            {actions.map(renderButton)}
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.message}>{message}</Text>
 
-            {finalShowCancel && actions.length > 0 && !verticalButtons && (
-              <TouchableOpacity 
-                style={[styles.button, styles.secondaryButton, { flex: 1 }]} 
-                onPress={onClose}
-              >
-                <Text style={styles.secondaryButtonText}>{cancelText}</Text>
-              </TouchableOpacity>
-            )}
+            <View style={[styles.buttonContainer, verticalButtons && styles.verticalButtonContainer]}>
+              {finalActions.map(renderButton)}
 
-            {finalShowCancel && verticalButtons && (
-              <TouchableOpacity 
-                style={[styles.button, styles.secondaryButton, styles.verticalButton]} 
-                onPress={onClose}
-              >
-                <Text style={styles.secondaryButtonText}>{cancelText}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </Animated.View>
+              {finalShowCancel && (
+                <TouchableOpacity 
+                  style={[
+                    styles.button, 
+                    styles.secondaryButton, 
+                    verticalButtons ? styles.verticalButton : { flex: 1 }
+                  ]} 
+                  onPress={onClose}
+                >
+                  <Text style={styles.secondaryButtonText}>{cancelText}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </ScrollView>
+        </View>
       </View>
     </Modal>
   );
@@ -172,15 +186,24 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: '100%',
+    maxHeight: Dimensions.get('window').height * 0.8,
     backgroundColor: Colors.white,
     borderRadius: borderRadius.xl,
-    padding: Spacing.xl,
-    alignItems: 'center',
     elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
+    overflow: 'hidden',
+  },
+  scrollView: {
+    width: '100%',
+  },
+  scrollContent: {
+    padding: Spacing.xl,
+    paddingBottom: Spacing.xl * 2,
+    alignItems: 'center',
+    width: '100%',
   },
   iconContainer: {
     width: 80,
@@ -219,13 +242,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  buttonWithDescription: {
+    height: 70,
+  },
+  buttonContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
+  },
   verticalButton: {
     width: '100%',
   },
   buttonText: {
     color: Colors.white,
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 16,
+  },
+  buttonDescription: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
   },
   secondaryButton: {
     backgroundColor: Colors.surface,
