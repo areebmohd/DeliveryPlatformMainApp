@@ -5,6 +5,7 @@ import { HomeScreen } from '../screens/customer/HomeScreen';
 import { StoreDetailsScreen } from '../screens/customer/StoreDetailsScreen';
 import { CartScreen } from '../screens/customer/CartScreen';
 import { AccountScreen } from '../screens/customer/AccountScreen';
+import { FavouritesScreen } from '../screens/customer/FavouritesScreen';
 import { Colors } from '../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +22,18 @@ const HomeStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeMain" component={HomeScreen} />
+      <Stack.Screen name="StoreDetails" component={StoreDetailsScreen} />
+      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+    </Stack.Navigator>
+  );
+};
+
+const AccountStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AccountMain" component={AccountScreen} />
+      <Stack.Screen name="Favourites" component={FavouritesScreen} />
+      <Stack.Screen name="CustomerOrders" component={CustomerOrdersScreen} />
       <Stack.Screen name="StoreDetails" component={StoreDetailsScreen} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
     </Stack.Navigator>
@@ -67,7 +80,7 @@ export const CustomerNavigator = () => {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Cart" component={CartScreen} />
-      <Tab.Screen name="Account" component={AccountScreen} />
+      <Tab.Screen name="Account" component={AccountStack} />
     </Tab.Navigator>
   );
 };

@@ -172,7 +172,7 @@ export const CustomerOrdersScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F8FA',
+    backgroundColor: Colors.background,
   },
   screenHeader: {
     padding: Spacing.lg,

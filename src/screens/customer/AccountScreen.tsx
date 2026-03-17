@@ -1,15 +1,31 @@
-import React from 'react';
-import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing } from '../../theme/colors';
+import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../context/AuthContext';
 import { AlertModal } from '../../components/ui/AlertModal';
-import { useState } from 'react';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-export const AccountScreen = () => {
-  const { profile, signOut } = useAuth();
+export const AccountScreen = ({ navigation }: any) => {
+  const { profile, signOut, updateProfile } = useAuth();
   const insets = useSafeAreaInsets();
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Edit states
+  const [editName, setEditName] = useState(profile?.full_name || '');
+  const [editPhone, setEditPhone] = useState(profile?.phone || '');
+  const [editUpiId, setEditUpiId] = useState(profile?.upi_id || '');
 
   const [alertConfig, setAlertConfig] = useState<{
     visible: boolean;
@@ -25,36 +41,175 @@ export const AccountScreen = () => {
     type: 'info',
   });
 
+  const showAlert = (title: string, message: string, type: any = 'info', primaryAction?: any, showCancel: boolean = true) => {
+    setAlertConfig({ visible: true, title, message, type, primaryAction, showCancel });
+  };
+
   const handleSignOut = () => {
-    setAlertConfig({
-      visible: true,
-      title: 'Sign Out',
-      message: 'Are you sure you want to sign out?',
-      type: 'warning',
-      showCancel: true,
-      primaryAction: {
+    showAlert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      'warning',
+      {
         text: 'Sign Out',
         onPress: signOut,
         variant: 'destructive',
       },
-    });
+      true
+    );
   };
+
+  const handleUpdateProfile = async () => {
+    if (!editName.trim() || !editPhone.trim() || !editUpiId.trim()) {
+      showAlert('Required Fields', 'Please fill all mandatory fields (Name, Phone, UPI ID).', 'warning');
+      return;
+    }
+
+    setLoading(true);
+    const result = await updateProfile({
+      full_name: editName,
+      phone: editPhone,
+      upi_id: editUpiId,
+    });
+    setLoading(false);
+
+    if (result.success) {
+      setIsEditing(false);
+      showAlert('Success', 'Profile updated successfully!', 'success');
+    } else {
+      showAlert('Error', 'Failed to update profile. Please try again.', 'error');
+    }
+  };
+
+  const OptionItem = ({ icon, label, onPress }: { icon: string; label: string; onPress?: () => void }) => (
+    <TouchableOpacity style={styles.optionItem} onPress={onPress}>
+      <View style={styles.optionLeft}>
+        <Icon name={icon} size={22} color={Colors.primary} />
+        <Text style={styles.optionLabel}>{label}</Text>
+      </View>
+      <Icon name="chevron-right" size={20} color={Colors.textSecondary} />
+    </TouchableOpacity>
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
-      <View style={styles.content}>
-        <Text style={styles.title}>Account</Text>
-        <Text style={styles.userName}>{profile?.full_name || 'User'}</Text>
-        <Text style={styles.email}>{profile?.email}</Text>
-        
-        <Button 
-          title="Sign Out" 
-          onPress={handleSignOut} 
-          variant="outline"
-          style={styles.signOutButton}
-        />
-      </View>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+      
+      <ScrollView 
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing.xl }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.headerTitle}>Customer Account</Text>
+
+        {/* User Info Box */}
+        <View style={styles.box}>
+          <View style={styles.boxHeader}>
+            <Text style={styles.boxTitle}>User Info</Text>
+            {isEditing && (
+              <TouchableOpacity onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {isEditing ? (
+            <View style={styles.editForm}>
+              <Input
+                label="Full Name"
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Enter your name"
+              />
+              <Input
+                label="Phone Number"
+                value={editPhone}
+                onChangeText={setEditPhone}
+                placeholder="Enter phone number"
+                keyboardType="phone-pad"
+              />
+              <Input
+                label="UPI ID"
+                value={editUpiId}
+                onChangeText={setEditUpiId}
+                placeholder="example@upi"
+                autoCapitalize="none"
+              />
+              <Button 
+                title="Save Changes" 
+                onPress={handleUpdateProfile} 
+                loading={loading}
+                style={styles.saveBtn}
+              />
+            </View>
+          ) : (
+            <View style={styles.infoList}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Name</Text>
+                <Text style={styles.infoValue}>{profile?.full_name || 'Not set'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Phone</Text>
+                <Text style={styles.infoValue}>{profile?.phone || 'Not set'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>UPI ID</Text>
+                <Text style={styles.infoValue}>{profile?.upi_id || 'Not set'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Email</Text>
+                <Text style={styles.infoValue}>{profile?.email}</Text>
+              </View>
+              
+              <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editBtnBottom}>
+                <Icon name="pencil-outline" size={18} color={Colors.primary} />
+                <Text style={styles.editBtnTextBottom}>Edit Profile Details</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Options Box */}
+        <View style={styles.box}>
+          <OptionItem 
+            icon="package-variant-closed" 
+            label="Orders" 
+            onPress={() => navigation.navigate('CustomerOrders')} 
+          />
+          <OptionItem icon="map-marker-outline" label="Addresses" onPress={() => {}} />
+          <OptionItem icon="bell-outline" label="Notifications" onPress={() => {}} />
+          <OptionItem icon="crown-outline" label="Premium" onPress={() => {}} />
+          <OptionItem 
+            icon="heart-outline" 
+            label="Favourites" 
+            onPress={() => navigation.navigate('Favourites')} 
+          />
+          <OptionItem icon="cash-refund" label="Refunds" onPress={() => {}} />
+          <OptionItem icon="headset" label="Customer Support" onPress={() => {}} />
+        </View>
+
+        {/* Sign Out Box */}
+        <View style={styles.box}>
+          <View style={styles.signOutHeader}>
+            <View style={styles.userCircle}>
+              <Icon name="account" size={30} color={Colors.primary} />
+            </View>
+            <View style={styles.signOutText}>
+              <Text style={styles.loggedInAs}>Logged in as</Text>
+              <Text style={styles.userEmail} numberOfLines={1}>{profile?.email}</Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.signOutBtnPremium} 
+            onPress={handleSignOut}
+          >
+            <View style={styles.signOutBtnContent}>
+              <Icon name="logout-variant" size={24} color={Colors.error} />
+              <Text style={styles.signOutBtnText}>Sign Out from App</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={Colors.error + '50'} />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       <AlertModal
         visible={alertConfig.visible}
@@ -72,28 +227,176 @@ export const AccountScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
-  content: {
-    padding: Spacing.lg,
+  scrollContent: {
+    padding: Spacing.md,
   },
-  title: {
+  headerTitle: {
     fontSize: 28,
     fontWeight: '800',
     color: Colors.text,
     marginBottom: Spacing.lg,
+    marginTop: Spacing.sm,
   },
-  userName: {
+  box: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  boxHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  boxTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Colors.text,
   },
-  email: {
+  cancelBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cancelBtnText: {
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  editBtnBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primaryLight,
+    padding: 14,
+    borderRadius: 16,
+    marginTop: Spacing.md,
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.primary + '20',
+  },
+  editBtnTextBottom: {
+    color: Colors.primary,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  infoList: {
+    gap: Spacing.md,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  infoLabel: {
     fontSize: 14,
     color: Colors.textSecondary,
-    marginBottom: Spacing.xl,
+    fontWeight: '600',
   },
-  signOutButton: {
-    marginTop: 'auto',
+  infoValue: {
+    fontSize: 15,
+    color: Colors.text,
+    fontWeight: '700',
+  },
+  infoValueDisabled: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  editForm: {
+    gap: Spacing.xs,
+  },
+  saveBtn: {
+    marginTop: Spacing.md,
+  },
+  optionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + '50',
+  },
+  optionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  optionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  signOutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  userCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: Colors.white,
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  signOutText: {
+    flex: 1,
+  },
+  loggedInAs: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  userEmail: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text,
+    marginTop: 2,
+  },
+  signOutBtnPremium: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFF1F2',
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+  },
+  signOutBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  signOutBtnText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: Colors.error,
   },
 });

@@ -163,7 +163,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       
       {/* Header */}
       <View style={styles.header}>
@@ -277,7 +277,7 @@ export const HomeScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',

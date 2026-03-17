@@ -24,11 +24,64 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const { addItem, updateQuantity, items, totalItems, subtotal } = useCart();
   const [activeTab, setActiveTab] = useState<'products' | 'info'>('products');
+  const [isFavourite, setIsFavourite] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchProducts();
+    checkFavourite();
   }, []);
+
+  const checkFavourite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('favourites')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('store_id', store.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      setIsFavourite(!!data);
+    } catch (e) {
+      console.error('Error checking favorite:', e);
+    }
+  };
+
+  const toggleFavourite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      setFavLoading(true);
+      if (isFavourite) {
+        const { error } = await supabase
+          .from('favourites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('store_id', store.id);
+        if (error) throw error;
+        setIsFavourite(false);
+      } else {
+        const { error } = await supabase
+          .from('favourites')
+          .insert({
+            user_id: user.id,
+            store_id: store.id,
+          });
+        if (error) throw error;
+        setIsFavourite(true);
+      }
+    } catch (e) {
+      console.error('Error toggling favorite:', e);
+    } finally {
+      setFavLoading(false);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -93,10 +146,27 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
       
       {/* Custom Header with Branding */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={Colors.text} />
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Icon name="arrow-left" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerMainTitle}>Store</Text>
+        </View>
+        <TouchableOpacity 
+          onPress={toggleFavourite} 
+          style={styles.favButton}
+          disabled={favLoading}
+        >
+          {favLoading ? (
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Icon 
+              name={isFavourite ? "heart" : "heart-outline"} 
+              size={28} 
+              color={isFavourite ? Colors.error : Colors.primary} 
+            />
+          )}
         </TouchableOpacity>
-        <Text style={styles.headerMainTitle}>Store</Text>
       </View>
 
       <ScrollView 
@@ -298,14 +368,32 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: Colors.background,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  favButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 22,
+    backgroundColor: Colors.white,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   backButton: {
     width: 40,

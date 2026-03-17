@@ -146,6 +146,22 @@ export const CartScreen = ({ navigation }: any) => {
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
+
+    // Profile Info Validation
+    const { profile } = useAuth();
+    if (!profile?.full_name || !profile?.phone || !profile?.upi_id) {
+      showAlert(
+        'Profile Incomplete',
+        'Please provide your Full Name, Phone, and UPI ID in the Account page before placing an order.',
+        'warning',
+        {
+          text: 'Go to Account',
+          onPress: () => navigation.navigate('Account'),
+        }
+      );
+      return;
+    }
+
     if (!selectedAddress) {
       showAlert('Address Required', 'Please select a delivery address', 'warning');
       return;
@@ -250,7 +266,7 @@ export const CartScreen = ({ navigation }: any) => {
   if (items.length === 0) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
         <View style={styles.emptyContainer}>
           <Icon name="cart-outline" size={80} color={Colors.border} />
           <Text style={styles.emptyTitle}>Cart is empty</Text>
@@ -268,7 +284,7 @@ export const CartScreen = ({ navigation }: any) => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       
       <ScrollView 
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 150 }]}

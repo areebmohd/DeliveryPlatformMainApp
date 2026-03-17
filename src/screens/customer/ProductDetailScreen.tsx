@@ -8,11 +8,13 @@ import {
   ScrollView,
   StatusBar,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useCart } from '../../context/CartContext';
+import { supabase } from '../../api/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -20,6 +22,62 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   const { product, store } = route.params;
   const insets = useSafeAreaInsets();
   const { addItem, updateQuantity, items } = useCart();
+  const [isFavourite, setIsFavourite] = React.useState(false);
+  const [favLoading, setFavLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    checkFavourite();
+  }, [product.id]);
+
+  const checkFavourite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('favourites')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('product_id', product.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      setIsFavourite(!!data);
+    } catch (e) {
+      console.error('Error checking favorite:', e);
+    }
+  };
+
+  const toggleFavourite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      setFavLoading(true);
+      if (isFavourite) {
+        const { error } = await supabase
+          .from('favourites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('product_id', product.id);
+        if (error) throw error;
+        setIsFavourite(false);
+      } else {
+        const { error } = await supabase
+          .from('favourites')
+          .insert({
+            user_id: user.id,
+            product_id: product.id,
+          });
+        if (error) throw error;
+        setIsFavourite(true);
+      }
+    } catch (e) {
+      console.error('Error toggling favorite:', e);
+    } finally {
+      setFavLoading(false);
+    }
+  };
 
   const cartItem = items.find(item => item.id === product.id);
   const quantity = cartItem ? cartItem.quantity : 0;
@@ -30,10 +88,27 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
       
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={Colors.text} />
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Icon name="arrow-left" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Product</Text>
+        </View>
+        <TouchableOpacity 
+          onPress={toggleFavourite} 
+          style={styles.favButton}
+          disabled={favLoading}
+        >
+          {favLoading ? (
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Icon 
+              name={isFavourite ? "heart" : "heart-outline"} 
+              size={28} 
+              color={isFavourite ? Colors.error : Colors.primary} 
+            />
+          )}
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Product</Text>
       </View>
 
       <ScrollView 
@@ -120,9 +195,27 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
     backgroundColor: Colors.background,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  favButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 22,
+    backgroundColor: Colors.white,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   backButton: {
     width: 40,
