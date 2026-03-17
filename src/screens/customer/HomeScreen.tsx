@@ -10,6 +10,7 @@ import {
   StatusBar,
   ActivityIndicator,
   Dimensions,
+  Modal,
 } from 'react-native';
 const { width } = Dimensions.get('window');
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,11 +20,11 @@ import { StoreCard } from '../../components/StoreCard';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { supabase } from '../../api/supabase';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 
 const CATEGORIES = [
   { id: '1', name: 'Grocery', icon: 'cart-outline' },
   { id: '2', name: 'Fruits', icon: 'food-apple-outline' },
-  { id: '3', name: 'Vegetables', icon: 'leaf-outline' },
   { id: '4', name: 'Pharmacy', icon: 'medical-bag' },
   { id: '5', name: 'Dairy', icon: 'cow' },
   { id: '6', name: 'Meat', icon: 'food-steak' },
@@ -38,7 +39,11 @@ export const HomeScreen = ({ navigation }: any) => {
   const [bestSellersLoading, setBestSellersLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const { addItem, updateQuantity, items } = useCart();
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [addressModalVisible, setAddressModalVisible] = useState(false);
+  const { addItem, updateQuantity, items, sessionAddress, setSessionAddress } = useCart();
+  const { user } = useAuth();
 
   const getQuantity = (productId: string) => {
     const item = items.find(i => i.id === productId);
@@ -49,7 +54,43 @@ export const HomeScreen = ({ navigation }: any) => {
     fetchStores();
     fetchBestSellers();
     fetchSuggestions();
-  }, []);
+    if (user) {
+      fetchAddresses();
+    }
+
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (user) {
+        fetchAddresses();
+      }
+    });
+
+    return unsubscribe;
+  }, [user, navigation]);
+
+  const fetchAddresses = async () => {
+    try {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from('addresses')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_deleted', false)
+        .order('is_default', { ascending: false });
+
+      if (error) throw error;
+      setSavedAddresses(data || []);
+      
+      // Select default or first available
+      if (data && data.length > 0) {
+        const defaultAddr = data.find((a: any) => a.is_default) || data[0];
+        setSelectedAddress(defaultAddr);
+      } else {
+        setSelectedAddress(null);
+      }
+    } catch (e) {
+      console.error('Error fetching addresses:', e);
+    }
+  };
 
   const fetchStores = async () => {
     try {
@@ -167,13 +208,29 @@ export const HomeScreen = ({ navigation }: any) => {
       
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <TouchableOpacity 
+          style={styles.locationContainer} 
+          onPress={() => setAddressModalVisible(true)}
+          activeOpacity={0.7}
+        >
           <View style={styles.locationRow}>
-            <Icon name="map-marker" size={20} color={Colors.primary} />
+            <Icon name="map-marker" size={18} color={Colors.primary} />
             <Text style={styles.locationLabel}>Delivering to</Text>
           </View>
-          <Text style={styles.locationTitle}>Gurugram, Sector 45 ↓</Text>
-        </View>
+          <View style={styles.addressRow}>
+            <Text style={styles.locationTitle} numberOfLines={1}>
+              {sessionAddress 
+                ? (sessionAddress.label.length > 25 ? `${sessionAddress.label.substring(0, 22)}...` : sessionAddress.label)
+                : selectedAddress 
+                  ? (() => {
+                      const fullAddress = `${selectedAddress.address_line}${selectedAddress.city ? `, ${selectedAddress.city}` : ''}`;
+                      return fullAddress.length > 25 ? `${fullAddress.substring(0, 22)}...` : fullAddress;
+                    })()
+                  : 'Select Address'}
+            </Text>
+            <Icon name="chevron-down" size={20} color={Colors.text} />
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.profileButton}>
           <Icon name="bell-outline" size={24} color={Colors.text} />
         </TouchableOpacity>
@@ -270,6 +327,81 @@ export const HomeScreen = ({ navigation }: any) => {
             </>
           )}
         </ScrollView>
+
+      {/* Address Selection Modal */}
+      <Modal
+        visible={addressModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setAddressModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Delivery Address</Text>
+              <TouchableOpacity onPress={() => setAddressModalVisible(false)}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalScroll}>
+              <TouchableOpacity 
+                style={styles.modalOption} 
+                onPress={() => {
+                  setAddressModalVisible(false);
+                  navigation.navigate('AddLiveLocation');
+                }}
+              >
+                <Icon name="crosshairs-gps" size={24} color={sessionAddress ? Colors.primary : Colors.primary} />
+                <Text style={[styles.modalOptionText, sessionAddress && { color: Colors.primary, fontWeight: '900' }]}>
+                  {sessionAddress ? "Live Location Active" : "Live Location"}
+                </Text>
+                {sessionAddress && <Icon name="check-circle" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.modalOption} 
+                onPress={() => {
+                  setAddressModalVisible(false);
+                  navigation.navigate('AddAddress'); 
+                }}
+              >
+                <Icon name="plus" size={24} color={Colors.primary} />
+                <Text style={styles.modalOptionText}>Add new address</Text>
+              </TouchableOpacity>
+
+              <View style={styles.savedAddressesHeader}>
+                <Text style={styles.savedAddressesTitle}>Saved Addresses</Text>
+              </View>
+
+              {savedAddresses.map((addr) => (
+                <TouchableOpacity 
+                  key={addr.id} 
+                  style={[styles.savedAddressItem, !sessionAddress && selectedAddress?.id === addr.id && styles.selectedAddressItem]}
+                  onPress={() => {
+                    setSelectedAddress(addr);
+                    setSessionAddress(null); // Clear session address if saved one is selected
+                    setAddressModalVisible(false);
+                  }}
+                >
+                  <Icon 
+                    name={addr.label.toLowerCase().includes('home') ? 'home-outline' : addr.label.toLowerCase().includes('work') ? 'briefcase-outline' : 'map-marker-outline'} 
+                    size={20} 
+                    color={!sessionAddress && selectedAddress?.id === addr.id ? Colors.primary : Colors.textSecondary} 
+                  />
+                  <View style={styles.savedAddressInfo}>
+                    <Text style={styles.savedAddressLabel}>{addr.label}</Text>
+                    <Text style={styles.savedAddressText} numberOfLines={1}>{addr.address_line}</Text>
+                  </View>
+                  {!sessionAddress && selectedAddress?.id === addr.id && (
+                    <Icon name="check-circle" size={20} color={Colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -286,6 +418,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
   },
+  locationContainer: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -296,11 +432,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 4,
   },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   locationTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: Colors.text,
     marginLeft: 2,
+    maxWidth: '85%',
   },
   profileButton: {
     width: 44,
@@ -422,5 +564,88 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     justifyContent: 'flex-start',
     gap: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingBottom: Spacing.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  modalScroll: {
+    padding: Spacing.md,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    marginBottom: Spacing.md,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginLeft: 12,
+  },
+  savedAddressesHeader: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+  },
+  savedAddressesTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  savedAddressItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 12,
+  },
+  selectedAddressItem: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + '05',
+    borderWidth: 2,
+  },
+  savedAddressInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  savedAddressLabel: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  savedAddressText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });

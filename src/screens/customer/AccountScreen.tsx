@@ -175,7 +175,11 @@ export const AccountScreen = ({ navigation }: any) => {
             label="Orders" 
             onPress={() => navigation.navigate('CustomerOrders')} 
           />
-          <OptionItem icon="map-marker-outline" label="Addresses" onPress={() => {}} />
+          <OptionItem 
+            icon="map-marker-outline" 
+            label="Addresses" 
+            onPress={() => navigation.navigate('Addresses')} 
+          />
           <OptionItem icon="bell-outline" label="Notifications" onPress={() => {}} />
           <OptionItem icon="crown-outline" label="Premium" onPress={() => {}} />
           <OptionItem 

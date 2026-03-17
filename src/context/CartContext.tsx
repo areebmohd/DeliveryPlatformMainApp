@@ -17,19 +17,21 @@ interface CartContextType {
   clearCart: () => void;
   totalItems: number;
   subtotal: number;
+  sessionAddress: any | null;
+  setSessionAddress: (address: any | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [sessionAddress, setSessionAddress] = useState<any | null>(null);
 
   const addItem = (product: any, store: any) => {
     setItems(prev => {
       // Check if item is from a different store
       if (prev.length > 0 && prev[0].store_id !== store.id) {
         // For MVP, we only allow items from one store at a time
-        // You could prompt the user here, but for now we'll just replace
         return [{ 
           id: product.id, 
           name: product.name, 
@@ -86,7 +88,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateQuantity, 
       clearCart,
       totalItems,
-      subtotal
+      subtotal,
+      sessionAddress,
+      setSessionAddress
     }}>
       {children}
     </CartContext.Provider>

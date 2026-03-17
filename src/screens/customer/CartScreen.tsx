@@ -25,7 +25,7 @@ import Geolocation from '@react-native-community/geolocation';
 const { width, height } = Dimensions.get('window');
 
 export const CartScreen = ({ navigation }: any) => {
-  const { items, updateQuantity, subtotal, totalItems, clearCart } = useCart();
+  const { items, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress } = useCart();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
@@ -67,7 +67,15 @@ export const CartScreen = ({ navigation }: any) => {
     if (user) {
       fetchAddresses();
     }
-  }, [user]);
+    
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (user) {
+        fetchAddresses();
+      }
+    });
+
+    return unsubscribe;
+  }, [user, navigation]);
 
   const fetchAddresses = async () => {
     try {
@@ -75,6 +83,7 @@ export const CartScreen = ({ navigation }: any) => {
         .from('addresses')
         .select('*')
         .eq('user_id', user?.id)
+        .eq('is_deleted', false)
         .order('is_default', { ascending: false });
 
       if (error) throw error;
@@ -162,13 +171,38 @@ export const CartScreen = ({ navigation }: any) => {
       return;
     }
 
-    if (!selectedAddress) {
+    if (!selectedAddress && !sessionAddress) {
       showAlert('Address Required', 'Please select a delivery address', 'warning');
       return;
     }
     
     try {
       setLoading(true);
+
+      let finalAddressId = selectedAddress?.id;
+
+      // If use session address, save it temporarily to get an ID
+      if (sessionAddress) {
+        const { data: tempAddr, error: addrError } = await supabase
+          .from('addresses')
+          .insert({
+            user_id: user?.id,
+            address_line: sessionAddress.address_line,
+            city: sessionAddress.city,
+            state: sessionAddress.state,
+            pincode: sessionAddress.pincode,
+            location: sessionAddress.location,
+            receiver_name: sessionAddress.receiver_name,
+            receiver_phone: sessionAddress.receiver_phone,
+            label: sessionAddress.label,
+            is_deleted: true // Hide it from the user's address book
+          })
+          .select()
+          .single();
+        
+        if (addrError) throw addrError;
+        finalAddressId = tempAddr.id;
+      }
       
       // Group items by store for orders
       const storesInCart = [...new Set(items.map(i => i.store_id))];
@@ -192,7 +226,7 @@ export const CartScreen = ({ navigation }: any) => {
           .insert({
             customer_id: user?.id,
             store_id: storeId,
-            delivery_address_id: selectedAddress.id,
+            delivery_address_id: finalAddressId,
             subtotal: storeSubtotal,
             total_amount: grandTotal, 
             delivery_fee: deliveryFee,
@@ -340,13 +374,19 @@ export const CartScreen = ({ navigation }: any) => {
             style={styles.addressBox} 
             onPress={() => setAddressModalVisible(true)}
           >
-            <Icon name="map-marker-outline" size={24} color={Colors.primary} />
+            <Icon 
+              name={sessionAddress ? "crosshairs-gps" : (selectedAddress?.label.toLowerCase().includes('home') ? 'home-outline' : 'map-marker-outline')} 
+              size={24} 
+              color={Colors.primary} 
+            />
             <View style={styles.addressInfo}>
               <Text style={styles.addressLabel}>
-                {selectedAddress ? selectedAddress.label : 'Select Address'}
+                {sessionAddress ? sessionAddress.label : (selectedAddress?.label || 'Select Address')}
               </Text>
               <Text style={styles.addressText} numberOfLines={1}>
-                {selectedAddress ? selectedAddress.address_line : 'Where should we deliver?'}
+                {sessionAddress 
+                  ? `${sessionAddress.address_line}, ${sessionAddress.city}`
+                  : (selectedAddress ? selectedAddress.address_line : 'Where should we deliver?')}
               </Text>
             </View>
             <Icon name="chevron-right" size={24} color={Colors.textSecondary} />
@@ -428,9 +468,18 @@ export const CartScreen = ({ navigation }: any) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalScroll}>
-              <TouchableOpacity style={styles.modalOption} onPress={handleUseCurrentLocation}>
-                <Icon name="crosshairs-gps" size={24} color={Colors.primary} />
-                <Text style={styles.modalOptionText}>Use current location</Text>
+              <TouchableOpacity 
+                style={styles.modalOption} 
+                onPress={() => {
+                  setAddressModalVisible(false);
+                  navigation.navigate('AddLiveLocation');
+                }}
+              >
+                <Icon name="crosshairs-gps" size={24} color={sessionAddress ? Colors.primary : Colors.primary} />
+                <Text style={[styles.modalOptionText, sessionAddress && { color: Colors.primary, fontWeight: '900' }]}>
+                  {sessionAddress ? "Live Location Active" : "Live Location"}
+                </Text>
+                {sessionAddress && <Icon name="check-circle" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -451,22 +500,23 @@ export const CartScreen = ({ navigation }: any) => {
               {savedAddresses.map((addr) => (
                 <TouchableOpacity 
                   key={addr.id} 
-                  style={[styles.savedAddressItem, selectedAddress?.id === addr.id && styles.selectedAddressItem]}
+                  style={[styles.savedAddressItem, !sessionAddress && selectedAddress?.id === addr.id && styles.selectedAddressItem]}
                   onPress={() => {
                     setSelectedAddress(addr);
+                    setSessionAddress(null); // Clear session address if saved one is selected
                     setAddressModalVisible(false);
                   }}
                 >
                   <Icon 
                     name={addr.label.toLowerCase().includes('home') ? 'home-outline' : 'map-marker-outline'} 
                     size={20} 
-                    color={selectedAddress?.id === addr.id ? Colors.primary : Colors.textSecondary} 
+                    color={!sessionAddress && selectedAddress?.id === addr.id ? Colors.primary : Colors.textSecondary} 
                   />
                   <View style={styles.savedAddressInfo}>
                     <Text style={styles.savedAddressLabel}>{addr.label}</Text>
                     <Text style={styles.savedAddressText} numberOfLines={1}>{addr.address_line}</Text>
                   </View>
-                  {selectedAddress?.id === addr.id && (
+                  {!sessionAddress && selectedAddress?.id === addr.id && (
                     <Icon name="check-circle" size={20} color={Colors.primary} />
                   )}
                 </TouchableOpacity>
