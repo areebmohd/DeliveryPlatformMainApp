@@ -242,18 +242,16 @@ export const HomeScreen = ({ navigation }: any) => {
       </View>
 
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <TouchableOpacity 
+        style={styles.searchContainer}
+        onPress={() => navigation.navigate('Search')}
+        activeOpacity={0.9}
+      >
         <View style={styles.searchBar}>
           <Icon name="magnify" size={24} color={Colors.textSecondary} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for stores or products..."
-            placeholderTextColor={Colors.textSecondary}
-            value={search}
-            onChangeText={setSearch}
-          />
+          <Text style={styles.searchPlaceholder}>Search for stores or products...</Text>
         </View>
-      </View>
+      </TouchableOpacity>
       </LinearGradient>
 
       <ScrollView 
@@ -480,11 +478,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 5,
   },
-  searchInput: {
-    flex: 1,
+  searchPlaceholder: {
     marginLeft: Spacing.sm,
     fontSize: 16,
-    color: Colors.text,
+    color: Colors.textSecondary,
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: 100,
