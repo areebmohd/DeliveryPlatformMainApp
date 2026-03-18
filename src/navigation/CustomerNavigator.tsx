@@ -17,6 +17,7 @@ import { AddressesScreen } from '../screens/customer/AddressesScreen';
 import { AddAddressScreen } from '../screens/customer/AddAddressScreen';
 import { AddLiveLocationScreen } from '../screens/customer/AddLiveLocationScreen';
 import { SearchScreen } from '../screens/customer/SearchScreen';
+import { CategoryScreen } from '../screens/customer/CategoryScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -30,6 +31,7 @@ const HomeStack = () => {
       <Stack.Screen name="AddAddress" component={AddAddressScreen} />
       <Stack.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
       <Stack.Screen name="Search" component={SearchScreen} />
+      <Stack.Screen name="Category" component={CategoryScreen} />
     </Stack.Navigator>
   );
 };

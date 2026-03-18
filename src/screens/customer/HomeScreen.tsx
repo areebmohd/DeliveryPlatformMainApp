@@ -153,7 +153,7 @@ export const HomeScreen = ({ navigation }: any) => {
         styles.categoryItem,
         selectedCategory === item.name && styles.categoryItemActive,
       ]}
-      onPress={() => setSelectedCategory(item.name)}
+      onPress={() => navigation.navigate('Category', { categoryName: item.name })}
     >
       <View style={[
         styles.categoryIconContainer,
