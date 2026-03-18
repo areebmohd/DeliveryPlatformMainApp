@@ -99,8 +99,10 @@ export const OrdersScreen = () => {
 
     if (error) console.error('Error fetching orders:', error);
     else {
-      // Filter out only completed (delivered) orders, keep cancelled and others
-      const visibleOrders = (data || []).filter((o: any) => o.status !== 'delivered');
+      // Filter out completed and cancelled orders
+      const visibleOrders = (data || []).filter((o: any) => 
+        o.status !== 'delivered' && o.status !== 'cancelled'
+      );
       setOrders(visibleOrders);
     }
   };
@@ -202,9 +204,9 @@ export const OrdersScreen = () => {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending_verification':
-      case 'accepted':
-      case 'preparing':
+      case 'pending_verification': return 'New Order';
+      case 'accepted': return 'Accepted';
+      case 'preparing': return 'Preparing';
       case 'ready': return 'Waiting for Pickup';
       case 'picked_up': return 'Picked Up';
       case 'delivered': return 'Delivered';
@@ -303,8 +305,30 @@ export const OrdersScreen = () => {
         </View>
 
         <View style={styles.orderFooter}>
-          <Text style={styles.amountLabel}>Grand Total</Text>
-          <Text style={styles.amountValue}>₹{item.total_amount}</Text>
+          <View>
+            <Text style={styles.amountLabel}>Grand Total</Text>
+            <Text style={styles.amountValue}>₹{item.total_amount}</Text>
+          </View>
+          
+          <View style={styles.actionButtons}>
+            {item.status === 'pending_verification' && (
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: Colors.primary }]}
+                onPress={() => updateStatus(item.id, 'accepted')}
+              >
+                <Text style={styles.actionBtnText}>Accept Order</Text>
+              </TouchableOpacity>
+            )}
+            
+            {(item.status === 'accepted' || item.status === 'preparing') && (
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: Colors.success }]}
+                onPress={() => updateStatus(item.id, 'ready')}
+              >
+                <Text style={styles.actionBtnText}>Mark As Ready</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
     );
@@ -551,6 +575,27 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '900',
     color: Colors.text,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  actionBtnText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '800',
   },
   center: {
     flex: 1,
