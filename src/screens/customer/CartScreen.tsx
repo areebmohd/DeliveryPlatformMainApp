@@ -26,7 +26,7 @@ const { width, height } = Dimensions.get('window');
 
 export const CartScreen = ({ navigation }: any) => {
   const { items, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress } = useCart();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
@@ -157,7 +157,6 @@ export const CartScreen = ({ navigation }: any) => {
     if (items.length === 0) return;
 
     // Profile Info Validation
-    const { profile } = useAuth();
     if (!profile?.full_name || !profile?.phone || !profile?.upi_id) {
       showAlert(
         'Profile Incomplete',
