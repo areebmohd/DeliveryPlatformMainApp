@@ -197,7 +197,7 @@ export const HomeScreen = ({ navigation }: any) => {
       quantity={getQuantity(item.id)}
       onIncrease={() => updateQuantity(item.id, 1)}
       onDecrease={() => updateQuantity(item.id, -1)}
-      width={(width - Spacing.md * 2 - 20) / 3}
+      width={(width - Spacing.md * 2 - 20) / 3 - 2}
     />
   );
 
