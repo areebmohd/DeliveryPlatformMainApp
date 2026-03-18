@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 export const SupportScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
+      <SafeTopBackground />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-left" size={24} color={Colors.text} />

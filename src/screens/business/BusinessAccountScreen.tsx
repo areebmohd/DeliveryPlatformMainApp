@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { supabase } from '../../api/supabase';
 import { AlertModal } from '../../components/ui/AlertModal';
+import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 export const BusinessAccountScreen = ({ navigation }: any) => {
   const { profile, signOut, user } = useAuth();
@@ -102,8 +103,9 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
+      <SafeTopBackground />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
           <Text style={styles.title}>Business Account</Text>
         </View>
         {/* Box 1: Profile */}

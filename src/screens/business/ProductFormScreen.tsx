@@ -18,6 +18,7 @@ import { AlertModal } from '../../components/ui/AlertModal';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useAuth } from '../../context/AuthContext';
+import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 export const ProductFormScreen = ({ route, navigation }: any) => {
   const { storeId, product, selectedType, initialType, mode } = route.params || {};
@@ -237,7 +238,8 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+      <SafeTopBackground />
+      <View style={[styles.header, { paddingTop: Spacing.sm }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>

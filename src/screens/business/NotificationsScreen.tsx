@@ -3,12 +3,14 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 export const NotificationsScreen = () => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
+      <SafeTopBackground />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notifications</Text>
       </View>
@@ -26,7 +28,7 @@ export const NotificationsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.background,
   },
   header: {
     padding: Spacing.lg,

@@ -15,6 +15,7 @@ import { AlertModal } from '../../components/ui/AlertModal';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 export const OrdersScreen = () => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -311,13 +312,14 @@ export const OrdersScreen = () => {
 
   return (
     <View style={styles.container}>
+      <SafeTopBackground />
       {loading && !refreshing ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : (
         <ScrollView 
-          contentContainerStyle={[styles.listContent, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + 100 }]}
+          contentContainerStyle={[styles.listContent, { paddingTop: Spacing.md, paddingBottom: insets.bottom + 100 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
           showsVerticalScrollIndicator={false}
         >

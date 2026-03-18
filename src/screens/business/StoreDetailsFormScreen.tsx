@@ -21,6 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase, uploadImage, deleteFile } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 import { AlertModal } from '../../components/ui/AlertModal';
 
@@ -236,7 +237,8 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+      <SafeTopBackground />
+      <View style={[styles.header, { paddingTop: Spacing.sm }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>

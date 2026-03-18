@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { BusinessProductCard } from '../../components/BusinessProductCard';
+import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 const { width } = Dimensions.get('window');
 
@@ -218,7 +219,7 @@ export const StoreScreen = ({ navigation }: any) => {
   }
 
   const renderHeader = () => (
-    <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+    <View style={[styles.header, { paddingTop: Spacing.sm }]}>
       <View style={styles.headerContent}>
         <Text style={styles.headerName}>{store?.name || 'Your Store'}</Text>
         <View style={styles.badgeRow}>
@@ -308,6 +309,7 @@ export const StoreScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
+      <SafeTopBackground />
       <ScrollView
         stickyHeaderIndices={[3]}
         contentContainerStyle={styles.scrollContent}

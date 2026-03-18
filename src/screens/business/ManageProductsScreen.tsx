@@ -17,6 +17,7 @@ import { AlertModal } from '../../components/ui/AlertModal';
 import { BusinessProductCard } from '../../components/BusinessProductCard';
 import { supabase } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 export const ManageProductsScreen = ({ route, navigation }: any) => {
   const { storeId } = route.params;
@@ -158,8 +159,9 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <SafeTopBackground />
+      <View style={[styles.header, { paddingTop: Spacing.sm }]}>
         <Icon 
           name="arrow-left" 
           size={24} 
