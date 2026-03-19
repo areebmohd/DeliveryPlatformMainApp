@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   Linking,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -133,6 +134,10 @@ export const StoreScreen = ({ navigation }: any) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onRefresh = async () => {
+    await Promise.all([fetchStore(), fetchProducts()]);
   };
 
   const fetchProducts = async () => {
@@ -311,12 +316,34 @@ export const StoreScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       <SafeTopBackground />
       <ScrollView
-        stickyHeaderIndices={[3]}
+        stickyHeaderIndices={[store && !store.is_active ? 4 : 3]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={onRefresh} colors={[Colors.primary]} />
+        }
       >
         {renderHeader()}
         {renderBanner()}
+        
+        {store && !store.is_active && (
+          <TouchableOpacity 
+            style={styles.inactiveAlert} 
+            onPress={handleNavigateToStoreForm}
+            activeOpacity={0.8}
+          >
+            <View style={styles.alertIconBg}>
+              <Icon name="alert-circle" size={24} color={Colors.error} />
+            </View>
+            <View style={styles.alertTextContainer}>
+              <Text style={styles.alertTitle}>Verification Required</Text>
+              <Text style={styles.alertSubtitle}>
+                Your store is inactive and hidden from users. Please fill necessary details to verify your store and activate it.
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={20} color={Colors.error} />
+          </TouchableOpacity>
+        )}
 
         <View style={{ height: 10 }} />
 
@@ -610,6 +637,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     borderStyle: 'dashed',
+  },
+  inactiveAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF0F0',
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FFDADA',
+  },
+  alertIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#FFE5E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  alertTextContainer: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#D32F2F',
+    marginBottom: 2,
+  },
+  alertSubtitle: {
+    fontSize: 12,
+    color: '#D32F2F',
+    lineHeight: 16,
+    fontWeight: '600',
   },
   placeholderText: {
     marginTop: 8,

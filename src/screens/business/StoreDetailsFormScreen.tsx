@@ -54,6 +54,10 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [location, setLocation] = useState<any>(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [ownerName, setOwnerName] = useState(store?.owner_name || '');
+  const [ownerNumber, setOwnerNumber] = useState(store?.owner_number || '');
+  const [verificationImages, setVerificationImages] = useState<string[]>(store?.verification_images || []);
+  const [isUploadingVerification, setIsUploadingVerification] = useState(false);
 
   // Alert Modal state
   const [alertConfig, setAlertConfig] = useState<{
@@ -174,10 +178,67 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     }
   };
 
+  const pickVerificationImage = async () => {
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      includeBase64: true,
+      quality: 0.7,
+    });
+
+    if (result.didCancel || !result.assets || result.assets.length === 0) return;
+
+    const asset = result.assets[0];
+    const base64 = asset.base64;
+    if (!base64 || !user?.id) return;
+
+    try {
+      setIsUploadingVerification(true);
+      const fileName = `${user?.id}_v_${Date.now()}.jpg`;
+      const publicUrl = await uploadImage('banners', fileName, base64);
+      setVerificationImages([...verificationImages, publicUrl]);
+    } catch (error: any) {
+      showAlert('Error', error.message || 'Could not upload image', 'error');
+    } finally {
+      setIsUploadingVerification(false);
+    }
+  };
+
+  const removeVerificationImage = async (url: string) => {
+    try {
+      await deleteFile('banners', url);
+      setVerificationImages(verificationImages.filter(img => img !== url));
+    } catch (error) {
+      console.error('Error removing verification image', error);
+    }
+  };
   const handleSaveStore = async () => {
+    // Basic required fields for all updates
     if (!name || !addressLine1 || !city || !state || !pincode) {
       showAlert('Required Info', 'Please fill in all required address fields', 'warning');
       return;
+    }
+
+    // MANDATORY FIELDS FOR NEW OR INACTIVE STORES (VERIFICATION)
+    if (!store || store.is_active === false) {
+      const missingFields = [];
+      if (!name) missingFields.push('Store Name');
+      if (!category) missingFields.push('Category');
+      if (!addressLine1 || !city || !state || !pincode) missingFields.push('Complete Address');
+      if (!location) missingFields.push('Live Location');
+      if (!phone) missingFields.push('Store Number');
+      if (!upiId) missingFields.push('UPI ID');
+      if (!ownerName) missingFields.push('Owner Name');
+      if (!ownerNumber) missingFields.push('Owner Number');
+      if (verificationImages.length === 0) missingFields.push('Store Images');
+
+      if (missingFields.length > 0) {
+        showAlert(
+          'Verification Required',
+          `Please fill in all mandatory details for verification: ${missingFields.join(', ')}`,
+          'warning'
+        );
+        return;
+      }
     }
 
     try {
@@ -201,6 +262,9 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         instagram_url: instagramUrl,
         facebook_url: facebookUrl,
         whatsapp_number: whatsappNumber,
+        owner_name: ownerName,
+        owner_number: ownerNumber,
+        verification_images: verificationImages,
       };
 
       if (location) {
@@ -273,17 +337,17 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Store Profile</Text>
-          <Input label="Store Name" value={name} onChangeText={setName} placeholder="e.g. Daily Needs Supermarket" />
-          <Input label="Category" value={category} onChangeText={setCategory} placeholder="e.g. Grocery, Pharmacy" />
+          <Input label="Store Name *" value={name} onChangeText={setName} placeholder="e.g. Daily Needs Supermarket" />
+          <Input label="Category *" value={category} onChangeText={setCategory} placeholder="e.g. Grocery, Pharmacy" />
           <Input label="Description" value={description} onChangeText={setDescription} placeholder="About your store..." multiline numberOfLines={3} />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Store Address</Text>
-          <Input label="Address Line 1" value={addressLine1} onChangeText={setAddressLine1} placeholder="Flat/House No, Building, Street" />
+          <Input label="Address Line 1 *" value={addressLine1} onChangeText={setAddressLine1} placeholder="Flat/House No, Building, Street" />
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Input label="Pin Code" value={pincode} onChangeText={setPincode} placeholder="122001" keyboardType="numeric" />
+              <Input label="Pin Code *" value={pincode} onChangeText={setPincode} placeholder="122001" keyboardType="numeric" />
             </View>
             <View style={{ width: 16 }} />
             <View style={{ flex: 1 }}>
@@ -292,17 +356,17 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
           </View>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Input label="City" value={city} onChangeText={setCity} placeholder="Gurugram" />
+              <Input label="City *" value={city} onChangeText={setCity} placeholder="Gurugram" />
             </View>
             <View style={{ width: 16 }} />
             <View style={{ flex: 1 }}>
-              <Input label="State" value={state} onChangeText={setState} placeholder="Haryana" />
+              <Input label="State *" value={state} onChangeText={setState} placeholder="Haryana" />
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Live Location</Text>
+          <Text style={styles.sectionTitle}>Live Location *</Text>
           <Text style={styles.subtitle}>Pinpoint your store's exact location for riders</Text>
           
           <View style={styles.mapContainer}>
@@ -345,7 +409,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Info</Text>
-          <Input label="Store Phone" value={phone} onChangeText={setPhone} placeholder="e.g. +91 9876543210" keyboardType="phone-pad" />
+          <Input label="Store Phone *" value={phone} onChangeText={setPhone} placeholder="e.g. +91 9876543210" keyboardType="phone-pad" />
           <Input label="Store Email" value={email} onChangeText={setEmail} placeholder="e.g. contact@store.com" keyboardType="email-address" autoCapitalize="none" />
           <Input label="WhatsApp Number" value={whatsappNumber} onChangeText={setWhatsappNumber} placeholder="For customer queries" keyboardType="phone-pad" />
         </View>
@@ -358,9 +422,53 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payments</Text>
-          <Input label="UPI ID" value={upiId} onChangeText={setUpiId} placeholder="yourname@upi" />
+          <Input label="UPI ID *" value={upiId} onChangeText={setUpiId} placeholder="yourname@upi" />
           <Text style={styles.helperText}>Your payments will be credited to this UPI ID.</Text>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Owner Information</Text>
+          <Input label="Owner Name *" value={ownerName} onChangeText={setOwnerName} placeholder="Full name of the owner" />
+          <Input label="Owner Number *" value={ownerNumber} onChangeText={setOwnerNumber} placeholder="Personal contact number" keyboardType="phone-pad" />
+        </View>
+
+        {(!store || store.is_active === false) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Store Verification Images *</Text>
+            <Text style={styles.subtitle}>Upload clear images of your store front and interior for verification.</Text>
+            
+            <View style={styles.verificationImageGrid}>
+              {verificationImages.map((url, index) => (
+                <View key={index} style={styles.verificationImageContainer}>
+                  <Image source={{ uri: url }} style={styles.verificationImage} />
+                  <TouchableOpacity 
+                    style={styles.removeImageIcon} 
+                    onPress={() => removeVerificationImage(url)}
+                  >
+                    <Icon name="close-circle" size={24} color={Colors.error} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              
+              {verificationImages.length < 5 && (
+                <TouchableOpacity 
+                  style={[styles.addImageButton, isUploadingVerification && { opacity: 0.5 }]} 
+                  onPress={pickVerificationImage}
+                  disabled={isUploadingVerification}
+                >
+                  {isUploadingVerification ? (
+                    <ActivityIndicator color={Colors.primary} />
+                  ) : (
+                    <>
+                      <Icon name="camera-plus-outline" size={30} color={Colors.primary} />
+                      <Text style={styles.addImageText}>Add Image</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
         
         <Button 
           title="Save Store Details" 
@@ -574,6 +682,47 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     color: Colors.textSecondary,
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  verificationImageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  verificationImageContainer: {
+    width: (width - 64 - 24) / 3,
+    height: (width - 64 - 24) / 3,
+    borderRadius: 12,
+    position: 'relative',
+  },
+  verificationImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  removeImageIcon: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  addImageButton: {
+    width: (width - 64 - 24) / 3,
+    height: (width - 64 - 24) / 3,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    borderStyle: 'dashed',
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addImageText: {
+    fontSize: 10,
+    color: Colors.primary,
+    fontWeight: '700',
+    marginTop: 4,
   },
 });

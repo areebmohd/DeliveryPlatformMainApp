@@ -115,7 +115,8 @@ export const HomeScreen = ({ navigation }: any) => {
       setBestSellersLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('*, stores:stores_view(*)')
+        .select('*, stores:stores_view!inner(*)')
+        .eq('stores.is_active', true)
         .eq('in_stock', true)
         .limit(10);
 
@@ -133,7 +134,8 @@ export const HomeScreen = ({ navigation }: any) => {
       setSuggestionsLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('*, stores:stores_view(*)')
+        .select('*, stores:stores_view!inner(*)')
+        .eq('stores.is_active', true)
         .eq('in_stock', true)
         .order('id', { ascending: false })
         .limit(12);

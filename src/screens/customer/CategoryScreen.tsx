@@ -41,8 +41,9 @@ export const CategoryScreen = ({ navigation, route }: any) => {
       // Fetch Products in this category
       const { data: productData, error: productError } = await supabase
         .from('products')
-        .select('*, stores:stores_view(*)')
+        .select('*, stores:stores_view!inner(*)')
         .ilike('category', `%${categoryName}%`)
+        .eq('stores.is_active', true)
         .eq('in_stock', true);
 
       // Fetch Stores in this category

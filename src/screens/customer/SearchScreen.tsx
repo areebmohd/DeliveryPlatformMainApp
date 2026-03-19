@@ -51,8 +51,9 @@ export const SearchScreen = ({ navigation, route }: any) => {
       // Search Products
       const { data: productData, error: productError } = await supabase
         .from('products')
-        .select('*, stores:stores_view(*)')
+        .select('*, stores:stores_view!inner(*)')
         .ilike('name', `%${searchQuery}%`)
+        .eq('stores.is_active', true)
         .eq('in_stock', true)
         .limit(20);
 
