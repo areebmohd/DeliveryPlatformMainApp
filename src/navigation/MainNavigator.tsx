@@ -17,7 +17,7 @@ export const MainNavigator = () => {
   }
 
   // Route based on user role
-  if (profile?.role === 'store') {
+  if (profile?.role === 'store' || profile?.role === 'admin') {
     return <BusinessNavigator />;
   }
 

@@ -180,7 +180,11 @@ export const AccountScreen = ({ navigation }: any) => {
             label="Addresses" 
             onPress={() => navigation.navigate('Addresses')} 
           />
-          <OptionItem icon="bell-outline" label="Notifications" onPress={() => {}} />
+          <OptionItem 
+            icon="bell-outline" 
+            label="Notifications" 
+            onPress={() => navigation.navigate('Notifications')} 
+          />
           <OptionItem icon="crown-outline" label="Premium" onPress={() => {}} />
           <OptionItem 
             icon="heart-outline" 

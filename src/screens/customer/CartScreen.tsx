@@ -257,8 +257,8 @@ export const CartScreen = ({ navigation }: any) => {
         if (RNUpiPayment && RNUpiPayment.initializePayment) {
           RNUpiPayment.initializePayment(
             {
-              vpa: store.upi_id,
-              payeeName: store.name,
+              vpa: 'aashu9105628720-1@okicici',
+              payeeName: 'Ashu',
               amount: grandTotal.toFixed(2),
               transactionNote: `Order #${order.order_number}`,
               transactionRef: order.id,

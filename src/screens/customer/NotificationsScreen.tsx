@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   StatusBar,
+  ScrollView,
   ActivityIndicator,
   SectionList,
 } from 'react-native';
@@ -28,7 +29,7 @@ export const NotificationsScreen = () => {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('target_group', 'business')
+        .eq('target_group', 'customer')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -66,7 +67,7 @@ export const NotificationsScreen = () => {
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.notificationCard}>
       <View style={styles.iconContainer}>
-        <Icon name="storefront-outline" size={24} color={Colors.primary} />
+        <Icon name="bell-ring-outline" size={24} color={Colors.primary} />
       </View>
       <View style={styles.textContainer}>
         <View style={styles.cardHeader}>
@@ -87,12 +88,12 @@ export const NotificationsScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       <SafeTopBackground />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Business Notifications</Text>
+        <Text style={styles.headerTitle}>Notifications</Text>
       </View>
 
       {loading ? (
@@ -111,7 +112,7 @@ export const NotificationsScreen = () => {
             <View style={styles.emptyContainer}>
               <Icon name="bell-off-outline" size={80} color={Colors.border} />
               <Text style={styles.emptyTitle}>No Notifications</Text>
-              <Text style={styles.emptySubtitle}>Administrative updates for your store will appear here.</Text>
+              <Text style={styles.emptySubtitle}>You're all caught up!</Text>
             </View>
           }
         />
@@ -222,6 +223,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginTop: Spacing.sm,
-    textAlign: 'center',
   },
 });
