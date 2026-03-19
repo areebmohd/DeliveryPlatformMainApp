@@ -51,8 +51,26 @@ export const RegisterScreen = ({ navigation }: any) => {
     setError('');
 
     try {
+      // Check if email already exists in any role
+      const { data: existingRole, error: checkError } = await supabase.rpc('check_email_exists', {
+        email_to_check: email.toLowerCase().trim(),
+      });
+
+      if (checkError) {
+        console.error('Error checking email existence:', checkError);
+      } else if (existingRole) {
+        showAlert(
+          'Email Already Registered',
+          `This email is already registered as a ${existingRole}. One email can only be used for one account type. Please sign in or use a different email.`,
+          'warning',
+          { text: 'OK', onPress: () => navigation.navigate('Login') }
+        );
+        setLoading(false);
+        return;
+      }
+
       const { error: signUpError } = await supabase.auth.signUp({
-        email,
+        email: email.toLowerCase().trim(),
         password,
         options: {
           data: {
@@ -62,7 +80,18 @@ export const RegisterScreen = ({ navigation }: any) => {
         },
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
+          showAlert(
+            'Account Exists',
+            'An account with this email already exists. Please sign in instead.',
+            'warning',
+            { text: 'Go to Login', onPress: () => navigation.navigate('Login') }
+          );
+          return;
+        }
+        throw signUpError;
+      }
       
       showAlert(
         'Success',
