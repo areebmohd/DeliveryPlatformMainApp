@@ -327,22 +327,50 @@ export const StoreScreen = ({ navigation }: any) => {
         {renderBanner()}
         
         {store && !store.is_active && (
-          <TouchableOpacity 
-            style={styles.inactiveAlert} 
-            onPress={handleNavigateToStoreForm}
-            activeOpacity={0.8}
-          >
-            <View style={styles.alertIconBg}>
-              <Icon name="alert-circle" size={24} color={Colors.error} />
-            </View>
-            <View style={styles.alertTextContainer}>
-              <Text style={styles.alertTitle}>Verification Required</Text>
-              <Text style={styles.alertSubtitle}>
-                Your store is inactive and hidden from users. Please fill necessary details to verify your store and activate it.
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={20} color={Colors.error} />
-          </TouchableOpacity>
+          (() => {
+            const isPending = 
+              !!store.name && 
+              !!store.category && 
+              !!store.address_line_1 && 
+              !!store.city && 
+              !!store.state && 
+              !!store.pincode && 
+              (!!store.location_wkt || !!store.location) && 
+              !!store.phone && 
+              !!store.upi_id && 
+              !!store.owner_name && 
+              !!store.owner_number && 
+              (store.verification_images?.length > 0) &&
+              store.is_approved === false;
+
+            return (
+              <TouchableOpacity 
+                style={[styles.inactiveAlert, isPending && styles.pendingAlert]} 
+                onPress={handleNavigateToStoreForm}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.alertIconBg, isPending && styles.pendingIconBg]}>
+                  <Icon 
+                    name={isPending ? "clock-check-outline" : "alert-circle"} 
+                    size={24} 
+                    color={isPending ? Colors.success : Colors.error} 
+                  />
+                </View>
+                <View style={styles.alertTextContainer}>
+                  <Text style={[styles.alertTitle, isPending && styles.pendingTitle]}>
+                    {isPending ? 'Verification Pending' : 'Verification Required'}
+                  </Text>
+                  <Text style={[styles.alertSubtitle, isPending && styles.pendingSubtitle]}>
+                    {isPending 
+                      ? 'You have submitted all the verifications details and your request is still pending please wait for some time.'
+                      : 'Your store is inactive and hidden from users. Please fill necessary details to verify your store and activate it.'
+                    }
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={20} color={isPending ? Colors.success : Colors.error} />
+              </TouchableOpacity>
+            );
+          })()
         )}
 
         <View style={{ height: 10 }} />
@@ -672,6 +700,19 @@ const styles = StyleSheet.create({
     color: '#D32F2F',
     lineHeight: 16,
     fontWeight: '600',
+  },
+  pendingAlert: {
+    backgroundColor: '#F0FFF4',
+    borderColor: '#C6F6D5',
+  },
+  pendingIconBg: {
+    backgroundColor: '#C6F6D5',
+  },
+  pendingTitle: {
+    color: Colors.success,
+  },
+  pendingSubtitle: {
+    color: Colors.success,
   },
   placeholderText: {
     marginTop: 8,
