@@ -22,6 +22,7 @@ import { supabase, uploadImage, deleteFile } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
+import { MapPickerView } from '../../components/address/MapPickerView';
 
 import { AlertModal } from '../../components/ui/AlertModal';
 
@@ -52,7 +53,6 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [city, setCity] = useState(store?.city || '');
   const [state, setState] = useState(store?.state || '');
   const [location, setLocation] = useState<any>(null);
-  const [fetchingLocation, setFetchingLocation] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [ownerName, setOwnerName] = useState(store?.owner_name || '');
   const [ownerNumber, setOwnerNumber] = useState(store?.owner_number || '');
@@ -95,56 +95,21 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     }
   }, [store]);
 
-  const showAlert = (title: string, message: string, type: any = 'info', onConfirm?: () => void) => {
-    setAlertConfig({ visible: true, title, message, type, onConfirm });
-  };
-
-  const getCurrentLocation = async () => {
-    setFetchingLocation(true);
-
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Location Permission',
-            message: 'We need access to your location to pinpoint your store on the map.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          setFetchingLocation(false);
-          showAlert('Permission Denied', 'Location permission is required to use this feature.', 'error');
-          return;
-        }
-      } catch (err) {
-        setFetchingLocation(false);
-        console.warn(err);
-        return;
-      }
+  // Listen for location from MapSelectionScreen
+  useEffect(() => {
+    if (route.params?.selectedLocation) {
+      const { latitude, longitude } = route.params.selectedLocation;
+      setLocation({ latitude, longitude });
+      
+      // Clean up params to avoid re-triggering
+      navigation.setParams({ selectedLocation: undefined });
     }
+  }, [route.params?.selectedLocation]);
 
-    Geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-        setFetchingLocation(false);
-      },
-      (error) => {
-        setFetchingLocation(false);
-        showAlert(
-          'Location Error',
-          'Could not get your current location. Please ensure GPS is enabled.',
-          'error'
-        );
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', onConfirm?: () => void) => {
+    setAlertConfig({ visible: true, title, message, type: type === 'warning' ? 'info' : type, onConfirm });
   };
+
 
   const pickImage = async () => {
     const result = await launchImageLibrary({
@@ -298,7 +263,6 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
       setLoading(false);
     }
   };
-
   return (
     <View style={styles.container}>
       <SafeTopBackground />
@@ -343,7 +307,20 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Store Address</Text>
+          <Text style={styles.sectionTitle}>Store Location</Text>
+          <Text style={styles.subtitle}>Pinpoint your store's exact location for riders</Text>
+          
+          <MapPickerView 
+            location={location}
+            onPress={() => navigation.navigate('MapSelection', {
+              initialLocation: location,
+              returnScreen: 'StoreDetailsForm',
+            })}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Address Details</Text>
           <Input label="Address Line 1 *" value={addressLine1} onChangeText={setAddressLine1} placeholder="Flat/House No, Building, Street" />
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
@@ -363,48 +340,6 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
               <Input label="State *" value={state} onChangeText={setState} placeholder="Haryana" />
             </View>
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Live Location *</Text>
-          <Text style={styles.subtitle}>Pinpoint your store's exact location for riders</Text>
-          
-          <View style={styles.mapContainer}>
-            {fetchingLocation ? (
-              <View style={styles.mapLoading}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.loadingText}>Fetching location...</Text>
-              </View>
-            ) : (
-              <View style={styles.mapView}>
-                <View style={styles.markerContainer}>
-                  <View style={styles.pulse} />
-                  <View style={styles.marker}>
-                    <Icon name="store" size={30} color={Colors.white} />
-                  </View>
-                </View>
-                {location && (
-                  <View style={styles.locationBadge}>
-                    <Icon name="check-circle" size={16} color={Colors.success} />
-                    <Text style={styles.locationBadgeText}>Location Set</Text>
-                  </View>
-                )}
-                {location && (
-                  <Text style={styles.coordsText}>
-                    Lat: {location.latitude.toFixed(4)}, Lng: {location.longitude.toFixed(4)}
-                  </Text>
-                )}
-              </View>
-            )}
-          </View>
-
-          <Button 
-            title={location ? "Update Live Location" : "Set Live Location"}
-            onPress={getCurrentLocation}
-            variant="outline"
-            style={{ marginTop: 16 }}
-            loading={fetchingLocation}
-          />
         </View>
 
         <View style={styles.section}>

@@ -17,6 +17,7 @@ import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
+import { MapPickerView } from '../../components/address/MapPickerView';
 
 const InputField = ({ label, value, onChangeText, placeholder, keyboardType = 'default', required = true }: any) => (
   <View style={styles.inputContainer}>
@@ -40,6 +41,12 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
+  // Parse initial location if editing
+  const initialLocation = address?.location ? {
+    latitude: parseFloat(address.location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/)?.[2] || '0'),
+    longitude: parseFloat(address.location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/)?.[1] || '0'),
+  } : null;
+
   const [formData, setFormData] = useState({
     label: address?.label || 'Home',
     address_line: address?.address_line || '',
@@ -49,21 +56,42 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
     state: address?.state || '',
     receiver_name: address?.receiver_name || '',
     receiver_phone: address?.receiver_phone || '',
+    location: initialLocation,
   });
+
+  // Listen for location from MapSelectionScreen
+  React.useEffect(() => {
+    if (route.params?.selectedLocation) {
+      const { latitude, longitude, address: selAddress } = route.params.selectedLocation;
+      setFormData(prev => ({
+        ...prev,
+        location: { latitude, longitude },
+        address_line: selAddress || prev.address_line,
+      }));
+      
+      // Clean up params to avoid re-triggering
+      navigation.setParams({ selectedLocation: undefined });
+    }
+  }, [route.params?.selectedLocation]);
 
   const handleSave = async () => {
     // Basic validation
-    if (!formData.address_line || !formData.pincode || !formData.city || !formData.state || !formData.receiver_name || !formData.receiver_phone) {
-      Alert.alert('Error', 'Please fill all required fields');
+    if (!formData.address_line || !formData.pincode || !formData.city || !formData.state || !formData.receiver_name || !formData.receiver_phone || !formData.location) {
+      Alert.alert('Error', 'Please fill all required fields and select map location');
       return;
     }
 
     setLoading(true);
     try {
+      const dataToSave = {
+        ...formData,
+        location: `POINT(${formData.location.longitude} ${formData.location.latitude})`,
+      };
+
       if (isEditing) {
         const { error } = await supabase
           .from('addresses')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', address.id);
         if (error) throw error;
       } else {
@@ -80,7 +108,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
           .from('addresses')
           .insert([{
             user_id: user?.id,
-            ...formData,
+            ...dataToSave,
             is_default: count === 0
           }]);
         if (error) throw error;
@@ -117,6 +145,14 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.form}>
+          <MapPickerView 
+            location={formData.location}
+            onPress={() => navigation.navigate('MapSelection', {
+              initialLocation: formData.location,
+              returnScreen: 'AddAddress',
+            })}
+          />
+
           <View style={styles.labelSection}>
             <Text style={styles.sectionTitle}>Address Label</Text>
             <View style={styles.labelPicker}>

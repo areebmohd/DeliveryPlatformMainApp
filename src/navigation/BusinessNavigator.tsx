@@ -18,6 +18,7 @@ import { StoreDetailsFormScreen } from '../screens/business/StoreDetailsFormScre
 import { PaymentsScreen } from '../screens/business/PaymentsScreen';
 import { SupportScreen } from '../screens/business/SupportScreen';
 import { AdvertiseScreen } from '../screens/business/AdvertiseScreen';
+import { MapSelectionScreen } from '../screens/customer/MapSelectionScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -29,6 +30,7 @@ const StoreStack = () => {
       <Stack.Screen name="ManageProducts" component={ManageProductsScreen} />
       <Stack.Screen name="ProductForm" component={ProductFormScreen} />
       <Stack.Screen name="StoreDetailsForm" component={StoreDetailsFormScreen} />
+      <Stack.Screen name="MapSelection" component={MapSelectionScreen} />
     </Stack.Navigator>
   );
 };
