@@ -227,11 +227,11 @@ export const HomeScreen = ({ navigation }: any) => {
           <View style={styles.addressRow}>
             <Text style={styles.locationTitle} numberOfLines={1}>
               {sessionAddress 
-                ? (sessionAddress.label.length > 25 ? `${sessionAddress.label.substring(0, 22)}...` : sessionAddress.label)
+                ? (sessionAddress.label.length > 25 ? `${sessionAddress.label.substring(0, 30)}...` : sessionAddress.label)
                 : selectedAddress 
                   ? (() => {
                       const fullAddress = `${selectedAddress.address_line}${selectedAddress.city ? `, ${selectedAddress.city}` : ''}`;
-                      return fullAddress.length > 25 ? `${fullAddress.substring(0, 22)}...` : fullAddress;
+                      return fullAddress.length > 25 ? `${fullAddress.substring(0, 30)}...` : fullAddress;
                     })()
                   : 'Select Address'}
             </Text>
