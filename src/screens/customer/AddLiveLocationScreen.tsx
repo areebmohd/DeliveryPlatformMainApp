@@ -21,6 +21,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useCart } from '../../context/CartContext';
+import { MapView, Camera, PointAnnotation } from 'mappls-map-react-native';
+import MapplsGL from 'mappls-map-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -133,7 +135,7 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        {/* Map Visualization Placeholder */}
+        {/* Map Visualization */}
         <View style={styles.mapContainer}>
           {fetchingLocation ? (
             <View style={styles.mapLoading}>
@@ -142,19 +144,36 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
             </View>
           ) : (
             <View style={styles.mapView}>
-              <View style={styles.markerContainer}>
-                <View style={styles.pulse} />
-                <View style={styles.marker}>
-                  <Icon name="map-marker" size={32} color={Colors.white} />
-                </View>
-              </View>
+              <MapView 
+                style={StyleSheet.absoluteFillObject}
+                key={location ? `${location.latitude}-${location.longitude}` : 'no-location'}
+              >
+                <Camera 
+                  centerCoordinate={location ? [location.longitude, location.latitude] : [77.2090, 28.6139]}
+                  zoomLevel={16}
+                />
+                {location && (
+                  <PointAnnotation
+                    id="currentLocation"
+                    coordinate={[location.longitude, location.latitude]}
+                  >
+                    <View style={styles.markerContainer}>
+                      <View style={styles.pulse} />
+                      <View style={styles.marker}>
+                        <Icon name="map-marker" size={24} color={Colors.white} />
+                      </View>
+                    </View>
+                  </PointAnnotation>
+                )}
+              </MapView>
+
               <View style={styles.locationBadge}>
                 <Icon name="check-circle" size={16} color={Colors.success} />
                 <Text style={styles.locationBadgeText}>Location Pinpointed</Text>
               </View>
               
               <Text style={styles.coordsText}>
-                Lat: {location?.latitude.toFixed(6)}, Lng: {location?.longitude.toFixed(6)}
+                Lat: {location?.latitude?.toFixed(6)}, Lng: {location?.longitude?.toFixed(6)}
               </Text>
             </View>
           )}

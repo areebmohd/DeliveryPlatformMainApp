@@ -8,14 +8,18 @@ import {
   ActivityIndicator,
   Platform,
   PermissionsAndroid,
+  Alert,
 } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
 import {
   MapView,
   Camera,
   RestApi,
-  LocationManager,
-  requestAndroidLocationPermissions,
+  // requestAndroidLocationPermissions, // Removed
+  // UserLocation, // Commented out
 } from 'mappls-map-react-native';
+import MapplsGL from 'mappls-map-react-native';
+
 import MapplsUIWidgets from 'mappls-search-widgets-react-native';
 import { Colors, Spacing } from '../../theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,7 +38,9 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
     initialLocation ? [initialLocation.longitude, initialLocation.latitude] : [77.2090, 28.6139]
   );
   const [address, setAddress] = useState<string>('');
+  const [addressDetails, setAddressDetails] = useState<any>(null);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
 
   // Reverse Geocoding whenever map movement stops
   const fetchAddress = async (lng: number, lat: number) => {
@@ -42,7 +48,9 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
       setIsReverseGeocoding(true);
       const res = await RestApi.reverseGeocode({ latitude: lat, longitude: lng });
       if (res && res.results && res.results.length > 0) {
-        setAddress(res.results[0].formatted_address || '');
+        const result = res.results[0];
+        setAddress(result.formatted_address || '');
+        setAddressDetails(result);
       }
     } catch (e) {
       console.error('Reverse Geocode failed:', e);
@@ -61,43 +69,64 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
     setLoading(true);
     try {
       if (Platform.OS === 'android') {
-        const granted = await requestAndroidLocationPermissions();
-        if (!granted) {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Permission Denied', 'Please enable location permissions in settings.');
           setLoading(false);
           return;
         }
       }
 
-      const location = await LocationManager.getLastKnownLocation();
-      if (location && location.coords) {
-        const { latitude, longitude } = location.coords;
-        cameraRef.current?.setCamera({
-          centerCoordinate: [longitude, latitude],
-          zoomLevel: 16,
-          animationDuration: 1000,
-        });
-      }
+      // Use standard Geolocation for a fresh fix
+      Geolocation.getCurrentPosition(
+        (info) => {
+          centerOnLocation(info.coords.latitude, info.coords.longitude);
+          setLoading(false);
+        },
+        (error) => {
+          console.error('Geolocation Error:', error);
+          Alert.alert('Location Error', 'Could not get your current location. Please check your GPS.');
+          setLoading(false);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      );
     } catch (e) {
       console.error('Location Error:', e);
-    } finally {
       setLoading(false);
     }
+  };
+
+  const centerOnLocation = (lat: number, lng: number) => {
+    setMapCenter([lng, lat]);
+    cameraRef.current?.setCamera({
+      centerCoordinate: [lng, lat],
+      zoomLevel: 16,
+      animationDuration: 1000,
+    });
+    fetchAddress(lng, lat);
   };
 
   const handleSearchPress = async () => {
     try {
       const data = await MapplsUIWidgets.searchWidget({
-        location: mapCenter ? [mapCenter[1], mapCenter[0]] : undefined, // Accepts [lat, lng] or similar
+        location: mapCenter ? [mapCenter[1], mapCenter[0]] : undefined,
       });
       
       if (data && data.eLocation) {
         const { latitude, longitude, placeName, placeAddress } = data.eLocation;
-        setAddress(placeAddress || placeName);
+        const fullAddress = placeAddress || placeName;
+        setAddress(fullAddress);
+        setMapCenter([longitude, latitude]);
         cameraRef.current?.setCamera({
           centerCoordinate: [longitude, latitude],
           zoomLevel: 16,
           animationDuration: 1000,
         });
+        
+        // After search, also fetch granular details for that location
+        fetchAddress(longitude, latitude);
       }
     } catch (e) {
       console.error('Search Widget Error:', e);
@@ -105,28 +134,42 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
   };
 
   const handleConfirm = () => {
-    if (!mapCenter) return;
-    
-    navigation.navigate({
-      name: returnScreen || 'AddAddress',
-      params: { 
-        selectedLocation: {
-          latitude: mapCenter[1],
-          longitude: mapCenter[0],
-          address: address,
-        }
-      },
-      merge: true,
-    });
+    if (mapCenter) {
+      navigation.navigate({
+        name: returnScreen || 'AddAddress',
+        params: { 
+          selectedLocation: {
+            latitude: mapCenter[1],
+            longitude: mapCenter[0],
+            address: address,
+            details: addressDetails,
+            preservedFormData: route.params?.preservedFormData,
+          }
+        },
+        merge: true,
+      });
+    }
   };
 
   useEffect(() => {
-    LocationManager.start();
+    const initLocation = async () => {
+      let granted = true;
+      if (Platform.OS === 'android') {
+        const status = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+        if (!status) {
+          const request = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+          granted = request === PermissionsAndroid.RESULTS.GRANTED;
+        }
+      }
+      setHasLocationPermission(granted);
+    };
+
+    initLocation();
+    
     if (mapCenter) {
       fetchAddress(mapCenter[0], mapCenter[1]);
     }
-    return () => LocationManager.stop();
-  }, []);
+  }, [mapCenter]);
 
   return (
     <View style={styles.container}>
@@ -145,6 +188,18 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
           zoomLevel={14}
           centerCoordinate={mapCenter ?? [77.2090, 28.6139]}
         />
+        {/*
+        {hasLocationPermission && (
+          <UserLocation 
+            visible={true} 
+            onUpdate={(loc) => {
+              if (loc && loc.coords && !mapCenter) {
+                setMapCenter([loc.coords.longitude, loc.coords.latitude]);
+              }
+            }}
+          />
+        )}
+        */}
       </MapView>
 
       {/* Center Pin */}

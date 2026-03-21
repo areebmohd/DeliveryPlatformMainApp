@@ -34,39 +34,100 @@ const InputField = ({ label, value, onChangeText, placeholder, keyboardType = 'd
 );
 
 export const AddAddressScreen = ({ navigation, route }: any) => {
-  const { address } = route.params || {};
-  const isEditing = !!address;
-  
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
-  const insets = useSafeAreaInsets();
+  const [editingAddress] = useState(route.params?.address);
+  const isEditing = !!editingAddress;
 
   // Parse initial location if editing
-  const initialLocation = address?.location ? {
-    latitude: parseFloat(address.location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/)?.[2] || '0'),
-    longitude: parseFloat(address.location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/)?.[1] || '0'),
-  } : null;
+  const parseLocation = (loc: any) => {
+    if (!loc) return null;
+    try {
+      // Handle WKB HEX format (Supabase returns geography as HEX)
+      // Example: 0101000020E6100000... (50 chars for Point with SRID)
+      if (typeof loc === 'string' && /^[0-9A-F]{50}$/i.test(loc)) {
+        try {
+          const xHex = loc.substring(loc.length - 32, loc.length - 16);
+          const yHex = loc.substring(loc.length - 16);
+          
+          const hexToDoubleLE = (hex: string) => {
+            const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+            const buffer = new ArrayBuffer(8);
+            const bView = new Uint8Array(buffer);
+            bView.set(bytes);
+            const view = new DataView(buffer);
+            return view.getFloat64(0, true);
+          };
+
+          return { longitude: hexToDoubleLE(xHex), latitude: hexToDoubleLE(yHex) };
+        } catch (e) {
+          console.error('WKB parse error:', e);
+        }
+      }
+
+      // Handle String formats: "POINT(lng lat)", "POINT(lng, lat)", "SRID=4326;POINT(lng lat)", etc.
+      if (typeof loc === 'string' && loc.toUpperCase().includes('POINT')) {
+        // Strip out SRID part if present, and handle both spaces or commas as separators
+        const match = loc.match(/POINT\s*\(([-\d.]+)\s*[, \s]\s*([-\d.]+)\)/i);
+        if (match) {
+          const v1 = parseFloat(match[1]);
+          const v2 = parseFloat(match[2]);
+          
+          // Heuristic for India (same as before but more robust)
+          if (v1 > 50 && v1 < 100) {
+            return { longitude: v1, latitude: v2 };
+          } else if (v2 > 50 && v2 < 100) {
+            return { longitude: v2, latitude: v1 };
+          }
+          return { longitude: v1, latitude: v2 };
+        }
+      } else if (typeof loc === 'object') {
+        // Handle GeoJSON: { type: 'Point', coordinates: [lng, lat] }
+        if (loc.type === 'Point' && Array.isArray(loc.coordinates)) {
+          return {
+            longitude: loc.coordinates[0],
+            latitude: loc.coordinates[1],
+          };
+        }
+        // Handle any object with lat/lng key variations
+        const lat = loc.latitude ?? loc.lat ?? loc.latitude_deg ?? loc.y ?? null;
+        const lng = loc.longitude ?? loc.lng ?? loc.longitude_deg ?? loc.x ?? null;
+        
+        if (lat !== null && lng !== null) {
+          return { latitude: parseFloat(lat), longitude: parseFloat(lng) };
+        }
+      }
+    } catch (e) {
+      console.error('Super-tolerant parse failed:', e);
+    }
+    return null;
+  };
+
+  const initialLocation = parseLocation(editingAddress?.location);
 
   const [formData, setFormData] = useState({
-    label: address?.label || 'Home',
-    address_line: address?.address_line || '',
-    pincode: address?.pincode || '',
-    city: address?.city || '',
-    sector_area: address?.sector_area || '',
-    state: address?.state || '',
-    receiver_name: address?.receiver_name || '',
-    receiver_phone: address?.receiver_phone || '',
+    id: editingAddress?.id || null,
+    label: editingAddress?.label || 'Home',
+    address_line: editingAddress?.address_line || '',
+    pincode: editingAddress?.pincode || '',
+    city: editingAddress?.city || '',
+    sector_area: editingAddress?.sector_area || '',
+    state: editingAddress?.state || '',
+    receiver_name: editingAddress?.receiver_name || '',
+    receiver_phone: editingAddress?.receiver_phone || '',
     location: initialLocation,
   });
 
   // Listen for location from MapSelectionScreen
   React.useEffect(() => {
     if (route.params?.selectedLocation) {
-      const { latitude, longitude, address: selAddress } = route.params.selectedLocation;
+      const { latitude, longitude, address: selAddress, details, preservedFormData } = route.params.selectedLocation;
+      
       setFormData(prev => ({
-        ...prev,
+        ...(preservedFormData || prev),
         location: { latitude, longitude },
-        address_line: selAddress || prev.address_line,
+        // Text fields remain manual as per user request
       }));
       
       // Clean up params to avoid re-triggering
@@ -83,16 +144,18 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
 
     setLoading(true);
     try {
+      const { location: locObj, id: addressId, ...restFormData } = formData;
       const dataToSave = {
-        ...formData,
-        location: `POINT(${formData.location.longitude} ${formData.location.latitude})`,
+        ...restFormData,
+        location: `SRID=4326;POINT(${locObj.longitude} ${locObj.latitude})`,
       };
 
-      if (isEditing) {
+      if (addressId) {
+        // Explicitly update existing record
         const { error } = await supabase
           .from('addresses')
           .update(dataToSave)
-          .eq('id', address.id);
+          .eq('id', addressId);
         if (error) throw error;
       } else {
         // Check if this is the first address for the user
@@ -114,7 +177,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
         if (error) throw error;
       }
       
-      Alert.alert('Success', `Address ${isEditing ? 'updated' : 'saved'} successfully`);
+      Alert.alert('Success', `Address ${addressId ? 'updated' : 'saved'} successfully`);
       navigation.goBack();
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to save address');
@@ -145,13 +208,6 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.form}>
-          <MapPickerView 
-            location={formData.location}
-            onPress={() => navigation.navigate('MapSelection', {
-              initialLocation: formData.location,
-              returnScreen: 'AddAddress',
-            })}
-          />
 
           <View style={styles.labelSection}>
             <Text style={styles.sectionTitle}>Address Label</Text>
@@ -218,6 +274,20 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
             value={formData.state}
             onChangeText={(t: string) => setFormData({ ...formData, state: t })}
           />
+
+          <View style={{ marginVertical: 12 }}>
+            <Text style={styles.inputLabel}>
+              Pin Location on Map <Text style={styles.required}>*</Text>
+            </Text>
+            <MapPickerView 
+              location={formData.location}
+              onPress={() => navigation.navigate('MapSelection', {
+                initialLocation: formData.location,
+                returnScreen: 'AddAddress',
+                preservedFormData: formData,
+              })}
+            />
+          </View>
 
           <Text style={styles.sectionTitle}>Receiver Details</Text>
           <InputField 
