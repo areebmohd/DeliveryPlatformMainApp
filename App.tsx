@@ -40,7 +40,16 @@ function AppContent() {
     <View style={{ flex: 1 }}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       
-      <NavigationContainer>
+      <NavigationContainer
+        linking={{
+          prefixes: ['com.mainapp://'],
+          config: {
+            screens: {
+              ResetPassword: 'reset-password',
+            },
+          },
+        }}
+      >
         {session ? <MainNavigator /> : <AuthNavigator />}
       </NavigationContainer>
     </View>
