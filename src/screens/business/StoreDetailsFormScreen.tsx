@@ -98,8 +98,30 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   // Listen for location from MapSelectionScreen
   useEffect(() => {
     if (route.params?.selectedLocation) {
-      const { latitude, longitude } = route.params.selectedLocation;
+      const { latitude, longitude, preservedFormData } = route.params.selectedLocation;
       setLocation({ latitude, longitude });
+      
+      if (preservedFormData) {
+        setName(preservedFormData.name);
+        setDescription(preservedFormData.description);
+        setCategory(preservedFormData.category);
+        setUpiId(preservedFormData.upiId);
+        setBannerUrl(preservedFormData.bannerUrl);
+        setOpeningHours(preservedFormData.openingHours);
+        setPhone(preservedFormData.phone);
+        setEmail(preservedFormData.email);
+        setInstagramUrl(preservedFormData.instagramUrl);
+        setFacebookUrl(preservedFormData.facebookUrl);
+        setWhatsappNumber(preservedFormData.whatsappNumber);
+        setAddressLine1(preservedFormData.addressLine1);
+        setPincode(preservedFormData.pincode);
+        setSectorArea(preservedFormData.sectorArea);
+        setCity(preservedFormData.city);
+        setState(preservedFormData.state);
+        setOwnerName(preservedFormData.ownerName);
+        setOwnerNumber(preservedFormData.ownerNumber);
+        setVerificationImages(preservedFormData.verificationImages);
+      }
       
       // Clean up params to avoid re-triggering
       navigation.setParams({ selectedLocation: undefined });
@@ -177,33 +199,29 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     }
   };
   const handleSaveStore = async () => {
-    // Basic required fields for all updates
-    if (!name || !addressLine1 || !city || !state || !pincode) {
-      showAlert('Required Info', 'Please fill in all required address fields', 'warning');
-      return;
+    // MANDATORY FIELDS FOR ALL STORES (Mandatory as per user request)
+    const missingFields = [];
+    if (!name) missingFields.push('Store Name');
+    if (!category) missingFields.push('Category');
+    if (!addressLine1 || !city || !state || !pincode) missingFields.push('Complete Address');
+    if (!location) missingFields.push('Live Location');
+    if (!phone) missingFields.push('Store Number');
+    if (!upiId) missingFields.push('UPI ID');
+    if (!ownerName) missingFields.push('Owner Name');
+    if (!ownerNumber) missingFields.push('Owner Number');
+
+    // Only check verification images if store is NOT active (OR if it's a new store)
+    if ((!store || store.is_active === false) && verificationImages.length === 0) {
+      missingFields.push('Store Images');
     }
 
-    // MANDATORY FIELDS FOR NEW OR INACTIVE STORES (VERIFICATION)
-    if (!store || store.is_active === false) {
-      const missingFields = [];
-      if (!name) missingFields.push('Store Name');
-      if (!category) missingFields.push('Category');
-      if (!addressLine1 || !city || !state || !pincode) missingFields.push('Complete Address');
-      if (!location) missingFields.push('Live Location');
-      if (!phone) missingFields.push('Store Number');
-      if (!upiId) missingFields.push('UPI ID');
-      if (!ownerName) missingFields.push('Owner Name');
-      if (!ownerNumber) missingFields.push('Owner Number');
-      if (verificationImages.length === 0) missingFields.push('Store Images');
-
-      if (missingFields.length > 0) {
-        showAlert(
-          'Verification Required',
-          `Please fill in all mandatory details for verification: ${missingFields.join(', ')}`,
-          'warning'
-        );
-        return;
-      }
+    if (missingFields.length > 0) {
+      showAlert(
+        'Required Information',
+        `Please fill in all mandatory details: ${missingFields.join(', ')}`,
+        'warning'
+      );
+      return;
     }
 
     try {
@@ -229,8 +247,17 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         whatsapp_number: whatsappNumber,
         owner_name: ownerName,
         owner_number: ownerNumber,
-        verification_images: verificationImages,
       };
+
+      // Only update verification images if provided (hidden for active stores anyway)
+      if (verificationImages.length > 0) {
+        storeData.verification_images = verificationImages;
+      }
+
+      // If store is already active, set has_pending_changes to true
+      if (store && store.is_active) {
+        storeData.has_pending_changes = true;
+      }
 
       if (location) {
         storeData.location = `POINT(${location.longitude} ${location.latitude})`;
@@ -254,7 +281,11 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         if (error) throw error;
       }
 
-      showAlert('Success', 'Store profile updated successfully!', 'success', () => {
+      const successMsg = store && store.is_active 
+        ? 'Store details updated! Admin will verify the changes soon.' 
+        : 'Store profile updated successfully!';
+
+      showAlert('Success', successMsg, 'success', () => {
         navigation.goBack();
       });
     } catch (e: any) {
@@ -315,6 +346,12 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
             onPress={() => navigation.navigate('MapSelection', {
               initialLocation: location,
               returnScreen: 'StoreDetailsForm',
+              preservedFormData: {
+                name, description, category, upiId, bannerUrl, openingHours, 
+                phone, email, instagramUrl, facebookUrl, whatsappNumber, 
+                addressLine1, pincode, sectorArea, city, state, 
+                ownerName, ownerNumber, verificationImages
+              }
             })}
           />
         </View>

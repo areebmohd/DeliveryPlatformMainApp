@@ -81,7 +81,8 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
         .from('stores')
         .select('*')
         .eq('owner_id', user?.id)
-        .single();
+        .limit(1)
+        .maybeSingle();
       
       if (data) setStore(data);
     } catch (e) {

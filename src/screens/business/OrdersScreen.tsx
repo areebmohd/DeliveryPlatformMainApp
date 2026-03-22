@@ -70,11 +70,14 @@ export const OrdersScreen = () => {
         .from('stores')
         .select('id, name')
         .eq('owner_id', user?.id)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (storeError) throw storeError;
-      setStore(storeData);
-      await fetchOrders(storeData.id);
+      if (storeData) {
+        setStore(storeData);
+        await fetchOrders(storeData.id);
+      }
     } catch (e) {
       console.error('Error fetching store/orders:', e);
     } finally {

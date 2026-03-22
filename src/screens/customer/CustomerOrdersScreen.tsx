@@ -179,7 +179,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           )}
 
-          {item.status === 'ready' && (
+          {['ready', 'picked_up'].includes(item.status) && (
             <View style={styles.otpSection}>
               <Icon name="shield-lock" size={18} color={Colors.primary} />
               <View style={styles.otpInfo}>

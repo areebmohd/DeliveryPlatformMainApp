@@ -125,7 +125,8 @@ export const StoreScreen = ({ navigation }: any) => {
         .from('stores_view')
         .select('*')
         .eq('owner_id', user?.id)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       if (data) setStore(data);
@@ -326,6 +327,22 @@ export const StoreScreen = ({ navigation }: any) => {
         {renderHeader()}
         {renderBanner()}
         
+        {store && store.is_active && store.has_pending_changes && (
+          <View style={[styles.inactiveAlert, styles.pendingAlert]}>
+            <View style={[styles.alertIconBg, styles.pendingIconBg]}>
+              <Icon name="information-outline" size={24} color={Colors.primary} />
+            </View>
+            <View style={styles.alertTextContainer}>
+              <Text style={[styles.alertTitle, styles.pendingTitle]}>
+                Changes Under Review
+              </Text>
+              <Text style={[styles.alertSubtitle, styles.pendingSubtitle]}>
+                You have changed details in store which will be verified by admin but the store will still be active.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {store && !store.is_active && (
           (() => {
             const isPending = 
