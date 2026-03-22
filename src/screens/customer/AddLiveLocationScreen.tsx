@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
@@ -18,6 +17,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Geolocation from '@react-native-community/geolocation';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useCart } from '../../context/CartContext';
@@ -34,6 +34,7 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
   const [receiverPhone, setReceiverPhone] = useState('');
   const { user } = useAuth();
   const { setSessionAddress } = useCart();
+  const { showAlert, showToast } = useAlert();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -57,7 +58,7 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
           setFetchingLocation(false);
-          Alert.alert('Permission Denied', 'Location permission is required to use this feature.');
+          showAlert({ title: 'Permission Denied', message: 'Location permission is required to use this feature.', type: 'error' });
           return;
         }
       } catch (err) {
@@ -77,11 +78,15 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
       },
       (error) => {
         setFetchingLocation(false);
-        Alert.alert(
-          'Location Error',
-          'Could not get your current location. Please ensure GPS is enabled and permissions are granted.',
-          [{ text: 'Retry', onPress: getCurrentLocation }, { text: 'Back', onPress: () => navigation.goBack() }]
-        );
+        showAlert({
+          title: 'Location Error',
+          message: 'Could not get your current location. Please ensure GPS is enabled and permissions are granted.',
+          type: 'error',
+          primaryAction: { text: 'Retry', onPress: getCurrentLocation },
+          showCancel: true,
+          cancelText: 'Back',
+          onClose: () => navigation.goBack(),
+        });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
     );
@@ -89,12 +94,12 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
 
   const handleSave = async () => {
     if (!receiverName.trim() || !receiverPhone.trim()) {
-      Alert.alert('Required', 'Please enter receiver name and phone number');
+      showAlert({ title: 'Required', message: 'Please enter receiver name and phone number', type: 'warning' });
       return;
     }
 
     if (!location) {
-      Alert.alert('Error', 'Location not found. Please try again.');
+      showAlert({ title: 'Error', message: 'Location not found. Please try again.', type: 'error' });
       return;
     }
 
@@ -113,10 +118,10 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
         label: `${receiverName}'s Live Location`
       });
       
-      Alert.alert('Success', 'Using live location for this order!');
+      showToast('Using live location for this order!', 'success');
       navigation.goBack();
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
       setLoading(false);
     }

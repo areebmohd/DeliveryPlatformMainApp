@@ -9,6 +9,7 @@ import { Colors } from './src/theme/colors';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CartProvider } from './src/context/CartContext';
+import { AlertProvider } from './src/context/AlertContext';
 import { MainNavigator } from './src/navigation/MainNavigator';
 
 function App() {
@@ -16,7 +17,9 @@ function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <CartProvider>
-          <AppContent />
+          <AlertProvider>
+            <AppContent />
+          </AlertProvider>
         </CartProvider>
       </AuthProvider>
     </SafeAreaProvider>

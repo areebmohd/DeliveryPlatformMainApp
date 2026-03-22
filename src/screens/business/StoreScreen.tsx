@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
-import { AlertModal } from '../../components/ui/AlertModal';
+import { useAlert } from '../../context/AlertContext';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
@@ -49,30 +49,7 @@ export const StoreScreen = ({ navigation }: any) => {
   const [products, setProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
 
-  // Alert Modal state
-  const [alertConfig, setAlertConfig] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    primaryAction?: any;
-    secondaryAction?: any;
-    tertiaryAction?: any;
-    verticalButtons?: boolean;
-    showCancel?: boolean;
-  }>({
-    visible: false,
-    title: '',
-    message: '',
-    type: 'info',
-  });
-
-  const showAlert = (config: any) => {
-    setAlertConfig({ visible: true, ...config });
-  };
-
-  const closeAlert = () =>
-    setAlertConfig(prev => ({ ...prev, visible: false }));
+  const { showAlert, showToast } = useAlert();
 
   useEffect(() => {
     fetchStore();
@@ -237,6 +214,7 @@ export const StoreScreen = ({ navigation }: any) => {
       message:
         'Are you sure you want to remove this item from your inventory? This cannot be undone.',
       type: 'warning',
+      showCancel: true,
       primaryAction: {
         text: 'Delete',
         onPress: async () => {
@@ -244,18 +222,22 @@ export const StoreScreen = ({ navigation }: any) => {
             .from('products')
             .delete()
             .eq('id', id);
-          if (!error) fetchProducts();
-          else
+          if (!error) {
+            fetchProducts();
+            showToast('Product deleted successfully', 'success');
+          } else {
             showAlert({
               title: 'Error',
               message: 'Could not delete product.',
               type: 'error',
             });
+          }
         },
         variant: 'destructive',
       },
     });
   };
+
 
   if (loading) {
     return (
@@ -691,17 +673,7 @@ export const StoreScreen = ({ navigation }: any) => {
         </View>
       </TouchableOpacity>
 
-      <AlertModal
-        visible={alertConfig.visible}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={closeAlert}
-        primaryAction={alertConfig.primaryAction}
-        secondaryAction={alertConfig.secondaryAction}
-        verticalButtons={alertConfig.verticalButtons}
-        showCancel={alertConfig.showCancel}
-      />
+      {/* Global AlertModal handles alerts now */}
     </View>
   );
 };

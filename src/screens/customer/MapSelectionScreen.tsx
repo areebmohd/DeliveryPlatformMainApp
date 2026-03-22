@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Platform,
   PermissionsAndroid,
-  Alert,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import {
@@ -23,6 +22,7 @@ import MapplsGL from 'mappls-map-react-native';
 import MapplsUIWidgets from 'mappls-search-widgets-react-native';
 import { Colors, Spacing } from '../../theme/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const { width } = Dimensions.get('window');
@@ -30,6 +30,7 @@ const { width } = Dimensions.get('window');
 export const MapSelectionScreen = ({ navigation, route }: any) => {
   const { initialLocation, returnScreen } = route.params || {};
   const insets = useSafeAreaInsets();
+  const { showAlert } = useAlert();
   const mapRef = useRef<any>(null);
   const cameraRef = useRef<any>(null);
   
@@ -73,7 +74,7 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission Denied', 'Please enable location permissions in settings.');
+          showAlert({ title: 'Permission Denied', message: 'Please enable location permissions in settings.', type: 'error' });
           setLoading(false);
           return;
         }
@@ -87,7 +88,7 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
         },
         (error) => {
           console.error('Geolocation Error:', error);
-          Alert.alert('Location Error', 'Could not get your current location. Please check your GPS.');
+          showAlert({ title: 'Location Error', message: 'Could not get your current location. Please check your GPS.', type: 'error' });
           setLoading(false);
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }

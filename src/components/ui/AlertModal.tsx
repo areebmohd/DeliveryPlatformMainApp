@@ -65,71 +65,59 @@ export const AlertModal = ({
 
   useEffect(() => {
     if (visible) {
+      scaleValue.setValue(0.85);
       Animated.spring(scaleValue, {
         toValue: 1,
         useNativeDriver: true,
         friction: 8,
         tension: 40,
       }).start();
-    } else {
-      scaleValue.setValue(0);
     }
   }, [visible]);
 
   const getIcon = () => {
     switch (type) {
-      case 'success': return { name: 'check-circle-outline', color: Colors.success };
-      case 'error': return { name: 'alert-circle-outline', color: Colors.error };
-      case 'warning': return { name: 'alert-outline', color: Colors.warning };
-      default: return { name: 'information-outline', color: Colors.secondary };
-    }
-  };
-
-  const getActionStyle = (variant: string = 'primary', typeColor: string) => {
-    switch (variant) {
-      case 'destructive': return { backgroundColor: Colors.error };
-      case 'outline': return { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: typeColor };
-      case 'secondary': return { backgroundColor: Colors.surface };
-      default: return { backgroundColor: typeColor };
-    }
-  };
-
-  const getActionTextStyle = (variant: string = 'primary', typeColor: string) => {
-    switch (variant) {
-      case 'outline': return { color: typeColor };
-      case 'secondary': return { color: Colors.textSecondary };
-      default: return { color: Colors.white };
+      case 'success': return { name: 'check-circle', color: Colors.success, bgColor: Colors.successLight };
+      case 'error': return { name: 'alert-circle', color: Colors.error, bgColor: Colors.errorLight };
+      case 'warning': return { name: 'alert', color: Colors.warning, bgColor: Colors.warningLight };
+      default: return { name: 'information', color: Colors.info, bgColor: Colors.infoLight };
     }
   };
 
   const icon = getIcon();
 
-  const renderButton = (action: AlertAction, index: number) => (
-    <TouchableOpacity 
-      key={index}
-      style={[
-        styles.button, 
-        verticalButtons ? styles.verticalButton : { flex: 1 },
-        action.description && styles.buttonWithDescription,
-        getActionStyle(action.variant, icon.color)
-      ]} 
-      onPress={() => {
-        action.onPress();
-        onClose();
-      }}
-    >
-      <View style={styles.buttonContent}>
-        <Text style={[styles.buttonText, getActionTextStyle(action.variant, icon.color)]}>
+  const renderButton = (action: AlertAction, index: number) => {
+    const isDestructive = action.variant === 'destructive';
+    const isOutline = action.variant === 'outline';
+    const isSecondary = action.variant === 'secondary';
+
+    return (
+      <TouchableOpacity 
+        key={index}
+        activeOpacity={0.8}
+        style={[
+          styles.button, 
+          verticalButtons ? styles.verticalButton : { flex: 1 },
+          isDestructive && { backgroundColor: Colors.error },
+          isOutline && { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: icon.color },
+          isSecondary && { backgroundColor: Colors.background },
+          !isDestructive && !isOutline && !isSecondary && { backgroundColor: icon.color },
+        ]} 
+        onPress={() => {
+          action.onPress();
+          onClose();
+        }}
+      >
+        <Text style={[
+          styles.buttonText,
+          isOutline && { color: icon.color },
+          isSecondary && { color: Colors.textSecondary },
+        ]}>
           {action.text}
         </Text>
-        {action.description && (
-          <Text style={[styles.buttonDescription, getActionTextStyle(action.variant, icon.color), { opacity: 0.8 }]}>
-            {action.description}
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Modal
@@ -139,38 +127,35 @@ export const AlertModal = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          <ScrollView 
-            style={styles.scrollView} 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={true}
-          >
-            <Text style={{ position: 'absolute', top: 0, opacity: 0 }}>DEBUG: {finalActions.length} actions</Text>
-            <View style={[styles.iconContainer, { backgroundColor: icon.color + '15' }]}>
-              <Icon name={icon.name} size={40} color={icon.color} />
-            </View>
-            
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.message}>{message}</Text>
+        <Animated.View style={[
+          styles.modalContainer,
+          { transform: [{ scale: scaleValue }] }
+        ]}>
+          <View style={[styles.iconContainer, { backgroundColor: icon.bgColor }]}>
+            <Icon name={icon.name} size={42} color={icon.color} />
+          </View>
+          
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.message}>{message}</Text>
 
-            <View style={[styles.buttonContainer, verticalButtons && styles.verticalButtonContainer]}>
-              {finalActions.map(renderButton)}
+          <View style={[styles.buttonContainer, verticalButtons && styles.verticalButtonContainer]}>
+            {finalActions.map(renderButton)}
 
-              {finalShowCancel && (
-                <TouchableOpacity 
-                  style={[
-                    styles.button, 
-                    styles.secondaryButton, 
-                    verticalButtons ? styles.verticalButton : { flex: 1 }
-                  ]} 
-                  onPress={onClose}
-                >
-                  <Text style={styles.secondaryButtonText}>{cancelText}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </ScrollView>
-        </View>
+            {finalShowCancel && (
+              <TouchableOpacity 
+                activeOpacity={0.7}
+                style={[
+                  styles.button, 
+                  styles.secondaryButton, 
+                  verticalButtons ? styles.verticalButton : { flex: 1 }
+                ]} 
+                onPress={onClose}
+              >
+                <Text style={styles.secondaryButtonText}>{cancelText}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -179,53 +164,46 @@ export const AlertModal = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: Colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,
   },
   modalContainer: {
     width: '100%',
-    maxHeight: Dimensions.get('window').height * 0.8,
     backgroundColor: Colors.white,
     borderRadius: borderRadius.xl,
-    elevation: 20,
+    padding: Spacing.xl,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 20,
-    overflow: 'hidden',
-  },
-  scrollView: {
-    width: '100%',
-  },
-  scrollContent: {
-    padding: Spacing.xl,
-    paddingBottom: Spacing.xl * 2,
-    alignItems: 'center',
-    width: '100%',
+    elevation: 10,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.lg,
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     color: Colors.text,
     textAlign: 'center',
     marginBottom: Spacing.sm,
+    letterSpacing: -0.5,
   },
   message: {
     fontSize: 16,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: Spacing.xl,
+    lineHeight: 24,
+    marginBottom: Spacing.xxl,
+    paddingHorizontal: Spacing.sm,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -234,37 +212,25 @@ const styles = StyleSheet.create({
   },
   verticalButtonContainer: {
     flexDirection: 'column',
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   button: {
-    height: 52,
-    borderRadius: borderRadius.md,
+    height: 56,
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  buttonWithDescription: {
-    height: 70,
-  },
-  buttonContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
   },
   verticalButton: {
     width: '100%',
   },
   buttonText: {
     color: Colors.white,
-    fontWeight: '800',
+    fontWeight: '700',
     fontSize: 16,
   },
-  buttonDescription: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 2,
-  },
   secondaryButton: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
   secondaryButtonText: {
     color: Colors.textSecondary,

@@ -7,12 +7,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export const AddressesScreen = ({ navigation }: any) => {
@@ -21,6 +21,7 @@ export const AddressesScreen = ({ navigation }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const { showAlert, showToast } = useAlert();
 
   useEffect(() => {
     fetchAddresses();
@@ -68,38 +69,39 @@ export const AddressesScreen = ({ navigation }: any) => {
 
       if (error) throw error;
       await fetchAddresses();
-      Alert.alert('Success', 'Default address updated');
+      showToast('Default address updated', 'success');
     } catch (e) {
-      Alert.alert('Error', 'Failed to set default address');
+      showAlert({ title: 'Error', message: 'Failed to set default address', type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteAddress = (id: string) => {
-    Alert.alert(
-      'Delete Address',
-      'Are you sure you want to delete this address?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('addresses')
-                .update({ is_deleted: true })
-                .eq('id', id);
-              if (error) throw error;
-              await fetchAddresses();
-            } catch (e) {
-              Alert.alert('Error', 'Failed to delete address');
-            }
-          },
+    showAlert({
+      title: 'Delete Address',
+      message: 'Are you sure you want to delete this address?',
+      type: 'warning',
+      showCancel: true,
+      primaryAction: {
+        text: 'Delete',
+        onPress: async () => {
+          try {
+            const { error } = await supabase
+              .from('addresses')
+              .update({ is_deleted: true })
+              .eq('id', id);
+            if (error) throw error;
+            await fetchAddresses();
+            showToast('Address deleted', 'success');
+          } catch (e) {
+            showAlert({ title: 'Error', message: 'Failed to delete address', type: 'error' });
+          }
         },
-      ]
-    );
+        variant: 'destructive',
+      },
+      cancelText: 'Cancel',
+    });
   };
 
   const renderAddressItem = ({ item }: { item: any }) => (

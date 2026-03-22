@@ -7,7 +7,6 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -15,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
 import { MapPickerView } from '../../components/address/MapPickerView';
@@ -37,6 +37,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+  const { showAlert, showToast } = useAlert();
   const [editingAddress] = useState(route.params?.address);
   const isEditing = !!editingAddress;
 
@@ -138,7 +139,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
   const handleSave = async () => {
     // Basic validation
     if (!formData.address_line || !formData.pincode || !formData.city || !formData.state || !formData.receiver_name || !formData.receiver_phone || !formData.location) {
-      Alert.alert('Error', 'Please fill all required fields and select map location');
+      showAlert({ title: 'Error', message: 'Please fill all required fields and select map location', type: 'warning' });
       return;
     }
 
@@ -177,10 +178,10 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
         if (error) throw error;
       }
       
-      Alert.alert('Success', `Address ${addressId ? 'updated' : 'saved'} successfully`);
+      showToast(`Address ${addressId ? 'updated' : 'saved'} successfully`, 'success');
       navigation.goBack();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to save address');
+      showAlert({ title: 'Error', message: e.message || 'Failed to save address', type: 'error' });
     } finally {
       setLoading(false);
     }

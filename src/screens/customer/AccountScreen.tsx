@@ -13,7 +13,7 @@ import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../context/AuthContext';
-import { AlertModal } from '../../components/ui/AlertModal';
+import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export const AccountScreen = ({ navigation }: any) => {
@@ -27,41 +27,25 @@ export const AccountScreen = ({ navigation }: any) => {
   const [editPhone, setEditPhone] = useState(profile?.phone || '');
   const [editUpiId, setEditUpiId] = useState(profile?.upi_id || '');
 
-  const [alertConfig, setAlertConfig] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    primaryAction?: any;
-    showCancel?: boolean;
-  }>({
-    visible: false,
-    title: '',
-    message: '',
-    type: 'info',
-  });
-
-  const showAlert = (title: string, message: string, type: any = 'info', primaryAction?: any, showCancel: boolean = true) => {
-    setAlertConfig({ visible: true, title, message, type, primaryAction, showCancel });
-  };
+  const { showAlert, showToast } = useAlert();
 
   const handleSignOut = () => {
-    showAlert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      'warning',
-      {
+    showAlert({
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out?',
+      type: 'warning',
+      primaryAction: {
         text: 'Sign Out',
         onPress: signOut,
         variant: 'destructive',
       },
-      true
-    );
+      showCancel: true
+    });
   };
 
   const handleUpdateProfile = async () => {
     if (!editName.trim() || !editPhone.trim() || !editUpiId.trim()) {
-      showAlert('Required Fields', 'Please fill all mandatory fields (Name, Phone, UPI ID).', 'warning');
+      showAlert({ title: 'Required Fields', message: 'Please fill all mandatory fields (Name, Phone, UPI ID).', type: 'warning' });
       return;
     }
 
@@ -75,9 +59,9 @@ export const AccountScreen = ({ navigation }: any) => {
 
     if (result.success) {
       setIsEditing(false);
-      showAlert('Success', 'Profile updated successfully!', 'success');
+      showToast('Profile updated successfully!', 'success');
     } else {
-      showAlert('Error', 'Failed to update profile. Please try again.', 'error');
+      showAlert({ title: 'Error', message: 'Failed to update profile. Please try again.', type: 'error' });
     }
   };
 
@@ -219,15 +203,7 @@ export const AccountScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      <AlertModal
-        visible={alertConfig.visible}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
-        primaryAction={alertConfig.primaryAction}
-        showCancel={alertConfig.showCancel}
-      />
+      {/* Global AlertModal handles alerts now */}
     </View>
   );
 };

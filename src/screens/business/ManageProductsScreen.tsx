@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { AlertModal } from '../../components/ui/AlertModal';
+import { useAlert } from '../../context/AlertContext';
 import { BusinessProductCard } from '../../components/BusinessProductCard';
 import { supabase } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -24,42 +24,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
 
-  // Alert Modal state
-  const [alertConfig, setAlertConfig] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    primaryAction?: any;
-    secondaryAction?: any;
-    tertiaryAction?: any;
-    verticalButtons?: boolean;
-    showCancel?: boolean;
-  }>({
-    visible: false,
-    title: '',
-    message: '',
-    type: 'info',
-  });
-
-  // Verify no other showAlert calls exist for the add flow
-
-  const showAlert = (config: any) => {
-    // Reset state before showing to prevent leakage from previous alerts
-    setAlertConfig({
-      visible: true,
-      title: config.title || '',
-      message: config.message || '',
-      type: config.type || 'info',
-      primaryAction: config.primaryAction,
-      secondaryAction: config.secondaryAction,
-      tertiaryAction: config.tertiaryAction,
-      verticalButtons: config.verticalButtons,
-      showCancel: config.showCancel !== false,
-    });
-  };
-
-  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
+  const { showAlert } = useAlert();
 
   useEffect(() => {
     fetchProducts();
@@ -201,18 +166,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
         />
       )}
 
-      <AlertModal
-        visible={alertConfig.visible}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={closeAlert}
-        primaryAction={alertConfig.primaryAction}
-        secondaryAction={alertConfig.secondaryAction}
-        tertiaryAction={alertConfig.tertiaryAction}
-        verticalButtons={alertConfig.verticalButtons}
-        showCancel={alertConfig.showCancel}
-      />
+      {/* Global AlertModal handles alerts now */}
     </View>
   );
 };

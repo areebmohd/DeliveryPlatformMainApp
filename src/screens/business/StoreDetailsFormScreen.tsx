@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   Image,
   ActivityIndicator,
@@ -23,7 +22,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { MapPickerView } from '../../components/address/MapPickerView';
 
-import { AlertModal } from '../../components/ui/AlertModal';
+import { useAlert } from '../../context/AlertContext';
 import { TimeSlotPicker } from '../../components/ui/TimeSlotPicker';
 
 const { width } = Dimensions.get('window');
@@ -59,19 +58,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [verificationImages, setVerificationImages] = useState<string[]>(store?.verification_images || []);
   const [isUploadingVerification, setIsUploadingVerification] = useState(false);
 
-  // Alert Modal state
-  const [alertConfig, setAlertConfig] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    onConfirm?: () => void;
-  }>({
-    visible: false,
-    title: '',
-    message: '',
-    type: 'info',
-  });
+  const { showAlert, showToast } = useAlert();
 
   useEffect(() => {
     // Only parse location from store ONCE if no location is already set
@@ -131,9 +118,6 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     }
   }, [route.params?.selectedLocation]);
 
-  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', onConfirm?: () => void) => {
-    setAlertConfig({ visible: true, title, message, type: type === 'warning' ? 'info' : type, onConfirm });
-  };
 
 
   const pickImage = async () => {
@@ -162,7 +146,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
       const publicUrl = await uploadImage('banners', fileName, base64);
       setBannerUrl(publicUrl);
     } catch (error: any) {
-      showAlert('Error', error.message || 'Could not upload banner', 'error');
+      showAlert({ title: 'Error', message: error.message || 'Could not upload banner', type: 'error' });
     } finally {
       setIsUploadingBanner(false);
     }
@@ -187,7 +171,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
       const publicUrl = await uploadImage('banners', fileName, base64);
       setVerificationImages([...verificationImages, publicUrl]);
     } catch (error: any) {
-      showAlert('Error', error.message || 'Could not upload image', 'error');
+      showAlert({ title: 'Error', message: error.message || 'Could not upload image', type: 'error' });
     } finally {
       setIsUploadingVerification(false);
     }
@@ -219,11 +203,11 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     }
 
     if (missingFields.length > 0) {
-      showAlert(
-        'Required Information',
-        `Please fill in all mandatory details: ${missingFields.join(', ')}`,
-        'warning'
-      );
+      showAlert({
+        title: 'Required Information',
+        message: `Please fill in all mandatory details: ${missingFields.join(', ')}`,
+        type: 'warning'
+      });
       return;
     }
 
@@ -288,11 +272,10 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         ? 'Store details updated! Admin will verify the changes soon.' 
         : 'Store profile updated successfully!';
 
-      showAlert('Success', successMsg, 'success', () => {
-        navigation.goBack();
-      });
+      showToast(successMsg, 'success');
+      navigation.goBack();
     } catch (e: any) {
-      showAlert('Error', e.message, 'error');
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -459,18 +442,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         />
       </ScrollView>
 
-      <AlertModal
-        visible={alertConfig.visible}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
-        showCancel={alertConfig.type !== 'success'}
-        primaryAction={alertConfig.onConfirm ? {
-          text: 'Confirm',
-          onPress: alertConfig.onConfirm,
-        } : undefined}
-      />
+      {/* Global AlertModal handles alerts now */}
     </View>
   );
 };

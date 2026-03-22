@@ -16,9 +16,9 @@ import { useCart } from '../../context/CartContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { AlertModal } from '../../components/ui/AlertModal';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import RNUpiPayment from 'react-native-upi-payment';
 import Geolocation from '@react-native-community/geolocation';
 
@@ -44,25 +44,7 @@ export const CartScreen = ({ navigation }: any) => {
   const [paymentMethod, setPaymentMethod] = useState<'pay_now' | 'pay_on_delivery'>('pay_now');
   const insets = useSafeAreaInsets();
 
-  // Alert Modal state
-  const [alertConfig, setAlertConfig] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    primaryAction?: any;
-    showCancel?: boolean;
-    onClose?: () => void;
-  }>({
-    visible: false,
-    title: '',
-    message: '',
-    type: 'info',
-  });
-
-  const showAlert = (title: string, message: string, type: any = 'info', primaryAction?: any, showCancel: boolean = true) => {
-    setAlertConfig({ visible: true, title, message, type, primaryAction, showCancel });
-  };
+  const { showAlert, showToast } = useAlert();
 
   useEffect(() => {
     if (user) {
@@ -108,7 +90,7 @@ export const CartScreen = ({ navigation }: any) => {
         setReceiverInfoVisible(true);
       },
       (error) => {
-        showAlert('Location Error', 'Could not get your current location. Please check permissions.', 'error');
+        showAlert({ title: 'Location Error', message: 'Could not get your current location. Please check permissions.', type: 'error' });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
     );
@@ -116,7 +98,7 @@ export const CartScreen = ({ navigation }: any) => {
 
   const handleSaveReceiverInfo = async () => {
     if (!receiverName.trim() || !receiverPhone.trim()) {
-      showAlert('Required', 'Please enter receiver name and phone number', 'warning');
+      showAlert({ title: 'Required', message: 'Please enter receiver name and phone number', type: 'warning' });
       return;
     }
 
@@ -143,7 +125,7 @@ export const CartScreen = ({ navigation }: any) => {
       setReceiverName('');
       setReceiverPhone('');
     } catch (e: any) {
-      showAlert('Error', e.message, 'error');
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -171,11 +153,11 @@ export const CartScreen = ({ navigation }: any) => {
       // 1. Check manual toggle
       if (!store.is_currently_open) {
         setLoading(false);
-        showAlert(
-          'Store Unavailable',
-          `${store.name} is currently not accepting online orders. Please try again later.`,
-          'error'
-        );
+        showAlert({
+          title: 'Store Unavailable',
+          message: `${store.name} is currently not accepting online orders. Please try again later.`,
+          type: 'error'
+        });
         return;
       }
 
@@ -207,11 +189,11 @@ export const CartScreen = ({ navigation }: any) => {
 
             if (!isOpen) {
               setLoading(false);
-              showAlert(
-                'Store Closed',
-                `${store.name} is currently closed. Please check their operating hours.`,
-                'warning'
-              );
+              showAlert({
+                title: 'Store Closed',
+                message: `${store.name} is currently closed. Please check their operating hours.`,
+                type: 'warning'
+              });
               return;
             }
           }
@@ -224,35 +206,35 @@ export const CartScreen = ({ navigation }: any) => {
 
       // Profile Info Validation
       if (!profile?.full_name || !profile?.phone || !profile?.upi_id) {
-        showAlert(
-          'Profile Incomplete',
-          'Please provide your Full Name, Phone, and UPI ID in the Account page before placing an order.',
-          'warning',
-          {
+        showAlert({
+          title: 'Profile Incomplete',
+          message: 'Please provide your Full Name, Phone, and UPI ID in the Account page before placing an order.',
+          type: 'warning',
+          primaryAction: {
             text: 'Go to Account',
             onPress: () => navigation.navigate('Account'),
           }
-        );
+        });
         return;
       }
 
       if (!selectedAddress && !sessionAddress) {
-        showAlert('Address Required', 'Please select a delivery address', 'warning');
+        showAlert({ title: 'Address Required', message: 'Please select a delivery address', type: 'warning' });
         return;
       }
       
-      showAlert(
-        'Place Order?',
-        `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
-        'info',
-        {
+      showAlert({
+        title: 'Place Order?',
+        message: `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
+        type: 'info',
+        primaryAction: {
           text: 'Place',
           onPress: () => processOrder(),
         }
-      );
+      });
     } catch (e: any) {
       setLoading(false);
-      showAlert('Error', 'Unable to verify store availability. Please try again.', 'error');
+      showAlert({ title: 'Error', message: 'Unable to verify store availability. Please try again.', type: 'error' });
       console.error('Checkout validation error:', e);
     }
   };
@@ -365,7 +347,7 @@ export const CartScreen = ({ navigation }: any) => {
                   .update({ status: 'cancelled', payment_status: 'failed' })
                   .eq('id', order.id);
                 
-                showAlert('Payment Failed', 'Order was not placed. Please try again or choose Pay on Delivery.', 'error');
+                showAlert({ title: 'Payment Failed', message: 'Order was not placed. Please try again or choose Pay on Delivery.', type: 'error' });
               }
             );
           } else {
@@ -385,7 +367,7 @@ export const CartScreen = ({ navigation }: any) => {
       }
 
     } catch (e: any) {
-      showAlert('Error', e.message, 'error');
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -435,12 +417,12 @@ export const CartScreen = ({ navigation }: any) => {
           <Text style={styles.headerTitle}>Your Cart</Text>
           <TouchableOpacity 
             style={styles.clearBtn} 
-            onPress={() => showAlert(
-              'Clear Cart?', 
-              'Are you sure you want to remove all items from your cart?', 
-              'warning',
-              { text: 'Yes, Clear', onPress: clearCart, variant: 'destructive' }
-            )}
+            onPress={() => showAlert({
+              title: 'Clear Cart?', 
+              message: 'Are you sure you want to remove all items from your cart?', 
+              type: 'warning',
+              primaryAction: { text: 'Yes, Clear', onPress: clearCart, variant: 'destructive' }
+            })}
           >
             <Text style={styles.clearText}>Clear</Text>
           </TouchableOpacity>
@@ -735,25 +717,7 @@ export const CartScreen = ({ navigation }: any) => {
         </View>
       </Modal>
 
-      <AlertModal
-        visible={infoModal.visible}
-        title={infoModal.title}
-        message={infoModal.content}
-        type="info"
-        onClose={() => setInfoModal({ ...infoModal, visible: false })}
-        showCancel={true}
-        cancelText="Close"
-      />
-
-      <AlertModal
-        visible={alertConfig.visible}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
-        primaryAction={alertConfig.primaryAction}
-        showCancel={alertConfig.showCancel}
-      />
+      {/* No local AlertModals needed anymore as they are handled globally */}
     </View>
   );
 };

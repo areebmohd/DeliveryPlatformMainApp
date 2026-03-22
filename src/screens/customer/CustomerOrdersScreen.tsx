@@ -7,13 +7,13 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
 
@@ -23,6 +23,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const { showAlert } = useAlert();
 
   useEffect(() => {
     fetchOrders();
@@ -97,31 +98,31 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
   };
 
   const handleCancelOrder = (orderId: string, orderNumber: string) => {
-    Alert.alert(
-      'Cancel Order',
-      `Are you sure you want to cancel order #${orderNumber}?`,
-      [
-        { text: 'No', style: 'cancel' },
-        { 
-          text: 'Yes, Cancel', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('orders')
-                .update({ status: 'cancelled' })
-                .eq('id', orderId);
-              
-              if (error) throw error;
-              fetchOrders();
-            } catch (error) {
-              console.error('Error cancelling order:', error);
-              Alert.alert('Error', 'Failed to cancel order. Please try again.');
-            }
+    showAlert({
+      title: 'Cancel Order',
+      message: `Are you sure you want to cancel order #${orderNumber}?`,
+      type: 'warning',
+      showCancel: true,
+      primaryAction: { 
+        text: 'Yes, Cancel', 
+        onPress: async () => {
+          try {
+            const { error } = await supabase
+              .from('orders')
+              .update({ status: 'cancelled' })
+              .eq('id', orderId);
+            
+            if (error) throw error;
+            fetchOrders();
+          } catch (error) {
+            console.error('Error cancelling order:', error);
+            showAlert({ title: 'Error', message: 'Failed to cancel order. Please try again.', type: 'error' });
           }
         },
-      ]
-    );
+        variant: 'destructive',
+      },
+      cancelText: 'No',
+    });
   };
 
   const renderOrderItem = ({ item }: { item: any }) => {

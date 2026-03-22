@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
-import { AlertModal } from '../../components/ui/AlertModal';
+import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -24,27 +24,7 @@ export const OrdersScreen = () => {
   const [store, setStore] = useState<any>(null);
   const insets = useSafeAreaInsets();
 
-  // Alert Modal state
-  const [alertConfig, setAlertConfig] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    primaryAction?: any;
-    secondaryAction?: any;
-    showCancel?: boolean;
-  }>({
-    visible: false,
-    title: '',
-    message: '',
-    type: 'info',
-  });
-
-  const showAlert = (config: any) => {
-    setAlertConfig({ visible: true, ...config });
-  };
-
-  const closeAlert = () => setAlertConfig(prev => ({ ...prev, visible: false }));
+  const { showAlert } = useAlert();
 
   useEffect(() => {
     fetchStoreAndOrders();
@@ -378,16 +358,7 @@ export const OrdersScreen = () => {
         </ScrollView>
       )}
 
-      <AlertModal
-        visible={alertConfig.visible}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={closeAlert}
-        primaryAction={alertConfig.primaryAction}
-        secondaryAction={alertConfig.secondaryAction}
-        showCancel={alertConfig.showCancel !== undefined ? alertConfig.showCancel : alertConfig.type !== 'success'}
-      />
+      {/* Global AlertModal handles alerts now */}
     </View>
   );
 };

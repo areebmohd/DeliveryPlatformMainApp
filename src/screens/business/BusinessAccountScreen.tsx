@@ -3,33 +3,19 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { supabase } from '../../api/supabase';
-import { AlertModal } from '../../components/ui/AlertModal';
 
 export const BusinessAccountScreen = ({ navigation }: any) => {
   const { profile, signOut, user } = useAuth();
   const insets = useSafeAreaInsets();
   const [store, setStore] = useState<any>(null);
 
-  // Alert Modal state
-  const [alertConfig, setAlertConfig] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    primaryAction?: any;
-    showCancel?: boolean;
-  }>({
-    visible: false,
-    title: '',
-    message: '',
-    type: 'info',
-  });
+  const { showAlert } = useAlert();
 
   const handleSignOut = () => {
-    setAlertConfig({
-      visible: true,
+    showAlert({
       title: 'Sign Out',
       message: 'Are you sure you want to sign out of your business account?',
       type: 'warning',
@@ -189,15 +175,7 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      <AlertModal
-        visible={alertConfig.visible}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
-        primaryAction={alertConfig.primaryAction}
-        showCancel={alertConfig.showCancel}
-      />
+      {/* Global AlertModal handles alerts now */}
     </View>
   );
 };

@@ -9,10 +9,16 @@ export const Colors = {
   border: '#E9ECEF',
   success: '#28A745',
   warning: '#F59E0B',
+  info: '#3B82F6', // Keeping info for consistency
   white: '#FFFFFF',
   black: '#000000',
   primaryLight: '#e7f1ff', // Light Blue
-  glass: 'rgba(255, 255, 255, 0.8)',
+  successLight: '#d4edda', // Light Green
+  errorLight: '#f8d7da',   // Light Red
+  warningLight: '#fff3cd', // Light Yellow
+  infoLight: '#d1ecf1',    // Light Info Blue
+  glass: 'rgba(255, 255, 255, 0.85)',
+  overlay: 'rgba(0, 0, 0, 0.5)',
 };
 
 export const Spacing = {

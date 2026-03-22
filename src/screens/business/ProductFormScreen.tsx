@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   Image,
   ActivityIndicator,
@@ -14,7 +13,7 @@ import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { supabase, uploadImage } from '../../api/supabase';
-import { AlertModal } from '../../components/ui/AlertModal';
+import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useAuth } from '../../context/AuthContext';
@@ -44,23 +43,8 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [searchingBarcode, setSearchingBarcode] = useState(false);
   const [hasSearchedBarcode, setHasSearchedBarcode] = useState(false);
 
-  // Alert Modal state
-  const [alertConfig, setAlertConfig] = useState<{
-    visible: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    onConfirm?: () => void;
-  }>({
-    visible: false,
-    title: '',
-    message: '',
-    type: 'info',
-  });
+  const { showAlert, showToast } = useAlert();
 
-  const showAlert = (title: string, message: string, type: any = 'info', onConfirm?: () => void) => {
-    setAlertConfig({ visible: true, title, message, type, onConfirm });
-  };
 
   const isEditing = !!product;
   const isBarcodeMode = productType === 'barcode';
@@ -110,13 +94,13 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         setCategory(data.category || '');
         setImageUrl(data.image_url || '');
         setIsBarcodeMatched(true);
-        showAlert('Product Found', 'Product details have been pre-filled and locked.', 'success');
+        showToast('Product Found', 'success');
       } else {
         setIsBarcodeMatched(false);
-        showAlert('Not Found', 'Generic product not found. You can enter details manually.', 'warning');
+        showAlert({ title: 'Not Found', message: 'Generic product not found. You can enter details manually.', type: 'warning' });
       }
     } catch (e: any) {
-      showAlert('Error', e.message, 'error');
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
       setSearchingBarcode(false);
     }
@@ -138,9 +122,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         const fileName = `products/${user.id}/${Date.now()}.jpg`;
         const publicUrl = await uploadImage('store-logos', fileName, result.assets[0].uri);
         setImageUrl(publicUrl);
-        showAlert('Success', 'Image uploaded successfully!', 'success');
+        showToast('Image uploaded successfully!', 'success');
       } catch (error: any) {
-        showAlert('Error', error.message, 'error');
+        showAlert({ title: 'Error', message: error.message, type: 'error' });
       } finally {
         setUploading(false);
       }
@@ -149,7 +133,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
   const handleSaveProduct = async () => {
     if (!name || !price) {
-      showAlert('Required Fields', 'Please enter product name and price.', 'warning');
+      showAlert({ title: 'Required Fields', message: 'Please enter product name and price.', type: 'warning' });
       return;
     }
 
@@ -166,14 +150,14 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           .maybeSingle();
         
         if (duplicateProduct) {
-          showAlert('Duplicate Product', 'A product with this name already exists in your store.', 'warning');
+          showAlert({ title: 'Duplicate Product', message: 'A product with this name already exists in your store.', type: 'warning' });
           return;
         }
         if (duplicateError) console.error('Error checking duplicates:', duplicateError);
       }
 
       if (!storeId) {
-        showAlert('Error', 'Store ID is missing. Please try again.', 'error');
+        showAlert({ title: 'Error', message: 'Store ID is missing. Please try again.', type: 'error' });
         return;
       }
 
@@ -220,16 +204,15 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         if (error) throw error;
       }
 
-      showAlert('Success', isEditing ? 'Product updated!' : 'Product added!', 'success', () => {
-        navigation.goBack();
-      });
+      showToast(isEditing ? 'Product updated!' : 'Product added!', 'success');
+      navigation.goBack();
       
       // Auto-navigate after a brief delay if user doesn't interact
       setTimeout(() => {
         if (navigation.canGoBack()) navigation.goBack();
       }, 1500);
     } catch (e: any) {
-      showAlert('Error', e.message, 'error');
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -403,23 +386,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         />
       </ScrollView>
 
-      <AlertModal
-        visible={alertConfig.visible}
-        title={alertConfig.title}
-        message={alertConfig.message}
-        type={alertConfig.type}
-        onClose={() => {
-          setAlertConfig(prev => ({ ...prev, visible: false }));
-          if (alertConfig.type === 'success' && alertConfig.onConfirm) {
-            alertConfig.onConfirm();
-          }
-        }}
-        showCancel={alertConfig.type !== 'success'}
-        primaryAction={alertConfig.onConfirm ? {
-          text: alertConfig.type === 'success' ? 'OK' : 'Confirm',
-          onPress: alertConfig.onConfirm,
-        } : undefined}
-      />
+      {/* Global AlertModal handles alerts now */}
     </View>
   );
 };
