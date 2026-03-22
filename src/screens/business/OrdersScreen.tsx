@@ -70,6 +70,7 @@ export const OrdersScreen = () => {
         .from('stores')
         .select('id, name')
         .eq('owner_id', user?.id)
+        .order('is_active', { ascending: false })
         .limit(1)
         .maybeSingle();
 

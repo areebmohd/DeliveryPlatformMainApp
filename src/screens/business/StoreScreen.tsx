@@ -125,6 +125,7 @@ export const StoreScreen = ({ navigation }: any) => {
         .from('stores_view')
         .select('*')
         .eq('owner_id', user?.id)
+        .order('is_active', { ascending: false })
         .limit(1)
         .maybeSingle();
 

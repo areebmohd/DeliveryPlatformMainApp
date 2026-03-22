@@ -31,7 +31,7 @@ const BANNER_HEIGHT = width * (10 / 16);
 
 export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const { user } = useAuth();
-  const { store } = route.params || {};
+  const [store, setStore] = useState<any>(route.params?.store || route.params?.selectedLocation?.preservedFormData?.store || null);
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(false);
@@ -74,7 +74,9 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   });
 
   useEffect(() => {
-    // Parse location if it exists in store params
+    // Only parse location from store ONCE if no location is already set
+    if (location) return;
+
     if (store?.location_wkt) {
       const match = store.location_wkt.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
       if (match) {
@@ -93,7 +95,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         });
       }
     }
-  }, [store]);
+  }, [store, location]); // Added location to deps to handle the 'return' logic correctly
 
   // Listen for location from MapSelectionScreen
   useEffect(() => {
@@ -121,6 +123,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         setOwnerName(preservedFormData.ownerName);
         setOwnerNumber(preservedFormData.ownerNumber);
         setVerificationImages(preservedFormData.verificationImages);
+        if (preservedFormData.store) setStore(preservedFormData.store);
       }
       
       // Clean up params to avoid re-triggering
@@ -350,7 +353,8 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
                 name, description, category, upiId, bannerUrl, openingHours, 
                 phone, email, instagramUrl, facebookUrl, whatsappNumber, 
                 addressLine1, pincode, sectorArea, city, state, 
-                ownerName, ownerNumber, verificationImages
+                ownerName, ownerNumber, verificationImages,
+                store
               }
             })}
           />
