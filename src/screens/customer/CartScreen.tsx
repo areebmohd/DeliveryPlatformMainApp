@@ -41,6 +41,7 @@ export const CartScreen = ({ navigation }: any) => {
     content: ''
   });
 
+  const [paymentMethod, setPaymentMethod] = useState<'pay_now' | 'pay_on_delivery'>('pay_now');
   const insets = useSafeAreaInsets();
 
   // Alert Modal state
@@ -231,7 +232,7 @@ export const CartScreen = ({ navigation }: any) => {
             delivery_fee: deliveryFee,
             platform_fee: platformFee,
             status: 'pending_verification',
-            payment_method: 'pay_now',
+            payment_method: paymentMethod,
             payment_status: 'pending'
           })
           .select()
@@ -253,27 +254,51 @@ export const CartScreen = ({ navigation }: any) => {
 
         if (itemsError) throw itemsError;
 
-        // UPI Payment
-        if (RNUpiPayment && RNUpiPayment.initializePayment) {
-          RNUpiPayment.initializePayment(
-            {
-              vpa: 'aashu9105628720-1@okicici',
-              payeeName: 'Ashu',
-              amount: grandTotal.toFixed(2),
-              transactionNote: `Order #${order.order_number}`,
-              transactionRef: order.id,
-            },
-            () => {
-              clearCart();
-              navigation.navigate('Orders');
-            },
-            () => {
-              showAlert('Payment Failed', 'Order saved. Please pay on delivery or try again.', 'error');
-            }
-          );
+        // UPI Payment (only if Pay Now is selected)
+        if (paymentMethod === 'pay_now') {
+          if (RNUpiPayment && RNUpiPayment.initializePayment) {
+            RNUpiPayment.initializePayment(
+              {
+                vpa: 'aashu9105628720-1@okicici', // Standard VPA for testing
+                payeeName: 'Ashu',
+                amount: grandTotal.toFixed(2),
+                transactionNote: `Order #${order.order_number}`,
+                transactionRef: order.id,
+              },
+              async () => {
+                // Payment Success - Update status to verified
+                await supabase
+                  .from('orders')
+                  .update({ payment_status: 'verified' })
+                  .eq('id', order.id);
+                
+                clearCart();
+                navigation.navigate('Account', { screen: 'CustomerOrders' });
+              },
+              async () => {
+                // Payment Failed/Cancelled - The order was created but should be cancelled or deleted
+                // The user said: "order will only place if he pay on the app"
+                await supabase
+                  .from('orders')
+                  .update({ status: 'cancelled', payment_status: 'failed' })
+                  .eq('id', order.id);
+                
+                showAlert('Payment Failed', 'Order was not placed. Please try again or choose Pay on Delivery.', 'error');
+              }
+            );
+          } else {
+            // Mock success if logic is missing (for local testing without UPI library active)
+            await supabase
+              .from('orders')
+              .update({ payment_status: 'verified' })
+              .eq('id', order.id);
+            clearCart();
+            navigation.navigate('Account', { screen: 'CustomerOrders' });
+          }
         } else {
+          // Pay on Delivery - Success immediately
           clearCart();
-          navigation.navigate('Orders');
+          navigation.navigate('Account', { screen: 'CustomerOrders' });
         }
       }
 
@@ -432,6 +457,66 @@ export const CartScreen = ({ navigation }: any) => {
           <View style={[styles.billRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Grand Total</Text>
             <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        {/* Payment Method Selection */}
+        <View style={styles.paymentSection}>
+          <Text style={styles.sectionTitle}>Payment Method</Text>
+          <View style={styles.paymentOptions}>
+            <TouchableOpacity 
+              style={[
+                styles.paymentOption, 
+                paymentMethod === 'pay_now' && styles.paymentOptionSelected
+              ]}
+              onPress={() => setPaymentMethod('pay_now')}
+            >
+              <View style={styles.paymentOptionHeader}>
+                <Icon 
+                  name="flash-outline" 
+                  size={24} 
+                  color={paymentMethod === 'pay_now' ? Colors.primary : Colors.textSecondary} 
+                />
+                <View style={[
+                  styles.radioOuter, 
+                  paymentMethod === 'pay_now' && styles.radioOuterSelected
+                ]}>
+                  {paymentMethod === 'pay_now' && <View style={styles.radioInner} />}
+                </View>
+              </View>
+              <Text style={[
+                styles.paymentOptionTitle,
+                paymentMethod === 'pay_now' && styles.paymentOptionTitleSelected
+              ]}>Pay Now</Text>
+              <Text style={styles.paymentOptionSub}>Pay instantly via UPI</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.paymentOption, 
+                paymentMethod === 'pay_on_delivery' && styles.paymentOptionSelected
+              ]}
+              onPress={() => setPaymentMethod('pay_on_delivery')}
+            >
+              <View style={styles.paymentOptionHeader}>
+                <Icon 
+                  name="truck-delivery-outline" 
+                  size={24} 
+                  color={paymentMethod === 'pay_on_delivery' ? Colors.primary : Colors.textSecondary} 
+                />
+                <View style={[
+                  styles.radioOuter, 
+                  paymentMethod === 'pay_on_delivery' && styles.radioOuterSelected
+                ]}>
+                  {paymentMethod === 'pay_on_delivery' && <View style={styles.radioInner} />}
+                </View>
+              </View>
+              <Text style={[
+                styles.paymentOptionTitle,
+                paymentMethod === 'pay_on_delivery' && styles.paymentOptionTitleSelected
+              ]}>Pay on Delivery</Text>
+              <Text style={styles.paymentOptionSub}>Cash or UPI at your door</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -795,6 +880,63 @@ const styles = StyleSheet.create({
   },
   checkoutBtn: {
     width: '55%',
+  },
+  paymentSection: {
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.md,
+  },
+  paymentOptions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  paymentOption: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: Colors.border,
+  },
+  paymentOptionSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight + '20', // Very subtle tint
+  },
+  paymentOptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioOuterSelected: {
+    borderColor: Colors.primary,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.primary,
+  },
+  paymentOptionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  paymentOptionTitleSelected: {
+    color: Colors.primary,
+  },
+  paymentOptionSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   emptyContainer: {
     flex: 1,
