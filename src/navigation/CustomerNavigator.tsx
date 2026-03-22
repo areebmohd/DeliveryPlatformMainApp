@@ -35,6 +35,7 @@ const HomeStack = () => {
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="Category" component={CategoryScreen} />
       <Stack.Screen name="MapSelection" component={MapSelectionScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 };

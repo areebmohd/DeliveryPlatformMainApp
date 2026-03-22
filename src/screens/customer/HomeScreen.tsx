@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StoreCard } from '../../components/StoreCard';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { supabase } from '../../api/supabase';
@@ -43,6 +44,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
+  const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const { addItem, updateQuantity, items, sessionAddress, setSessionAddress } = useCart();
   const { user } = useAuth();
 
@@ -62,11 +64,38 @@ export const HomeScreen = ({ navigation }: any) => {
     const unsubscribe = navigation.addListener('focus', () => {
       if (user) {
         fetchAddresses();
+        checkNotifications();
       }
     });
 
     return unsubscribe;
   }, [user, navigation]);
+
+  const checkNotifications = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('created_at')
+        .eq('target_group', 'customer')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const latestTime = data[0].created_at;
+        const lastSeenTime = await AsyncStorage.getItem('last_seen_notification_time');
+        
+        if (!lastSeenTime || new Date(latestTime) > new Date(lastSeenTime)) {
+          setHasNewNotifications(true);
+        } else {
+          setHasNewNotifications(false);
+        }
+      }
+    } catch (e) {
+      console.error('Error checking notifications:', e);
+    }
+  };
 
   const fetchAddresses = async () => {
     try {
@@ -238,8 +267,12 @@ export const HomeScreen = ({ navigation }: any) => {
             <Icon name="chevron-down" size={20} color={Colors.white} />
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.notificationButton}>
+        <TouchableOpacity 
+          style={styles.notificationButton}
+          onPress={() => navigation.navigate('Notifications')}
+        >
           <Icon name="bell-outline" size={24} color={Colors.white} />
+          {hasNewNotifications && <View style={styles.notificationBadge} />}
         </TouchableOpacity>
       </View>
 
@@ -462,6 +495,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 9,
+    right: 12,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FF0000',
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
   },
   searchContainer: {
     paddingHorizontal: Spacing.md,

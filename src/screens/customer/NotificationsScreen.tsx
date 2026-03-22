@@ -6,15 +6,16 @@ import {
   StatusBar,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
   SectionList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import { supabase } from '../../api/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
-export const NotificationsScreen = () => {
+export const NotificationsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +58,12 @@ export const NotificationsScreen = () => {
       }));
 
       setSections(sectionData);
+
+      // Mark as read by saving the latest timestamp
+      if (data && data.length > 0) {
+        const latestTime = data[0].created_at;
+        await AsyncStorage.setItem('last_seen_notification_time', latestTime);
+      }
     } catch (e) {
       console.error('Error fetching notifications:', e);
     } finally {
@@ -88,11 +95,16 @@ export const NotificationsScreen = () => {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
-      <SafeTopBackground />
       
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Icon name="arrow-left" size={24} color={Colors.text} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
       </View>
 
@@ -127,11 +139,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
     backgroundColor: Colors.white,
+    marginRight: Spacing.md,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   headerTitle: {
     fontSize: 24,
@@ -144,7 +168,6 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     paddingVertical: Spacing.sm,
-    marginTop: Spacing.md,
     marginBottom: Spacing.xs,
   },
   sectionTitle: {

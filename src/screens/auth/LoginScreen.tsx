@@ -17,6 +17,7 @@ import { supabase } from '../../api/supabase';
 export const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'customer' | 'store'>('customer');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,8 +31,34 @@ export const LoginScreen = ({ navigation }: any) => {
     setError('');
     
     try {
+      // Pre-login role validation
+      const { data: existingRole, error: checkError } = await supabase.rpc('check_email_exists', {
+        email_to_check: email.toLowerCase().trim(),
+      });
+
+      if (checkError) {
+        console.error('Error checking role:', checkError);
+      } else if (!existingRole) {
+        setError('No account found with this email.');
+        setLoading(false);
+        return;
+      } else {
+        const isBusinessSelection = role === 'store';
+        const isBusinessRole = existingRole === 'store' || existingRole === 'admin';
+        
+        if (isBusinessSelection && !isBusinessRole) {
+          setError('This account is registered as a Customer. Please select the correct option.');
+          setLoading(false);
+          return;
+        } else if (!isBusinessSelection && isBusinessRole) {
+          setError('This account is registered as a Business. Please select the correct option.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.toLowerCase().trim(),
         password,
       });
 
@@ -54,6 +81,25 @@ export const LoginScreen = ({ navigation }: any) => {
           <View style={styles.header}>
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>Sign in to continue to our revolution</Text>
+          </View>
+
+          <View style={styles.roleContainer}>
+            <TouchableOpacity
+              style={[styles.roleButton, role === 'customer' && styles.roleButtonActive]}
+              onPress={() => setRole('customer')}
+            >
+              <Text style={[styles.roleText, role === 'customer' && styles.roleTextActive]}>
+                Customer
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.roleButton, role === 'store' && styles.roleButtonActive]}
+              onPress={() => setRole('store')}
+            >
+              <Text style={[styles.roleText, role === 'store' && styles.roleTextActive]}>
+                Business
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.form}>
@@ -142,6 +188,35 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '600',
     fontSize: 14,
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    marginBottom: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 4,
+  },
+  roleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  roleButtonActive: {
+    backgroundColor: Colors.white,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  roleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  roleTextActive: {
+    color: Colors.primary,
   },
   footer: {
     flexDirection: 'row',

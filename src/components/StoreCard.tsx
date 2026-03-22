@@ -97,12 +97,13 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     padding: Spacing.md,
+    paddingTop: Spacing.sm,
   },
   nameRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   name: {
     fontSize: 18,
@@ -114,7 +115,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 4,
   },
   categoryBadge: {
     backgroundColor: Colors.primaryLight,

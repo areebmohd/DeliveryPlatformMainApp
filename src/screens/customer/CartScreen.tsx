@@ -176,6 +176,18 @@ export const CartScreen = ({ navigation }: any) => {
       return;
     }
     
+    showAlert(
+      'Place Order?',
+      `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
+      'info',
+      {
+        text: 'Place',
+        onPress: () => processOrder(),
+      }
+    );
+  };
+
+  const processOrder = async () => {
     try {
       setLoading(true);
 

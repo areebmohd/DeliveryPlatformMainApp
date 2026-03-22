@@ -86,13 +86,12 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
       
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <View style={styles.headerLeft}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Icon name="arrow-left" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Product</Text>
+          <Text style={styles.headerTitle}>Product Details</Text>
         </View>
         <TouchableOpacity 
           onPress={toggleFavourite} 
@@ -104,7 +103,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           ) : (
             <Icon 
               name={isFavourite ? "heart" : "heart-outline"} 
-              size={28} 
+              size={24} 
               color={isFavourite ? Colors.error : Colors.primary} 
             />
           )}
@@ -205,11 +204,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   favButton: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 22,
+    borderRadius: 20,
     backgroundColor: Colors.white,
     elevation: 2,
     shadowColor: '#000',
@@ -223,13 +222,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.white,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: Colors.text,
-    marginLeft: Spacing.sm,
+    marginLeft: Spacing.md,
   },
   scrollContent: {
     paddingTop: Spacing.sm,
@@ -237,12 +241,10 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: width,
     height: width, // Square image
-    paddingHorizontal: Spacing.md,
   },
   image: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
     resizeMode: 'cover',
   },
   imagePlaceholder: {
