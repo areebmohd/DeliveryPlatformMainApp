@@ -24,6 +24,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { MapPickerView } from '../../components/address/MapPickerView';
 
 import { AlertModal } from '../../components/ui/AlertModal';
+import { TimeSlotPicker } from '../../components/ui/TimeSlotPicker';
 
 const { width } = Dimensions.get('window');
 const BANNER_HEIGHT = width * (10 / 16);
@@ -393,11 +394,17 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
           <Input label="Instagram URL" value={instagramUrl} onChangeText={setInstagramUrl} placeholder="instagram.com/yourstore" autoCapitalize="none" />
           <Input label="Facebook URL" value={facebookUrl} onChangeText={setFacebookUrl} placeholder="facebook.com/yourstore" autoCapitalize="none" />
         </View>
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payments</Text>
           <Input label="UPI ID *" value={upiId} onChangeText={setUpiId} placeholder="yourname@upi" />
           <Text style={styles.helperText}>Your payments will be credited to this UPI ID.</Text>
+        </View>
+
+        <View style={styles.section}>
+          <TimeSlotPicker 
+            value={openingHours} 
+            onChange={setOpeningHours} 
+          />
         </View>
 
         <View style={styles.section}>

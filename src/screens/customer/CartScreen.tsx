@@ -157,34 +157,104 @@ export const CartScreen = ({ navigation }: any) => {
   const handleCheckout = async () => {
     if (items.length === 0) return;
 
-    // Profile Info Validation
-    if (!profile?.full_name || !profile?.phone || !profile?.upi_id) {
+    try {
+      setLoading(true);
+      const storeId = items[0].store_id;
+      const { data: store, error: storeError } = await supabase
+        .from('stores_view')
+        .select('is_currently_open, opening_hours, name')
+        .eq('id', storeId)
+        .single();
+      
+      if (storeError) throw storeError;
+
+      // 1. Check manual toggle
+      if (!store.is_currently_open) {
+        setLoading(false);
+        showAlert(
+          'Store Unavailable',
+          `${store.name} is currently not accepting online orders. Please try again later.`,
+          'error'
+        );
+        return;
+      }
+
+      // 2. Check opening hours
+      if (store.opening_hours) {
+        try {
+          const slots = JSON.parse(store.opening_hours);
+          if (Array.isArray(slots) && slots.length > 0) {
+            const now = new Date();
+            const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+
+            const timeToMinutes = (timeStr: string) => {
+              const [time, period] = timeStr.split(' ');
+              let [h, m] = time.split(':').map(Number);
+              if (period === 'PM' && h !== 12) h += 12;
+              if (period === 'AM' && h === 12) h = 0;
+              return h * 60 + m;
+            };
+
+            const isOpen = slots.some(slot => {
+              const startMins = timeToMinutes(slot.start);
+              const endMins = timeToMinutes(slot.end);
+              // Handle midnight crossover (e.g. 10 PM to 2 AM)
+              if (endMins < startMins) {
+                return currentTotalMins >= startMins || currentTotalMins <= endMins;
+              }
+              return currentTotalMins >= startMins && currentTotalMins <= endMins;
+            });
+
+            if (!isOpen) {
+              setLoading(false);
+              showAlert(
+                'Store Closed',
+                `${store.name} is currently closed. Please check their operating hours.`,
+                'warning'
+              );
+              return;
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing opening hours during checkout:', e);
+        }
+      }
+      
+      setLoading(false);
+
+      // Profile Info Validation
+      if (!profile?.full_name || !profile?.phone || !profile?.upi_id) {
+        showAlert(
+          'Profile Incomplete',
+          'Please provide your Full Name, Phone, and UPI ID in the Account page before placing an order.',
+          'warning',
+          {
+            text: 'Go to Account',
+            onPress: () => navigation.navigate('Account'),
+          }
+        );
+        return;
+      }
+
+      if (!selectedAddress && !sessionAddress) {
+        showAlert('Address Required', 'Please select a delivery address', 'warning');
+        return;
+      }
+      
       showAlert(
-        'Profile Incomplete',
-        'Please provide your Full Name, Phone, and UPI ID in the Account page before placing an order.',
-        'warning',
+        'Place Order?',
+        `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
+        'info',
         {
-          text: 'Go to Account',
-          onPress: () => navigation.navigate('Account'),
+          text: 'Place',
+          onPress: () => processOrder(),
         }
       );
-      return;
+    } catch (e: any) {
+      setLoading(false);
+      showAlert('Error', 'Unable to verify store availability. Please try again.', 'error');
+      console.error('Checkout validation error:', e);
     }
-
-    if (!selectedAddress && !sessionAddress) {
-      showAlert('Address Required', 'Please select a delivery address', 'warning');
-      return;
-    }
-    
-    showAlert(
-      'Place Order?',
-      `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
-      'info',
-      {
-        text: 'Place',
-        onPress: () => processOrder(),
-      }
-    );
   };
 
   const processOrder = async () => {

@@ -19,6 +19,19 @@ import { supabase } from '../../api/supabase';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { useCart } from '../../context/CartContext';
 
+const formatOpeningHours = (hoursJson: string) => {
+  try {
+    if (!hoursJson) return 'Contact store for timings';
+    const parsed = JSON.parse(hoursJson);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map((slot: any) => `${slot.start} - ${slot.end}`).join('\n');
+    }
+    return hoursJson;
+  } catch (e) {
+    return hoursJson || 'Contact store for timings';
+  }
+};
+
 export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const { store } = route.params;
   const [products, setProducts] = useState<any[]>([]);
@@ -207,6 +220,13 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
+        {!store.is_currently_open && (
+          <View style={styles.closedBanner}>
+            <Icon name="clock-alert-outline" size={20} color={Colors.white} />
+            <Text style={styles.closedText}>Store is currently closed for online orders</Text>
+          </View>
+        )}
+
         {/* Tabs */}
         <View style={styles.tabWrapper}>
           <View style={styles.tabContainer}>
@@ -282,7 +302,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                   <Text style={styles.infoLabel}>Operating Hours</Text>
                   <View style={styles.infoRow}>
                     <Icon name="clock-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.infoValue}>{store.opening_hours || 'Contact store for timings'}</Text>
+                    <Text style={styles.infoValue}>{formatOpeningHours(store.opening_hours)}</Text>
                   </View>
                 </View>
 
@@ -691,5 +711,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     marginRight: 8,
+  },
+  closedBanner: {
+    marginHorizontal: Spacing.md,
+    backgroundColor: Colors.error,
+    padding: 12,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  closedText: {
+    color: Colors.white,
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

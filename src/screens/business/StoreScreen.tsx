@@ -26,6 +26,19 @@ const { width } = Dimensions.get('window');
 
 type TabType = 'products' | 'info';
 
+const formatOpeningHours = (hoursJson: string) => {
+  try {
+    if (!hoursJson) return 'Schedule not set';
+    const parsed = JSON.parse(hoursJson);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map((slot: any) => `${slot.start} - ${slot.end}`).join('\n');
+    }
+    return hoursJson;
+  } catch (e) {
+    return hoursJson || 'Schedule not set';
+  }
+};
+
 export const StoreScreen = ({ navigation }: any) => {
   const { user } = useAuth();
   const [store, setStore] = useState<any>(null);
@@ -139,6 +152,34 @@ export const StoreScreen = ({ navigation }: any) => {
 
   const onRefresh = async () => {
     await Promise.all([fetchStore(), fetchProducts()]);
+  };
+
+  const handleToggleAvailability = async () => {
+    if (!store?.id) return;
+    try {
+      const nextStatus = !store.is_currently_open;
+      
+      // Optimistic Update
+      const previousStore = { ...store };
+      setStore({ ...store, is_currently_open: nextStatus });
+
+      const { error } = await supabase
+        .from('stores')
+        .update({ is_currently_open: nextStatus })
+        .eq('id', store.id);
+      
+      if (error) {
+        setStore(previousStore);
+        throw error;
+      }
+    } catch (e) {
+      console.error('Error toggling availability:', e);
+      showAlert({
+        title: 'Error',
+        message: 'Could not update availability',
+        type: 'error',
+      });
+    }
   };
 
   const fetchProducts = async () => {
@@ -343,6 +384,27 @@ export const StoreScreen = ({ navigation }: any) => {
           </View>
         )}
 
+        {store && store.is_active && !store.is_currently_open && (
+          <TouchableOpacity 
+            style={[styles.inactiveAlert, { backgroundColor: '#FFF4F4', borderColor: '#FFE2E2' }]} 
+            onPress={handleToggleAvailability}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.alertIconBg, { backgroundColor: '#FFE2E2' }]}>
+              <Icon name="store-off-outline" size={24} color={Colors.error} />
+            </View>
+            <View style={styles.alertTextContainer}>
+              <Text style={[styles.alertTitle, { color: Colors.error }]}>
+                Store is Offline
+              </Text>
+              <Text style={[styles.alertSubtitle, { color: '#666' }]}>
+                Your store is manually closed for online orders. Customers cannot see your products or place orders.
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={20} color={Colors.error} />
+          </TouchableOpacity>
+        )}
+
         {store && !store.is_active && (
           (() => {
             const isPending = 
@@ -454,8 +516,31 @@ export const StoreScreen = ({ navigation }: any) => {
                       color={Colors.primary}
                     />
                     <Text style={styles.infoValue}>
-                      {store?.opening_hours || 'Schedule not set'}
+                      {formatOpeningHours(store?.opening_hours)}
                     </Text>
+                  </View>
+
+                  <View style={styles.availabilityToggle}>
+                    <View>
+                      <Text style={styles.availabilityTitle}>Available for Orders</Text>
+                      <Text style={styles.availabilitySubtitle}>
+                        {store?.is_currently_open 
+                          ? 'Customers can place orders now' 
+                          : 'Store is manually closed for orders'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity 
+                      onPress={handleToggleAvailability}
+                      style={[
+                        styles.toggleBtn,
+                        store?.is_currently_open ? styles.toggleBtnActive : styles.toggleBtnInactive
+                      ]}
+                    >
+                      <View style={[
+                        styles.toggleSwitch,
+                        store?.is_currently_open ? styles.switchRight : styles.switchLeft
+                      ]} />
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -870,6 +955,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.primary,
     fontWeight: '700',
+  },
+  availabilityToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8F9FA',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E1E4E8',
+  },
+  availabilityTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  availabilitySubtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  toggleBtn: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleBtnActive: {
+    backgroundColor: Colors.success,
+  },
+  toggleBtnInactive: {
+    backgroundColor: Colors.border,
+  },
+  toggleSwitch: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  switchLeft: {
+    alignSelf: 'flex-start',
+  },
+  switchRight: {
+    alignSelf: 'flex-end',
   },
   infoDivider: {
     height: 1,
