@@ -3,15 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 export const SupportScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.container}>
-      <SafeTopBackground />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
@@ -42,17 +40,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.white,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    paddingBottom: Spacing.md,
   },
   backBtn: {
+    backgroundColor: Colors.white,
     padding: 8,
-    marginRight: 8,
+    borderRadius: 25,
+    marginRight: Spacing.md,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   headerTitle: {
     fontSize: 20,

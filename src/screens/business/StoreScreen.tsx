@@ -21,7 +21,6 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { BusinessProductCard } from '../../components/BusinessProductCard';
-import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 const { width } = Dimensions.get('window');
 
@@ -316,7 +315,6 @@ export const StoreScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <SafeTopBackground />
       <ScrollView
         stickyHeaderIndices={[store && !store.is_active ? 4 : 3]}
         contentContainerStyle={styles.scrollContent}
@@ -325,6 +323,7 @@ export const StoreScreen = ({ navigation }: any) => {
           <RefreshControl refreshing={loading} onRefresh={onRefresh} colors={[Colors.primary]} />
         }
       >
+        <View style={{ paddingTop: insets.top }} />
         {renderHeader()}
         {renderBanner()}
         

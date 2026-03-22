@@ -17,7 +17,6 @@ import { AlertModal } from '../../components/ui/AlertModal';
 import { BusinessProductCard } from '../../components/BusinessProductCard';
 import { supabase } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 export const ManageProductsScreen = ({ route, navigation }: any) => {
   const { storeId } = route.params;
@@ -160,14 +159,13 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <SafeTopBackground />
-      <View style={[styles.header, { paddingTop: Spacing.sm }]}>
-        <Icon 
-          name="arrow-left" 
-          size={24} 
-          color={Colors.text} 
-          onPress={() => navigation.goBack()} 
-        />
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Icon name="arrow-left" size={24} color={Colors.text} />
+        </TouchableOpacity>
         <Text style={styles.title}>Manage Products</Text>
         <TouchableOpacity onPress={() => handleNavigateToForm()}>
           <Icon name="plus-circle" size={28} color={Colors.primary} />
@@ -229,9 +227,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingBottom: Spacing.lg,
+  },
+  backButton: {
+    backgroundColor: Colors.white,
+    padding: 8,
+    borderRadius: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   title: {
     fontSize: 20,

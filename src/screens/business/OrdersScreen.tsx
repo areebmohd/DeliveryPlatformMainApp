@@ -15,7 +15,6 @@ import { AlertModal } from '../../components/ui/AlertModal';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { SafeTopBackground } from '../../components/ui/SafeTopBackground';
 
 export const OrdersScreen = () => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -340,7 +339,14 @@ export const OrdersScreen = () => {
 
   return (
     <View style={styles.container}>
-      <SafeTopBackground />
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+        <Text style={styles.title}>Orders</Text>
+        {stats.active > 0 && (
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeText}>{stats.active} Active</Text>
+          </View>
+        )}
+      </View>
       {loading && !refreshing ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -351,14 +357,6 @@ export const OrdersScreen = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Orders</Text>
-            {stats.active > 0 && (
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>{stats.active} Active</Text>
-              </View>
-            )}
-          </View>
 
           {orderList.length > 0 ? orderList.map((group) => (
             <View key={group.title}>
@@ -403,6 +401,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    paddingHorizontal: Spacing.lg,
   },
   title: {
     fontSize: 22,
