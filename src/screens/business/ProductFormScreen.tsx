@@ -47,6 +47,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [hasSearchedBarcode, setHasSearchedBarcode] = useState(false);
 
   const { showAlert, showToast } = useAlert();
+  
+  // Logistics state
+  const [isOversized, setIsOversized] = useState(product?.needs_large_vehicle || false);
 
 
   const isEditing = !!product;
@@ -144,39 +147,13 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     try {
       setIsLoading(true);
 
-      // 1. Fetch Dimensions via AI automatically if name/category is present
-      let estimatedLength = product?.length_cm || 0;
-      let estimatedWidth = product?.width_cm || 0;
-      let estimatedHeight = product?.height_cm || 0;
-      let manualWeight = parseFloat(weight) || 0;
-      let estimatedNeedsLarge = product?.needs_large_vehicle || false;
-
-      // Only re-fetch if it's new or name/category changed
-      if (!isEditing || product.name !== name.trim() || product.category !== category.trim()) {
-        try {
-          const { data, error } = await supabase.functions.invoke('estimate-dimensions', {
-            body: { name: name.trim(), category: category.trim() }
-          });
-
-          if (!error && data && !data.error) {
-            estimatedLength = data.length_cm;
-            estimatedWidth = data.width_cm;
-            estimatedHeight = data.height_cm;
-            
-            // Recalculate needs_large based on MANUAL weight + AI dimensions
-            const maxSide = Math.max(data.length_cm, data.width_cm, data.height_cm);
-            const totalDim = data.length_cm + data.width_cm + data.height_cm;
-            estimatedNeedsLarge = manualWeight > 20 || maxSide > 80 || totalDim > 150;
-          }
-        } catch (e) {
-          console.warn('AI Estimation failed, using defaults:', e);
-        }
-      } else {
-        // If not re-fetching, still update vehicle recommendation based on manual weight change
-        const maxSide = Math.max(estimatedLength, estimatedWidth, estimatedHeight);
-        const totalDim = estimatedLength + estimatedWidth + estimatedHeight;
-        estimatedNeedsLarge = manualWeight > 20 || maxSide > 80 || totalDim > 150;
-      }
+      // Logistics Logic (Manual Toggle replaces AI)
+      const manualWeight = parseFloat(weight) || 0;
+      const needsLarge = manualWeight > 20 || isOversized;
+      
+      // We set nominal dimensions to satisfy existing cart logic if needed
+      // (though Cart now primarily uses needs_large_vehicle flag)
+      const dimValue = isOversized ? 41 : 20; 
 
       // 2. Check for duplicate name in the same store
       if (!isEditing) {
@@ -226,10 +203,10 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         product_type: productType,
         stock_quantity: parseInt(stockQuantity),
         in_stock: inStock,
-        length_cm: estimatedLength,
-        width_cm: estimatedWidth,
-        height_cm: estimatedHeight,
-        needs_large_vehicle: estimatedNeedsLarge,
+        length_cm: dimValue,
+        width_cm: dimValue,
+        height_cm: dimValue,
+        needs_large_vehicle: needsLarge,
         updated_at: new Date().toISOString(),
       };
 
@@ -419,6 +396,39 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             keyboardType="numeric"
             editable={canEditDetails}
           />
+
+          <View style={styles.logisticsSection}>
+            <Text style={styles.logisticsTitle}>Delivery Details</Text>
+            <View style={styles.deliveryOptionsRow}>
+              <TouchableOpacity 
+                style={[styles.deliveryOptionCard, !isOversized && styles.deliveryOptionActive]}
+                onPress={() => setIsOversized(false)}
+                activeOpacity={0.7}
+              >
+                <Icon 
+                  name="motorbike" 
+                  size={32} 
+                  color={!isOversized ? Colors.primary : Colors.textSecondary} 
+                />
+                <Text style={[styles.deliveryOptionLabel, !isOversized && { color: Colors.primary }]}>Standard Bike</Text>
+                <Text style={styles.deliveryOptionSub}>Fits in 40x40x40cm bag</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.deliveryOptionCard, isOversized && styles.deliveryOptionActive]}
+                onPress={() => setIsOversized(true)}
+                activeOpacity={0.7}
+              >
+                <Icon 
+                  name="truck-delivery" 
+                  size={32} 
+                  color={isOversized ? Colors.primary : Colors.textSecondary} 
+                />
+                <Text style={[styles.deliveryOptionLabel, isOversized && { color: Colors.primary }]}>Large Vehicle</Text>
+                <Text style={styles.deliveryOptionSub}>Greater than 40cm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
         <Button
@@ -675,5 +685,52 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginLeft: 16,
     fontWeight: '500',
+  },
+  logisticsSection: {
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  logisticsTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.md,
+    letterSpacing: 1,
+  },
+  deliveryOptionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deliveryOptionCard: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  deliveryOptionActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight + '15',
+    borderWidth: 2,
+  },
+  deliveryOptionLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.text,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  deliveryOptionSub: {
+    fontSize: 10,
+    color: Colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
   },
 });
