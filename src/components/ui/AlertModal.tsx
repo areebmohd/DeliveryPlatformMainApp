@@ -103,8 +103,8 @@ export const AlertModal = ({
           isSecondary && { backgroundColor: Colors.background },
           !isDestructive && !isOutline && !isSecondary && { backgroundColor: icon.color },
         ]} 
-        onPress={() => {
-          action.onPress();
+        onPress={async () => {
+          await action.onPress();
           onClose();
         }}
       >

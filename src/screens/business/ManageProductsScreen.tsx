@@ -24,7 +24,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
 
-  const { showAlert } = useAlert();
+  const { showAlert, showToast } = useAlert();
 
   useEffect(() => {
     fetchProducts();
@@ -64,6 +64,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
         .from('products')
         .select('*')
         .eq('store_id', storeId)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -98,7 +99,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = (product: any) => {
     showAlert({
       title: 'Delete Product',
       message: 'Are you sure you want to delete this product? All its data will be removed permanently.',
@@ -107,12 +108,33 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
         text: 'Delete',
         onPress: async () => {
           try {
-            const { error } = await supabase
-              .from('products')
-              .delete()
-              .eq('id', id);
-            if (error) throw error;
-            fetchProducts();
+            if (product.product_type === 'personal') {
+              // Try hard delete first
+              const { error } = await supabase
+                .from('products')
+                .delete()
+                .eq('id', product.id);
+              
+              if (error) {
+                // If ordered (FK constraint), fallback to soft delete
+                const { error: updateError } = await supabase
+                  .from('products')
+                  .update({ is_deleted: true, in_stock: false })
+                  .eq('id', product.id);
+                if (updateError) throw updateError;
+              }
+            } else {
+              // Common/Barcode: always soft delete to preserve for other stores
+              const { error } = await supabase
+                .from('products')
+                .update({ is_deleted: true, in_stock: false })
+                .eq('id', product.id);
+              if (error) throw error;
+            }
+            
+            // Remove from local state immediately for better UX
+            setProducts(prev => prev.filter(p => p.id !== product.id));
+            showToast('Product removed successfully', 'success');
           } catch (e: any) {
             showAlert({ title: 'Error', message: e.message, type: 'error' });
           }
@@ -149,7 +171,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
               product={item}
               onToggleStock={handleToggleStock}
               onEdit={handleNavigateToForm}
-              onDelete={handleDeleteProduct}
+              onDelete={() => handleDeleteProduct(item)}
             />
           )}
           ListEmptyComponent={

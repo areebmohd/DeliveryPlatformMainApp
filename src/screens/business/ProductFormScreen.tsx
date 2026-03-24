@@ -17,6 +17,8 @@ import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useAuth } from '../../context/AuthContext';
+import { PRODUCT_CATEGORIES } from '../../theme/categories';
+import { Modal } from 'react-native';
 
 export const ProductFormScreen = ({ route, navigation }: any) => {
   const { storeId, product, selectedType, initialType, mode } = route.params || {};
@@ -36,6 +38,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [inStock, setInStock] = useState(product?.in_stock !== false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
   // Barcode & Stock states
   const [barcode, setBarcode] = useState(product?.barcode || '');
@@ -97,6 +100,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         showToast('Product Found', 'success');
       } else {
         setIsBarcodeMatched(false);
+        // Look for common products by name if barcode not found (as a fallback or for common mode)
         showAlert({ title: 'Not Found', message: 'Generic product not found. You can enter details manually.', type: 'warning' });
       }
     } catch (e: any) {
@@ -206,11 +210,6 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
       showToast(isEditing ? 'Product updated!' : 'Product added!', 'success');
       navigation.goBack();
-      
-      // Auto-navigate after a brief delay if user doesn't interact
-      setTimeout(() => {
-        if (navigation.canGoBack()) navigation.goBack();
-      }, 1500);
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
@@ -329,13 +328,19 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             onChangeText={setName}
             editable={canEditDetails}
           />
-          <Input
-            label="Category"
-            placeholder="Dairy, Snacks, etc."
-            value={category}
-            onChangeText={setCategory}
-            editable={canEditDetails}
-          />
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Category</Text>
+            <TouchableOpacity 
+              style={[styles.dropdownTrigger, !canEditDetails && styles.disabledInput]}
+              onPress={() => canEditDetails && setCategoryModalVisible(true)}
+              disabled={!canEditDetails}
+            >
+              <Text style={[styles.dropdownValue, !category && { color: Colors.textSecondary }]}>
+                {category || "Select a category"}
+              </Text>
+              <Icon name="chevron-down" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
           <Input
             label="Description"
             placeholder="Details..."
@@ -385,6 +390,39 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           style={styles.submitButton}
         />
       </ScrollView>
+
+      <Modal
+        visible={categoryModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.categoryModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choose Category</Text>
+              <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={styles.categoryList}>
+              {PRODUCT_CATEGORIES.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={styles.categoryOption}
+                  onPress={() => {
+                    setCategory(cat.name);
+                    setCategoryModalVisible(false);
+                  }}
+                >
+                  <Icon name={cat.icon} size={24} color={Colors.primary} />
+                  <Text style={styles.categoryOptionText}>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Global AlertModal handles alerts now */}
     </View>
@@ -540,5 +578,64 @@ const styles = StyleSheet.create({
   submitButton: {
     marginTop: Spacing.md,
     elevation: 4,
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    borderRadius: borderRadius.md,
+    minHeight: 56,
+  },
+  dropdownValue: {
+    fontSize: 16,
+    color: Colors.text,
+    lineHeight: 22,
+    paddingVertical: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  categoryModalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '70%',
+    paddingBottom: Spacing.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  categoryList: {
+    padding: Spacing.md,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: Spacing.xs,
+  },
+  categoryOptionText: {
+    fontSize: 16,
+    color: Colors.text,
+    marginLeft: 16,
+    fontWeight: '500',
   },
 });

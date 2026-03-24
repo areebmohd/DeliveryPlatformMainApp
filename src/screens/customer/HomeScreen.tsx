@@ -23,14 +23,9 @@ import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { supabase } from '../../api/supabase';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
+import { PRODUCT_CATEGORIES } from '../../theme/categories';
 
-const CATEGORIES = [
-  { id: '1', name: 'Grocery', icon: 'cart-outline' },
-  { id: '2', name: 'Fruits', icon: 'food-apple-outline' },
-  { id: '4', name: 'Pharmacy', icon: 'medical-bag' },
-  { id: '5', name: 'Dairy', icon: 'cow' },
-  { id: '6', name: 'Meat', icon: 'food-steak' },
-];
+const CATEGORIES = PRODUCT_CATEGORIES;
 
 export const HomeScreen = ({ navigation }: any) => {
   const [stores, setStores] = useState<any[]>([]);
@@ -146,6 +141,7 @@ export const HomeScreen = ({ navigation }: any) => {
         .from('products')
         .select('*, stores:stores_view!inner(*)')
         .eq('stores.is_active', true)
+        .eq('is_deleted', false)
         .eq('in_stock', true)
         .limit(10);
 
@@ -165,6 +161,7 @@ export const HomeScreen = ({ navigation }: any) => {
         .from('products')
         .select('*, stores:stores_view!inner(*)')
         .eq('stores.is_active', true)
+        .eq('is_deleted', false)
         .eq('in_stock', true)
         .order('id', { ascending: false })
         .limit(12);

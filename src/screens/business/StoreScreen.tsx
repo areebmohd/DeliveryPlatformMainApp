@@ -167,6 +167,7 @@ export const StoreScreen = ({ navigation }: any) => {
         .from('products')
         .select('*')
         .eq('store_id', store.id)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -208,7 +209,7 @@ export const StoreScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = (product: any) => {
     showAlert({
       title: 'Delete Product',
       message:
@@ -218,17 +219,38 @@ export const StoreScreen = ({ navigation }: any) => {
       primaryAction: {
         text: 'Delete',
         onPress: async () => {
-          const { error } = await supabase
-            .from('products')
-            .delete()
-            .eq('id', id);
-          if (!error) {
+          try {
+            if (product.product_type === 'personal') {
+              // Try hard delete first
+              const { error } = await supabase
+                .from('products')
+                .delete()
+                .eq('id', product.id);
+              
+              if (error) {
+                // If ordered (FK constraint), fallback to soft delete
+                console.log('Ordered product, falling back to soft delete');
+                const { error: updateError } = await supabase
+                  .from('products')
+                  .update({ is_deleted: true, in_stock: false })
+                  .eq('id', product.id);
+                if (updateError) throw updateError;
+              }
+            } else {
+              // Common/Barcode: always soft delete
+              const { error } = await supabase
+                .from('products')
+                .update({ is_deleted: true, in_stock: false })
+                .eq('id', product.id);
+              if (error) throw error;
+            }
+            
             fetchProducts();
             showToast('Product deleted successfully', 'success');
-          } else {
+          } catch (e: any) {
             showAlert({
               title: 'Error',
-              message: 'Could not delete product.',
+              message: e.message || 'Could not delete product.',
               type: 'error',
             });
           }
@@ -452,7 +474,7 @@ export const StoreScreen = ({ navigation }: any) => {
                     product={item}
                     onToggleStock={handleToggleStock}
                     onEdit={handleNavigateToProductForm}
-                    onDelete={handleDeleteProduct}
+                    onDelete={() => handleDeleteProduct(item)}
                   />
                 ))
               ) : (
