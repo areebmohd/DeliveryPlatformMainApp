@@ -16,11 +16,11 @@ function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <CartProvider>
-          <AlertProvider>
+        <AlertProvider>
+          <CartProvider>
             <AppContent />
-          </AlertProvider>
-        </CartProvider>
+          </CartProvider>
+        </AlertProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

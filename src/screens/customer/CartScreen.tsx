@@ -151,7 +151,7 @@ export const CartScreen = ({ navigation }: any) => {
     }
 
     try {
-      // 1. Check for vehicle type
+      // 1. Check for vehicle type (already consistent in context)
       let totalWeight = 0;
       let oversized = false;
       let forcedLarge = false;
@@ -168,25 +168,9 @@ export const CartScreen = ({ navigation }: any) => {
 
       const needsLarge = totalWeight > 20 || oversized || forcedLarge;
       setIsLargeVehicle(needsLarge);
-      if (!needsLarge) setHasHelper(false); // Reset if not large vehicle
+      if (!needsLarge) setHasHelper(false);
 
-      // 2. Fetch Store location
-      const storeId = items[0].store_id;
-      const { data: store } = await supabase
-        .from('stores_view')
-        .select('location_wkt')
-        .eq('id', storeId)
-        .single();
-      
-      if (!store?.location_wkt) return;
-
-      // Parse store location POINT(lng lat)
-      const storeMatch = store.location_wkt.match(/POINT\(([-\d.]+) ([-\d.]+)\)/i);
-      if (!storeMatch) return;
-      const sLng = parseFloat(storeMatch[1]);
-      const sLat = parseFloat(storeMatch[2]);
-
-      // Parse user location
+      // 2. Multi-Store Route Calculation
       const userLocObj = sessionAddress || selectedAddress;
       if (!userLocObj) return;
       
@@ -198,8 +182,39 @@ export const CartScreen = ({ navigation }: any) => {
       const uLng = parseFloat(userMatch[1]);
       const uLat = parseFloat(userMatch[2]);
 
-      const d = calculateDistance(sLat, sLng, uLat, uLng);
-      setDistance(d);
+      // Unique stores in cart
+      const uniqueStores = Array.from(new Map(items.map(item => [item.store_id, { lat: item.store_lat, lng: item.store_lng }])).entries());
+      
+      if (uniqueStores.length === 0) return;
+
+      // Calculate distance to user for each store
+      const storesWithUserDist = uniqueStores.map(([id, loc]) => ({
+        id,
+        lat: loc.lat,
+        lng: loc.lng,
+        distToUser: calculateDistance(loc.lat, loc.lng, uLat, uLng)
+      }));
+
+      // Sort by distance to user descending (farthest first)
+      storesWithUserDist.sort((a, b) => b.distToUser - a.distToUser);
+
+      // Route: Farthest -> ... -> Closest -> User
+      let totalRouteDist = 0;
+      for (let i = 0; i < storesWithUserDist.length; i++) {
+        if (i === storesWithUserDist.length - 1) {
+          // Last store to User
+          totalRouteDist += storesWithUserDist[i].distToUser;
+        } else {
+          // Store i to Store i+1
+          const distBetween = calculateDistance(
+            storesWithUserDist[i].lat, storesWithUserDist[i].lng,
+            storesWithUserDist[i+1].lat, storesWithUserDist[i+1].lng
+          );
+          totalRouteDist += distBetween;
+        }
+      }
+
+      setDistance(totalRouteDist);
 
     } catch (e) {
       console.error('Error calculating fees:', e);
@@ -226,64 +241,61 @@ export const CartScreen = ({ navigation }: any) => {
 
     try {
       setLoading(true);
-      const storeId = items[0].store_id;
-      const { data: store, error: storeError } = await supabase
-        .from('stores_view')
-        .select('is_currently_open, opening_hours, name')
-        .eq('id', storeId)
-        .single();
+      const storesInCart = [...new Set(items.map(i => i.store_id))];
       
-      if (storeError) throw storeError;
+      // 1. Check all stores in cart for availability
+      for (const stId of storesInCart) {
+        const { data: store, error: storeError } = await supabase
+          .from('stores_view')
+          .select('is_currently_open, opening_hours, name')
+          .eq('id', stId)
+          .single();
+        
+        if (storeError) throw storeError;
 
-      // 1. Check manual toggle
-      if (!store.is_currently_open) {
-        setLoading(false);
-        showAlert({
-          title: 'Store Unavailable',
-          message: `${store.name} is currently not accepting online orders. Please try again later.`,
-          type: 'error'
-        });
-        return;
-      }
+        if (!store.is_currently_open) {
+          setLoading(false);
+          showAlert({
+            title: 'Store Unavailable',
+            message: `${store.name} is currently not accepting online orders.`,
+            type: 'error'
+          });
+          return;
+        }
 
-      // 2. Check opening hours
-      if (store.opening_hours) {
-        try {
-          const slots = JSON.parse(store.opening_hours);
-          if (Array.isArray(slots) && slots.length > 0) {
-            const now = new Date();
-            const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+        if (store.opening_hours) {
+          try {
+            const slots = JSON.parse(store.opening_hours);
+            if (Array.isArray(slots) && slots.length > 0) {
+              const now = new Date();
+              const currentTotalMins = now.getHours() * 60 + now.getMinutes();
 
-            const timeToMinutes = (timeStr: string) => {
-              const [time, period] = timeStr.split(' ');
-              let [h, m] = time.split(':').map(Number);
-              if (period === 'PM' && h !== 12) h += 12;
-              if (period === 'AM' && h === 12) h = 0;
-              return h * 60 + m;
-            };
+              const timeToMinutes = (timeStr: string) => {
+                const [time, period] = timeStr.split(' ');
+                let [h, m] = time.split(':').map(Number);
+                if (period === 'PM' && h !== 12) h += 12;
+                if (period === 'AM' && h === 12) h = 0;
+                return h * 60 + m;
+              };
 
-            const isOpen = slots.some(slot => {
-              const startMins = timeToMinutes(slot.start);
-              const endMins = timeToMinutes(slot.end);
-              // Handle midnight crossover (e.g. 10 PM to 2 AM)
-              if (endMins < startMins) {
-                return currentTotalMins >= startMins || currentTotalMins <= endMins;
-              }
-              return currentTotalMins >= startMins && currentTotalMins <= endMins;
-            });
-
-            if (!isOpen) {
-              setLoading(false);
-              showAlert({
-                title: 'Store Closed',
-                message: `${store.name} is currently closed. Please check their operating hours.`,
-                type: 'warning'
+              const isOpen = slots.some(slot => {
+                const startMins = timeToMinutes(slot.start);
+                const endMins = timeToMinutes(slot.end);
+                if (endMins < startMins) return currentTotalMins >= startMins || currentTotalMins <= endMins;
+                return currentTotalMins >= startMins && currentTotalMins <= endMins;
               });
-              return;
+
+              if (!isOpen) {
+                setLoading(false);
+                showAlert({
+                  title: 'Store Closed',
+                  message: `${store.name} is currently closed.`,
+                  type: 'warning'
+                });
+                return;
+              }
             }
-          }
-        } catch (e) {
-          console.error('Error parsing opening hours during checkout:', e);
+          } catch (e) {}
         }
       }
       
@@ -355,106 +367,90 @@ export const CartScreen = ({ navigation }: any) => {
         finalAddressId = tempAddr.id;
       }
       
-      // Group items by store for orders
+      // 4. Create ONE order for the entire cart
       const storesInCart = [...new Set(items.map(i => i.store_id))];
-      
-      for (const storeId of storesInCart) {
-        const storeItems = items.filter(i => i.store_id === storeId);
-        const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-        
-        const { data: store, error: storeError } = await supabase
-          .from('stores')
-          .select('upi_id, name')
-          .eq('id', storeId)
-          .single();
-        
-        if (storeError || !store.upi_id) {
-          throw new Error(`Store ${storeId} UPI ID not found.`);
-        }
+      const isMultiStore = storesInCart.length > 1;
 
-        const { data: order, error: orderError } = await supabase
-          .from('orders')
-          .insert({
-            customer_id: user?.id,
-            store_id: storeId,
-            delivery_address_id: finalAddressId,
-            subtotal: storeSubtotal,
-            total_amount: grandTotal, 
-            delivery_fee: deliveryFee,
-            platform_fee: platformFee,
-            status: 'pending_verification',
-            payment_method: paymentMethod,
-            payment_status: 'pending',
-            transport_type: isLargeVehicle ? 'heavy' : 'standard',
-            total_weight_kg: totalWeight,
-            has_helper: hasHelper,
-            helper_fee: helperFee
-          })
-          .select()
-          .single();
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customer_id: user?.id,
+          store_id: isMultiStore ? null : storesInCart[0], // null for multi-store
+          delivery_address_id: finalAddressId,
+          subtotal: subtotal,
+          total_amount: grandTotal, 
+          delivery_fee: deliveryFee,
+          platform_fee: platformFee,
+          status: 'pending_verification',
+          payment_method: paymentMethod,
+          payment_status: 'pending',
+          transport_type: isLargeVehicle ? 'heavy' : 'standard',
+          total_weight_kg: items.reduce((sum, i) => sum + (i.weight_kg * i.quantity), 0),
+          has_helper: hasHelper,
+          helper_fee: helperFee
+        })
+        .select()
+        .single();
 
-        if (orderError) throw orderError;
+      if (orderError) throw orderError;
 
-        const orderItems = storeItems.map(item => ({
-          order_id: order.id,
-          product_id: item.id,
-          product_name: item.name,
-          product_price: item.price,
-          quantity: item.quantity
-        }));
+      // 5. Insert all items for this order
+      const orderItems = items.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        product_name: item.name,
+        product_price: item.price,
+        quantity: item.quantity
+      }));
 
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(orderItems);
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
 
-        if (itemsError) throw itemsError;
+      if (itemsError) throw itemsError;
 
-        // UPI Payment (only if Pay Now is selected)
-        if (paymentMethod === 'pay_now') {
-          if (RNUpiPayment && RNUpiPayment.initializePayment) {
-            RNUpiPayment.initializePayment(
-              {
-                vpa: 'aashu9105628720-1@okicici', // Standard VPA for testing
-                payeeName: 'Ashu',
-                amount: grandTotal.toFixed(2),
-                transactionNote: `Order #${order.order_number}`,
-                transactionRef: order.id,
-              },
-              async () => {
-                // Payment Success - Update status to verified
-                await supabase
-                  .from('orders')
-                  .update({ payment_status: 'verified' })
-                  .eq('id', order.id);
-                
-                clearCart();
-                navigation.navigate('Account', { screen: 'CustomerOrders' });
-              },
-              async () => {
-                // Payment Failed/Cancelled - The order was created but should be cancelled or deleted
-                // The user said: "order will only place if he pay on the app"
-                await supabase
-                  .from('orders')
-                  .update({ status: 'cancelled', payment_status: 'failed' })
-                  .eq('id', order.id);
-                
-                showAlert({ title: 'Payment Failed', message: 'Order was not placed. Please try again or choose Pay on Delivery.', type: 'error' });
-              }
-            );
-          } else {
-            // Mock success if logic is missing (for local testing without UPI library active)
-            await supabase
-              .from('orders')
-              .update({ payment_status: 'verified' })
-              .eq('id', order.id);
-            clearCart();
-            navigation.navigate('Account', { screen: 'CustomerOrders' });
-          }
+      // 6. Payment Logic
+      if (paymentMethod === 'pay_now') {
+        if (RNUpiPayment && RNUpiPayment.initializePayment) {
+          RNUpiPayment.initializePayment(
+            {
+              vpa: 'aashu9105628720-1@okicici', // Standard VPA for testing
+              payeeName: 'Ashu',
+              amount: grandTotal.toFixed(2),
+              transactionNote: `Order #${order.order_number}`,
+              transactionRef: order.id,
+            },
+            async () => {
+              await supabase
+                .from('orders')
+                .update({ payment_status: 'verified' })
+                .eq('id', order.id);
+              
+              clearCart();
+              navigation.navigate('Account', { screen: 'CustomerOrders' });
+            },
+            async () => {
+              await supabase
+                .from('orders')
+                .update({ status: 'cancelled', payment_status: 'failed' })
+                .eq('id', order.id);
+              
+              showAlert({ title: 'Payment Failed', message: 'Order was not placed. Please try again or choose Pay on Delivery.', type: 'error' });
+            }
+          );
         } else {
-          // Pay on Delivery - Success immediately
+          // Mock success for local testing
+          await supabase
+            .from('orders')
+            .update({ payment_status: 'verified' })
+            .eq('id', order.id);
           clearCart();
           navigation.navigate('Account', { screen: 'CustomerOrders' });
         }
+      } else {
+        // Pay on Delivery
+        clearCart();
+        navigation.navigate('Account', { screen: 'CustomerOrders' });
       }
 
     } catch (e: any) {

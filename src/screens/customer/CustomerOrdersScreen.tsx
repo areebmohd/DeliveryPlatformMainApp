@@ -59,7 +59,14 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
         .select(`
           *,
           stores (name, category),
-          order_items (product_name, quantity, product_price)
+          order_items (
+            product_name, 
+            quantity, 
+            product_price,
+            products (
+              stores (name)
+            )
+          )
         `)
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false });
@@ -161,20 +168,32 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
           </Text>
         </View>
 
-        {/* Store Name Row */}
-        <Text style={styles.storeName}>{item.stores?.name}</Text>
+        {/* Items Grouped by Store */}
+        {(() => {
+          const groups: { [key: string]: any[] } = {};
+          item.order_items.forEach((oi: any) => {
+            const sName = oi.products?.stores?.name || item.stores?.name || 'Multiple Stores';
+            if (!groups[sName]) groups[sName] = [];
+            groups[sName].push(oi);
+          });
 
-        <View style={styles.itemsList}>
-          {item.order_items.map((oi: any, idx: number) => (
-            <View key={idx} style={styles.orderItemRow}>
-              <View style={styles.itemLeft}>
-                <Text style={styles.itemQty}>{oi.quantity} x</Text>
-                <Text style={styles.itemName} numberOfLines={1}>{oi.product_name}</Text>
+          return Object.keys(groups).map((sName, gIdx) => (
+            <View key={gIdx} style={{ marginTop: Spacing.sm }}>
+              <Text style={styles.storeName}>{sName}</Text>
+              <View style={styles.itemsList}>
+                {groups[sName].map((oi: any, idx: number) => (
+                  <View key={idx} style={styles.orderItemRow}>
+                    <View style={styles.itemLeft}>
+                      <Text style={styles.itemQty}>{oi.quantity} x</Text>
+                      <Text style={styles.itemName} numberOfLines={1}>{oi.product_name}</Text>
+                    </View>
+                    <Text style={styles.itemPrice}>₹{oi.product_price * oi.quantity}</Text>
+                  </View>
+                ))}
               </View>
-              <Text style={styles.itemPrice}>₹{oi.product_price * oi.quantity}</Text>
             </View>
-          ))}
-        </View>
+          ));
+        })()}
 
         <View style={styles.cardFooter}>
           {item.has_helper && (

@@ -33,7 +33,7 @@ export const OrdersScreen = () => {
 
     const channel = supabase
       .channel(`store-orders-sync-${store.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `store_id=eq.${store.id}` }, () => fetchOrders())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => fetchOrders())
       .subscribe();
 
@@ -69,15 +69,16 @@ export const OrdersScreen = () => {
     const id = storeId || store?.id;
     if (!id) return;
 
+    // Query orders that have items from this store
     const { data, error } = await supabase
       .from('orders')
       .select(`
         *,
         customer:profiles!orders_customer_id_fkey (full_name, phone),
         rider:profiles!orders_rider_id_fkey (full_name),
-        order_items (*)
+        order_items!inner (*, products!inner(store_id))
       `)
-      .eq('store_id', id)
+      .eq('order_items.products.store_id', id)
       .order('created_at', { ascending: false });
 
     if (error) console.error('Error fetching orders:', error);
@@ -222,7 +223,11 @@ export const OrdersScreen = () => {
   }));
 
   const renderOrderCard = (item: any) => {
-    const activeItems = item.order_items?.filter((i: any) => !i.is_removed) || [];
+    // Filter items to ONLY show those from THIS store
+    const storeItems = item.order_items?.filter((i: any) => i.products?.store_id === store?.id) || [];
+    const activeItems = storeItems.filter((i: any) => !i.is_removed);
+    
+    if (activeItems.length === 0) return null; // Should not happen with inner join but safe
     const isModifiable = ['pending_verification', 'accepted', 'preparing', 'ready'].includes(item.status);
     const statusColor = getStatusColor(item.status);
 
