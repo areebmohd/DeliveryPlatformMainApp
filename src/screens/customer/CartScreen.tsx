@@ -77,7 +77,7 @@ export const CartScreen = ({ navigation }: any) => {
   const fetchAddresses = async () => {
     try {
       const { data, error } = await supabase
-        .from('addresses')
+        .from('addresses_view')
         .select('*')
         .eq('user_id', user?.id)
         .eq('is_deleted', false)
@@ -173,23 +173,27 @@ export const CartScreen = ({ navigation }: any) => {
       // 2. Fetch Store location
       const storeId = items[0].store_id;
       const { data: store } = await supabase
-        .from('stores')
-        .select('location')
+        .from('stores_view')
+        .select('location_wkt')
         .eq('id', storeId)
         .single();
       
-      if (!store?.location) return;
+      if (!store?.location_wkt) return;
 
       // Parse store location POINT(lng lat)
-      const storeMatch = store.location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+      const storeMatch = store.location_wkt.match(/POINT\(([-\d.]+) ([-\d.]+)\)/i);
       if (!storeMatch) return;
       const sLng = parseFloat(storeMatch[1]);
       const sLat = parseFloat(storeMatch[2]);
 
       // Parse user location
-      const userLoc = sessionAddress?.location || selectedAddress?.location;
-      if (!userLoc) return;
-      const userMatch = userLoc.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+      const userLocObj = sessionAddress || selectedAddress;
+      if (!userLocObj) return;
+      
+      const userLocWkt = userLocObj.location_wkt || userLocObj.location; 
+      if (!userLocWkt) return;
+
+      const userMatch = userLocWkt.match(/POINT\(([-\d.]+) ([-\d.]+)\)/i);
       if (!userMatch) return;
       const uLng = parseFloat(userMatch[1]);
       const uLat = parseFloat(userMatch[2]);
@@ -584,8 +588,8 @@ export const CartScreen = ({ navigation }: any) => {
                 visible: true,
                 title: 'Delivery Fee',
                 content: isLargeVehicle 
-                  ? `Large Vehicle Delivery\nPickup Fee: ₹300\nPer KM Fee: ₹30\nDistance: ${distance.toFixed(2)} km`
-                  : `Standard Bike Delivery\nPickup Fee: ₹20\nPer KM Fee: ₹5\nDistance: ${distance.toFixed(2)} km`
+                  ? `₹300 pickup fee + ₹30 per km\n(Large Vehicle / Truck)\n\nDistance: ${distance.toFixed(2)} km`
+                  : `₹20 pickup fee + ₹5 per km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
               })}>
                 <Icon name="information-outline" size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -632,7 +636,7 @@ export const CartScreen = ({ navigation }: any) => {
               <TouchableOpacity onPress={() => setInfoModal({
                 visible: true,
                 title: 'Platform Fee',
-                content: 'Orders below ₹500: ₹5\nOrders above ₹500: 1% of subtotal'
+                content: '• Orders below ₹500: ₹5 platform fee\n• Orders above ₹500: 1% platform fee'
               })}>
                 <Icon name="information-outline" size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -797,6 +801,38 @@ export const CartScreen = ({ navigation }: any) => {
       </Modal>
 
       {/* Receiver Info Modal removed as user info is used directly */}
+
+      {/* Fee Info Modal */}
+      <Modal
+        visible={infoModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setInfoModal({ ...infoModal, visible: false })}
+      >
+        <TouchableOpacity 
+          style={styles.centeredModalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setInfoModal({ ...infoModal, visible: false })}
+        >
+          <View style={styles.infoModalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{infoModal.title}</Text>
+              <TouchableOpacity onPress={() => setInfoModal({ ...infoModal, visible: false })}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.infoModalBody}>
+              <Text style={styles.infoModalText}>{infoModal.content}</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.modalCloseBtn}
+              onPress={() => setInfoModal({ ...infoModal, visible: false })}
+            >
+              <Text style={styles.modalCloseBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* No local AlertModals needed anymore as they are handled globally */}
     </View>
@@ -1100,6 +1136,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
+  centeredModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   modalContent: {
     backgroundColor: Colors.white,
     borderTopLeftRadius: 24,
@@ -1233,6 +1275,40 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  infoModalCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    width: '90%',
+    alignSelf: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    overflow: 'hidden',
+  },
+  infoModalBody: {
+    padding: 24,
+  },
+  infoModalText: {
+    fontSize: 15,
+    color: Colors.text,
+    lineHeight: 24,
+    fontWeight: '500',
+  },
+  modalCloseBtn: {
+    backgroundColor: Colors.primary,
+    margin: 20,
+    marginTop: 0,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modalCloseBtnText: {
+    color: Colors.white,
+    fontWeight: '800',
+    fontSize: 16,
   },
   vehicleAlertText: {
     flex: 1,
