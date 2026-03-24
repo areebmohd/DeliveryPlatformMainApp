@@ -273,7 +273,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         : 'Store profile updated successfully!';
 
       showToast(successMsg, 'success');
-      navigation.goBack();
+      navigation.navigate('StoreDashboard');
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {

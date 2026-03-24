@@ -40,11 +40,12 @@ const formatOpeningHours = (hoursJson: string) => {
 };
 
 export const StoreScreen = ({ navigation }: any) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [store, setStore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('products');
   const insets = useSafeAreaInsets();
+  const { signOut } = useAuth();
 
   const [products, setProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -107,6 +108,15 @@ export const StoreScreen = ({ navigation }: any) => {
     };
   }, [store?.id, activeTab]);
 
+  useEffect(() => {
+    if (store && !store.is_active && !isStorePending(store)) {
+      const remaining = calculateDaysRemaining(store.created_at);
+      if (remaining === 0) {
+        handleDeleteAccountCompletely();
+      }
+    }
+  }, [store?.id, store?.is_active, store?.created_at]);
+
   const fetchStore = async () => {
     try {
       setLoading(true);
@@ -122,6 +132,78 @@ export const StoreScreen = ({ navigation }: any) => {
       if (data) setStore(data);
     } catch (e) {
       console.error('Error fetching store:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateDaysRemaining = (createdAt: string) => {
+    if (!createdAt) return 5;
+    const creationDate = new Date(createdAt);
+    const currentDate = new Date();
+    const diffTime = currentDate.getTime() - creationDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, 5 - diffDays);
+  };
+
+  const isStorePending = (s: any) => {
+    if (!s) return false;
+    return (
+      !!s.name && 
+      !!s.category && 
+      !!s.address_line_1 && 
+      !!s.city && 
+      !!s.state && 
+      !!s.pincode && 
+      (!!s.location_wkt || !!s.location) && 
+      !!s.phone && 
+      !!s.upi_id && 
+      !!s.owner_name && 
+      !!s.owner_number && 
+      (s.verification_images?.length > 0) &&
+      s.is_approved === false
+    );
+  };
+
+  const handleDeleteAccountCompletely = async () => {
+    if (!store?.id || !user?.id) return;
+    try {
+      setLoading(true);
+      // Delete store
+      const { error: storeError } = await supabase
+        .from('stores')
+        .delete()
+        .eq('id', store.id);
+      
+      if (storeError) throw storeError;
+
+      // Delete Profile (Complete Deletion)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+      
+      if (profileError) throw profileError;
+
+      showAlert({
+        title: 'Account Deleted',
+        message: 'Your business account has been completely deleted as the verification details were not filled within the 5-day deadline.',
+        type: 'info',
+        onClose: async () => {
+          await signOut();
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+        }
+      });
+    } catch (e) {
+      console.error('Error deleting account completely:', e);
+      showAlert({
+        title: 'Error',
+        message: 'Could not process account deletion. Please contact support.',
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -311,6 +393,42 @@ export const StoreScreen = ({ navigation }: any) => {
     </View>
   );
 
+  const renderVerificationAlert = () => {
+    if (store?.is_active) return null;
+    
+    const isPending = isStorePending(store);
+    const creationDate = store?.created_at || profile?.created_at;
+    const remaining = calculateDaysRemaining(creationDate);
+
+    return (
+      <TouchableOpacity 
+        style={[styles.inactiveAlert, isPending && styles.pendingAlert, !isPending && { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7', marginHorizontal: Spacing.md, marginTop: Spacing.md }]} 
+        onPress={handleNavigateToStoreForm}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.alertIconBg, isPending && styles.pendingIconBg, !isPending && { backgroundColor: '#FEF3C7' }]}>
+          <Icon 
+            name={isPending ? "clock-check-outline" : "clock-alert-outline"} 
+            size={24} 
+            color={isPending ? Colors.success : "#D97706"} 
+          />
+        </View>
+        <View style={styles.alertTextContainer}>
+          <Text style={[styles.alertTitle, isPending && styles.pendingTitle, !isPending && { color: '#D97706' }]}>
+            {isPending ? 'Verification Pending' : 'Action Required'}
+          </Text>
+          <Text style={[styles.alertSubtitle, isPending && styles.pendingSubtitle, !isPending && { color: '#92400E' }]}>
+            {isPending 
+              ? 'You have submitted all the verifications details and your request is still pending please wait for some time.'
+              : `Please fill all necessary details for verification or your account will be deleted in ${remaining} days.`
+            }
+          </Text>
+        </View>
+        <Icon name="chevron-right" size={20} color={isPending ? Colors.success : "#D97706"} />
+      </TouchableOpacity>
+    );
+  };
+
   const renderTabs = () => (
     <View style={styles.tabWrapper}>
       <View style={styles.tabContainer}>
@@ -361,7 +479,7 @@ export const StoreScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       <ScrollView
-        stickyHeaderIndices={[store && !store.is_active ? 4 : 3]}
+        stickyHeaderIndices={[store && !store.is_active ? 5 : 4]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -371,6 +489,7 @@ export const StoreScreen = ({ navigation }: any) => {
         <View style={{ paddingTop: insets.top }} />
         {renderHeader()}
         {renderBanner()}
+        {renderVerificationAlert()}
         
         {store && store.is_active && store.has_pending_changes && (
           <View style={[styles.inactiveAlert, styles.pendingAlert]}>
@@ -407,53 +526,6 @@ export const StoreScreen = ({ navigation }: any) => {
             </View>
             <Icon name="chevron-right" size={20} color={Colors.error} />
           </TouchableOpacity>
-        )}
-
-        {store && !store.is_active && (
-          (() => {
-            const isPending = 
-              !!store.name && 
-              !!store.category && 
-              !!store.address_line_1 && 
-              !!store.city && 
-              !!store.state && 
-              !!store.pincode && 
-              (!!store.location_wkt || !!store.location) && 
-              !!store.phone && 
-              !!store.upi_id && 
-              !!store.owner_name && 
-              !!store.owner_number && 
-              (store.verification_images?.length > 0) &&
-              store.is_approved === false;
-
-            return (
-              <TouchableOpacity 
-                style={[styles.inactiveAlert, isPending && styles.pendingAlert]} 
-                onPress={handleNavigateToStoreForm}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.alertIconBg, isPending && styles.pendingIconBg]}>
-                  <Icon 
-                    name={isPending ? "clock-check-outline" : "alert-circle"} 
-                    size={24} 
-                    color={isPending ? Colors.success : Colors.error} 
-                  />
-                </View>
-                <View style={styles.alertTextContainer}>
-                  <Text style={[styles.alertTitle, isPending && styles.pendingTitle]}>
-                    {isPending ? 'Verification Pending' : 'Verification Required'}
-                  </Text>
-                  <Text style={[styles.alertSubtitle, isPending && styles.pendingSubtitle]}>
-                    {isPending 
-                      ? 'You have submitted all the verifications details and your request is still pending please wait for some time.'
-                      : 'Your store is inactive and hidden from users. Please fill necessary details to verify your store and activate it.'
-                    }
-                  </Text>
-                </View>
-                <Icon name="chevron-right" size={20} color={isPending ? Colors.success : Colors.error} />
-              </TouchableOpacity>
-            );
-          })()
         )}
 
         <View style={{ height: 10 }} />
@@ -524,28 +596,30 @@ export const StoreScreen = ({ navigation }: any) => {
                     </Text>
                   </View>
 
-                  <View style={styles.availabilityToggle}>
-                    <View>
-                      <Text style={styles.availabilityTitle}>Available for Orders</Text>
-                      <Text style={styles.availabilitySubtitle}>
-                        {store?.is_currently_open 
-                          ? 'Customers can place orders now' 
-                          : 'Store is manually closed for orders'}
-                      </Text>
+                  {store?.is_approved && (
+                    <View style={styles.availabilityToggle}>
+                      <View>
+                        <Text style={styles.availabilityTitle}>Available for Orders</Text>
+                        <Text style={styles.availabilitySubtitle}>
+                          {store?.is_currently_open 
+                            ? 'Customers can place orders now' 
+                            : 'Store is manually closed for orders'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity 
+                        onPress={handleToggleAvailability}
+                        style={[
+                          styles.toggleBtn,
+                          store?.is_currently_open ? styles.toggleBtnActive : styles.toggleBtnInactive
+                        ]}
+                      >
+                        <View style={[
+                          styles.toggleSwitch,
+                          store?.is_currently_open ? styles.switchRight : styles.switchLeft
+                        ]} />
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity 
-                      onPress={handleToggleAvailability}
-                      style={[
-                        styles.toggleBtn,
-                        store?.is_currently_open ? styles.toggleBtnActive : styles.toggleBtnInactive
-                      ]}
-                    >
-                      <View style={[
-                        styles.toggleSwitch,
-                        store?.is_currently_open ? styles.switchRight : styles.switchLeft
-                      ]} />
-                    </TouchableOpacity>
-                  </View>
+                  )}
                 </View>
 
                 <View style={styles.infoDivider} />
