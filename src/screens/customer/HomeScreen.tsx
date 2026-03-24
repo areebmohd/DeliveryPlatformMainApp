@@ -393,7 +393,7 @@ export const HomeScreen = ({ navigation }: any) => {
               >
                 <Icon name="crosshairs-gps" size={24} color={sessionAddress ? Colors.primary : Colors.primary} />
                 <Text style={[styles.modalOptionText, sessionAddress && { color: Colors.primary, fontWeight: '900' }]}>
-                  {sessionAddress ? "Live Location Active" : "Live Location"}
+                  {sessionAddress ? "Live Location Active" : "Use Live Location"}
                 </Text>
                 {sessionAddress && <Icon name="check-circle" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
               </TouchableOpacity>
@@ -406,7 +406,7 @@ export const HomeScreen = ({ navigation }: any) => {
                 }}
               >
                 <Icon name="plus" size={24} color={Colors.primary} />
-                <Text style={styles.modalOptionText}>Add new address</Text>
+                <Text style={styles.modalOptionText}>Add New Address</Text>
               </TouchableOpacity>
 
               <View style={styles.savedAddressesHeader}>

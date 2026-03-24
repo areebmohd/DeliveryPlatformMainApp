@@ -36,7 +36,7 @@ const InputField = ({ label, value, onChangeText, placeholder, keyboardType = 'd
 export const AddAddressScreen = ({ navigation, route }: any) => {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { showAlert, showToast } = useAlert();
   const [editingAddress] = useState(route.params?.address);
   const isEditing = !!editingAddress;
@@ -115,8 +115,6 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
     city: editingAddress?.city || '',
     sector_area: editingAddress?.sector_area || '',
     state: editingAddress?.state || '',
-    receiver_name: editingAddress?.receiver_name || '',
-    receiver_phone: editingAddress?.receiver_phone || '',
     location: initialLocation,
   });
 
@@ -138,7 +136,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
 
   const handleSave = async () => {
     // Basic validation
-    if (!formData.address_line || !formData.pincode || !formData.city || !formData.state || !formData.receiver_name || !formData.receiver_phone || !formData.location) {
+    if (!formData.address_line || !formData.pincode || !formData.city || !formData.state || !formData.location) {
       showAlert({ title: 'Error', message: 'Please fill all required fields and select map location', type: 'warning' });
       return;
     }
@@ -149,6 +147,8 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
       const dataToSave = {
         ...restFormData,
         location: `SRID=4326;POINT(${locObj.longitude} ${locObj.latitude})`,
+        receiver_name: profile?.full_name || '',
+        receiver_phone: profile?.phone || '',
       };
 
       if (addressId) {
@@ -289,21 +289,6 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
               })}
             />
           </View>
-
-          <Text style={styles.sectionTitle}>Receiver Details</Text>
-          <InputField 
-            label="Receiver's Name" 
-            placeholder="Who will collect the delivery?" 
-            value={formData.receiver_name}
-            onChangeText={(t: string) => setFormData({ ...formData, receiver_name: t })}
-          />
-          <InputField 
-            label="Receiver's Phone" 
-            placeholder="10-digit mobile number" 
-            value={formData.receiver_phone}
-            onChangeText={(t: string) => setFormData({ ...formData, receiver_phone: t })}
-            keyboardType="phone-pad"
-          />
 
           <Button
             title={loading ? "Saving..." : (isEditing ? "Update Address" : "Save Address")}

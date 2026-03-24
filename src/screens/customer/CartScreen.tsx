@@ -31,9 +31,6 @@ export const CartScreen = ({ navigation }: any) => {
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
-  const [receiverInfoVisible, setReceiverInfoVisible] = useState(false);
-  const [receiverName, setReceiverName] = useState('');
-  const [receiverPhone, setReceiverPhone] = useState('');
   const [tempLocation, setTempLocation] = useState<any>(null);
   const [infoModal, setInfoModal] = useState<{ visible: boolean, title: string, content: string }>({
     visible: false,
@@ -87,7 +84,10 @@ export const CartScreen = ({ navigation }: any) => {
           longitude: position.coords.longitude,
         });
         setAddressModalVisible(false);
-        setReceiverInfoVisible(true);
+        handleSaveLiveLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
       },
       (error) => {
         showAlert({ title: 'Location Error', message: 'Could not get your current location. Please check permissions.', type: 'error' });
@@ -96,12 +96,7 @@ export const CartScreen = ({ navigation }: any) => {
     );
   };
 
-  const handleSaveReceiverInfo = async () => {
-    if (!receiverName.trim() || !receiverPhone.trim()) {
-      showAlert({ title: 'Required', message: 'Please enter receiver name and phone number', type: 'warning' });
-      return;
-    }
-
+  const handleSaveLiveLocation = async (loc: any) => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -111,8 +106,10 @@ export const CartScreen = ({ navigation }: any) => {
           address_line: 'Current Location', 
           city: 'Gurugram', 
           pincode: '122001',
-          location: `SRID=4326;POINT(${tempLocation.longitude} ${tempLocation.latitude})`,
-          label: `${receiverName} (${receiverPhone})`
+          location: `SRID=4326;POINT(${loc.longitude} ${loc.latitude})`,
+          label: `${profile?.full_name || 'My'}'s Live Location`,
+          receiver_name: profile?.full_name || '',
+          receiver_phone: profile?.phone || '',
         })
         .select()
         .single();
@@ -121,9 +118,6 @@ export const CartScreen = ({ navigation }: any) => {
       
       setSelectedAddress(data);
       fetchAddresses();
-      setReceiverInfoVisible(false);
-      setReceiverName('');
-      setReceiverPhone('');
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
@@ -204,16 +198,18 @@ export const CartScreen = ({ navigation }: any) => {
       
       setLoading(false);
 
-      // Profile Info Validation
       if (!profile?.full_name || !profile?.phone || !profile?.upi_id) {
+        setLoading(false);
         showAlert({
           title: 'Profile Incomplete',
-          message: 'Please provide your Full Name, Phone, and UPI ID in the Account page before placing an order.',
+          message: 'Please fill your User Info (Name, Phone, and UPI ID) in the Account page before placing an order.',
           type: 'warning',
           primaryAction: {
             text: 'Go to Account',
             onPress: () => navigation.navigate('Account'),
-          }
+          },
+          showCancel: true,
+          cancelText: 'Maybe Later'
         });
         return;
       }
@@ -674,48 +670,7 @@ export const CartScreen = ({ navigation }: any) => {
         </View>
       </Modal>
 
-      {/* Receiver Info Modal - using generic AlertModal for simplicity if possible, or another standard Modal */}
-      <Modal
-        visible={receiverInfoVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setReceiverInfoVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.receiverModalContent}>
-            <Text style={[styles.modalTitle, { marginBottom: 8 }]}>Receiver Details</Text>
-            <Text style={{ color: Colors.textSecondary, marginBottom: 20 }}>Enter details of the person receiving the order</Text>
-            
-            <Input
-              placeholder="Receiver Name"
-              value={receiverName}
-              onChangeText={setReceiverName}
-            />
-            <View style={{ height: 12 }} />
-            <Input
-              placeholder="Phone Number"
-              value={receiverPhone}
-              onChangeText={setReceiverPhone}
-              keyboardType="phone-pad"
-            />
-            
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity 
-                style={[styles.modalActionBtn, { backgroundColor: Colors.surface }]} 
-                onPress={() => setReceiverInfoVisible(false)}
-              >
-                <Text style={{ color: Colors.textSecondary, fontWeight: '700' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalActionBtn, { backgroundColor: Colors.primary }]} 
-                onPress={handleSaveReceiverInfo}
-              >
-                <Text style={{ color: Colors.white, fontWeight: '700' }}>Save & Proceed</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Receiver Info Modal removed as user info is used directly */}
 
       {/* No local AlertModals needed anymore as they are handled globally */}
     </View>

@@ -30,9 +30,7 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(true);
   const [location, setLocation] = useState<any>(null);
-  const [receiverName, setReceiverName] = useState('');
-  const [receiverPhone, setReceiverPhone] = useState('');
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { setSessionAddress } = useCart();
   const { showAlert, showToast } = useAlert();
   const insets = useSafeAreaInsets();
@@ -93,11 +91,6 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
   };
 
   const handleSave = async () => {
-    if (!receiverName.trim() || !receiverPhone.trim()) {
-      showAlert({ title: 'Required', message: 'Please enter receiver name and phone number', type: 'warning' });
-      return;
-    }
-
     if (!location) {
       showAlert({ title: 'Error', message: 'Location not found. Please try again.', type: 'error' });
       return;
@@ -113,9 +106,9 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
         state: 'Haryana',
         pincode: '000000',
         location: `SRID=4326;POINT(${location.longitude} ${location.latitude})`,
-        receiver_name: receiverName,
-        receiver_phone: receiverPhone,
-        label: `${receiverName}'s Live Location`
+        receiver_name: profile?.full_name || '',
+        receiver_phone: profile?.phone || '',
+        label: `${profile?.full_name || 'My'}'s Live Location`
       });
       
       showToast('Using live location for this order!', 'success');
@@ -185,24 +178,6 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
         </View>
 
         <View style={styles.form}>
-          <Text style={styles.sectionTitle}>Receiver Details</Text>
-          <Text style={styles.subtitle}>Who should the rider contact at this location?</Text>
-
-          <Input
-            label="Receiver Name"
-            placeholder="e.g. John Doe"
-            value={receiverName}
-            onChangeText={setReceiverName}
-          />
-          <View style={{ height: 16 }} />
-          <Input
-            label="Receiver Phone Number"
-            placeholder="e.g. 9876543210"
-            value={receiverPhone}
-            onChangeText={setReceiverPhone}
-            keyboardType="phone-pad"
-          />
-
           <Button
             title={loading ? "Saving..." : "Save Delivery Location"}
             onPress={handleSave}

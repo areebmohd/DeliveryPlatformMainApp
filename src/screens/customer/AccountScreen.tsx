@@ -118,6 +118,7 @@ export const AccountScreen = ({ navigation }: any) => {
                 placeholder="example@upi"
                 autoCapitalize="none"
               />
+              <Text style={styles.inputNote}>* This UPI ID will be used for refunds only.</Text>
               <Button 
                 title="Save Changes" 
                 onPress={handleUpdateProfile} 
@@ -304,6 +305,14 @@ const styles = StyleSheet.create({
   },
   editForm: {
     gap: Spacing.xs,
+  },
+  inputNote: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: -4,
+    marginBottom: 8,
+    marginLeft: 4,
+    fontStyle: 'italic',
   },
   saveBtn: {
     marginTop: Spacing.md,

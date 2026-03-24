@@ -118,12 +118,10 @@ export const AddressesScreen = ({ navigation }: any) => {
             </View>
           )}
         </View>
-        {item.receiver_name ? <Text style={styles.receiverName}>{item.receiver_name}</Text> : null}
         <Text style={styles.addressText}>
           {item.address_line}, {item.sector_area ? `${item.sector_area}, ` : ''}
           {item.city}, {item.state} - {item.pincode}
         </Text>
-        {item.receiver_phone ? <Text style={styles.phoneText}>Phone: {item.receiver_phone}</Text> : null}
         
         <View style={styles.actionRow}>
           <TouchableOpacity 
