@@ -47,6 +47,11 @@ export const RegisterScreen = ({ navigation }: any) => {
       return;
     }
 
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -114,12 +119,6 @@ export const RegisterScreen = ({ navigation }: any) => {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
 
           <View style={styles.header}>
             <Text style={styles.title}>Join Revolution</Text>
@@ -166,6 +165,7 @@ export const RegisterScreen = ({ navigation }: any) => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
             />
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -209,14 +209,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: Spacing.md,
   },
-  backButton: {
-    marginBottom: Spacing.lg,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: Colors.text,
-    fontWeight: '600',
-  },
   header: {
     marginBottom: Spacing.xl,
   },
@@ -225,6 +217,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.text,
     marginBottom: Spacing.xs,
+    marginTop: 100,
   },
   subtitle: {
     fontSize: 16,

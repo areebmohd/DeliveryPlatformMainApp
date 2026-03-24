@@ -27,6 +27,11 @@ export const LoginScreen = ({ navigation }: any) => {
       return;
     }
 
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
     setLoading(true);
     setError('');
     
@@ -117,6 +122,7 @@ export const LoginScreen = ({ navigation }: any) => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
             />
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
