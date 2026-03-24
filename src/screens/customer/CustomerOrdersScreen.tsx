@@ -149,6 +149,18 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
           </View>
         </View>
 
+        {/* Transport Type Row */}
+        <View style={styles.transportRow}>
+          <Icon 
+            name={item.transport_type === 'heavy' ? 'truck-delivery' : 'motorbike'} 
+            size={18} 
+            color={Colors.textSecondary} 
+          />
+          <Text style={styles.transportLabel}>
+            {item.transport_type === 'heavy' ? 'Large Vehicle Delivery' : 'Standard Bike Delivery'}
+          </Text>
+        </View>
+
         {/* Store Name Row */}
         <Text style={styles.storeName}>{item.stores?.name}</Text>
 
@@ -165,6 +177,12 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
         </View>
 
         <View style={styles.cardFooter}>
+          {item.has_helper && (
+            <View style={styles.helperRow}>
+              <Text style={styles.helperLabel}>Helper Service</Text>
+              <Text style={styles.helperValue}>₹{item.helper_fee}</Text>
+            </View>
+          )}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Grand Total</Text>
             <Text style={styles.totalAmount}>₹{item.total_amount}</Text>
@@ -444,5 +462,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 22,
+  },
+  transportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: 6,
+  },
+  transportLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  helperRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  helperLabel: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  helperValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
   },
 });

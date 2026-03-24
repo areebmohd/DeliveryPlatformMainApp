@@ -7,6 +7,11 @@ interface CartItem {
   quantity: number;
   store_id: string;
   store_name: string;
+  weight_kg: number;
+  length_cm: number;
+  width_cm: number;
+  height_cm: number;
+  needs_large_vehicle: boolean;
 }
 
 interface CartContextType {
@@ -38,7 +43,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           price: product.price, 
           quantity: 1, 
           store_id: store.id,
-          store_name: store.name 
+          store_name: store.name,
+          weight_kg: product.weight_kg || 0,
+          length_cm: product.length_cm || 0,
+          width_cm: product.width_cm || 0,
+          height_cm: product.height_cm || 0,
+          needs_large_vehicle: product.needs_large_vehicle || false
         }];
       }
 
@@ -54,7 +64,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         price: product.price, 
         quantity: 1, 
         store_id: store.id,
-        store_name: store.name
+        store_name: store.name,
+        weight_kg: product.weight_kg || 0,
+        length_cm: product.length_cm || 0,
+        width_cm: product.width_cm || 0,
+        height_cm: product.height_cm || 0,
+        needs_large_vehicle: product.needs_large_vehicle || false
       }];
     });
   };

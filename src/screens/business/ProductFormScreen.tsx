@@ -144,7 +144,41 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     try {
       setIsLoading(true);
 
-      // 0. Check for duplicate name in the same store
+      // 1. Fetch Dimensions via AI automatically if name/category is present
+      let estimatedLength = product?.length_cm || 0;
+      let estimatedWidth = product?.width_cm || 0;
+      let estimatedHeight = product?.height_cm || 0;
+      let manualWeight = parseFloat(weight) || 0;
+      let estimatedNeedsLarge = product?.needs_large_vehicle || false;
+
+      // Only re-fetch if it's new or name/category changed
+      if (!isEditing || product.name !== name.trim() || product.category !== category.trim()) {
+        try {
+          const { data, error } = await supabase.functions.invoke('estimate-dimensions', {
+            body: { name: name.trim(), category: category.trim() }
+          });
+
+          if (!error && data && !data.error) {
+            estimatedLength = data.length_cm;
+            estimatedWidth = data.width_cm;
+            estimatedHeight = data.height_cm;
+            
+            // Recalculate needs_large based on MANUAL weight + AI dimensions
+            const maxSide = Math.max(data.length_cm, data.width_cm, data.height_cm);
+            const totalDim = data.length_cm + data.width_cm + data.height_cm;
+            estimatedNeedsLarge = manualWeight > 20 || maxSide > 80 || totalDim > 150;
+          }
+        } catch (e) {
+          console.warn('AI Estimation failed, using defaults:', e);
+        }
+      } else {
+        // If not re-fetching, still update vehicle recommendation based on manual weight change
+        const maxSide = Math.max(estimatedLength, estimatedWidth, estimatedHeight);
+        const totalDim = estimatedLength + estimatedWidth + estimatedHeight;
+        estimatedNeedsLarge = manualWeight > 20 || maxSide > 80 || totalDim > 150;
+      }
+
+      // 2. Check for duplicate name in the same store
       if (!isEditing) {
         const { data: duplicateProduct, error: duplicateError } = await supabase
           .from('products')
@@ -185,13 +219,17 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         name: name.trim(),
         description: description.trim(),
         price: parseFloat(price),
-        weight_kg: weight ? parseFloat(weight) : 0,
+        weight_kg: manualWeight,
         category: category.trim(),
         image_url: finalImageUrl,
         barcode: barcode.trim() || null,
         product_type: productType,
         stock_quantity: parseInt(stockQuantity),
         in_stock: inStock,
+        length_cm: estimatedLength,
+        width_cm: estimatedWidth,
+        height_cm: estimatedHeight,
+        needs_large_vehicle: estimatedNeedsLarge,
         updated_at: new Date().toISOString(),
       };
 
@@ -374,7 +412,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             />
           </View>
           <Input
-            label="Weight (kg)"
+            label="Weight (kg) *"
             placeholder="0.5"
             value={weight}
             onChangeText={setWeight}

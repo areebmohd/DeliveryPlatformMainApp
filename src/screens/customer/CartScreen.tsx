@@ -43,6 +43,23 @@ export const CartScreen = ({ navigation }: any) => {
 
   const { showAlert, showToast } = useAlert();
 
+  const [distance, setDistance] = useState(0);
+  const [isLargeVehicle, setIsLargeVehicle] = useState(false);
+  const [hasHelper, setHasHelper] = useState(false);
+
+  // Distance helper
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
   useEffect(() => {
     if (user) {
       fetchAddresses();
@@ -117,6 +134,7 @@ export const CartScreen = ({ navigation }: any) => {
       if (error) throw error;
       
       setSelectedAddress(data);
+      setSessionAddress(null);
       fetchAddresses();
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
@@ -125,10 +143,79 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
+  const calculateFees = async () => {
+    if (items.length === 0 || (!selectedAddress && !sessionAddress)) {
+      setDistance(0);
+      setIsLargeVehicle(false);
+      return;
+    }
+
+    try {
+      // 1. Check for vehicle type
+      let totalWeight = 0;
+      let oversized = false;
+      let forcedLarge = false;
+
+      items.forEach(item => {
+        totalWeight += (item.weight_kg || 0) * item.quantity;
+        if (item.length_cm > 40 || item.width_cm > 40 || item.height_cm > 40) {
+          oversized = true;
+        }
+        if (item.needs_large_vehicle) {
+          forcedLarge = true;
+        }
+      });
+
+      const needsLarge = totalWeight > 20 || oversized || forcedLarge;
+      setIsLargeVehicle(needsLarge);
+      if (!needsLarge) setHasHelper(false); // Reset if not large vehicle
+
+      // 2. Fetch Store location
+      const storeId = items[0].store_id;
+      const { data: store } = await supabase
+        .from('stores')
+        .select('location')
+        .eq('id', storeId)
+        .single();
+      
+      if (!store?.location) return;
+
+      // Parse store location POINT(lng lat)
+      const storeMatch = store.location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+      if (!storeMatch) return;
+      const sLng = parseFloat(storeMatch[1]);
+      const sLat = parseFloat(storeMatch[2]);
+
+      // Parse user location
+      const userLoc = sessionAddress?.location || selectedAddress?.location;
+      if (!userLoc) return;
+      const userMatch = userLoc.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+      if (!userMatch) return;
+      const uLng = parseFloat(userMatch[1]);
+      const uLat = parseFloat(userMatch[2]);
+
+      const d = calculateDistance(sLat, sLng, uLat, uLng);
+      setDistance(d);
+
+    } catch (e) {
+      console.error('Error calculating fees:', e);
+    }
+  };
+
+  useEffect(() => {
+    calculateFees();
+  }, [items, selectedAddress, sessionAddress]);
+
   // Fees Logic
   const platformFee = subtotal >= 500 ? (subtotal * 0.01) : 5;
-  const deliveryFee = totalItems > 0 ? 30 : 0; 
-  const grandTotal = subtotal + deliveryFee + platformFee;
+  const deliveryFee = items.length === 0 ? 0 : (
+    isLargeVehicle 
+      ? 300 + (distance * 30)
+      : 20 + (distance * 5)
+  );
+  const helperFee = hasHelper ? 400 : 0;
+  const grandTotal = subtotal + deliveryFee + platformFee + helperFee;
+  const totalWeight = items.reduce((sum, i) => sum + (i.weight_kg * i.quantity), 0);
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
@@ -293,7 +380,11 @@ export const CartScreen = ({ navigation }: any) => {
             platform_fee: platformFee,
             status: 'pending_verification',
             payment_method: paymentMethod,
-            payment_status: 'pending'
+            payment_status: 'pending',
+            transport_type: isLargeVehicle ? 'heavy' : 'standard',
+            total_weight_kg: totalWeight,
+            has_helper: hasHelper,
+            helper_fee: helperFee
           })
           .select()
           .single();
@@ -488,17 +579,52 @@ export const CartScreen = ({ navigation }: any) => {
 
           <View style={styles.billRow}>
             <View style={styles.labelWithInfo}>
-              <Text style={styles.billLabel}>Delivery Fee</Text>
+              <Text style={styles.billLabel}>Delivery Fee ({isLargeVehicle ? 'Large Vehicle' : 'Bike'})</Text>
               <TouchableOpacity onPress={() => setInfoModal({
                 visible: true,
                 title: 'Delivery Fee',
-                content: 'Pickup Fee: ₹20\nPer KM Fee: ₹5\n(Approximate based on distance)'
+                content: isLargeVehicle 
+                  ? `Large Vehicle Delivery\nPickup Fee: ₹300\nPer KM Fee: ₹30\nDistance: ${distance.toFixed(2)} km`
+                  : `Standard Bike Delivery\nPickup Fee: ₹20\nPer KM Fee: ₹5\nDistance: ${distance.toFixed(2)} km`
               })}>
                 <Icon name="information-outline" size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
           </View>
+
+          {isLargeVehicle && (
+            <View style={styles.vehicleAlertContainer}>
+              <View style={styles.vehicleAlert}>
+                <Icon name="truck-delivery" size={20} color={Colors.error} />
+                <Text style={styles.vehicleAlertText}>
+                  Large vehicle is needed due to item weight or oversized dimensions.
+                </Text>
+              </View>
+              
+              <TouchableOpacity 
+                style={[styles.helperToggle, hasHelper && styles.helperToggleActive]}
+                onPress={() => setHasHelper(!hasHelper)}
+              >
+                <View style={styles.helperInfo}>
+                  <Text style={styles.helperTitle}>Add Helper (₹400)</Text>
+                  <Text style={styles.helperSubtitle}>A professional to help load/unload large items.</Text>
+                </View>
+                <Icon 
+                  name={hasHelper ? "checkbox-marked" : "checkbox-blank-outline"} 
+                  size={24} 
+                  color={hasHelper ? Colors.primary : Colors.textSecondary} 
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {hasHelper && (
+            <View style={styles.billRow}>
+              <Text style={styles.billLabel}>Helper Fee</Text>
+              <Text style={styles.billValue}>₹{helperFee.toFixed(2)}</Text>
+            </View>
+          )}
 
           <View style={styles.billRow}>
             <View style={styles.labelWithInfo}>
@@ -1064,5 +1190,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
+  },
+  vehicleAlertContainer: {
+    marginBottom: Spacing.md,
+  },
+  vehicleAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F5',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#FED7D7',
+    gap: 10,
+  },
+  helperToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: 'space-between',
+  },
+  helperToggleActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  helperInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  helperTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  helperSubtitle: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  vehicleAlertText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#C53030',
+    fontWeight: '700',
+    lineHeight: 18,
   },
 });
