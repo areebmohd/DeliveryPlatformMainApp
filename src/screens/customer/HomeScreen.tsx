@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   headerGradient: {
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   header: {
     flexDirection: 'row',
@@ -618,8 +618,8 @@ const styles = StyleSheet.create({
     marginRight: Spacing.lg,
   },
   categoryIconContainer: {
-    width: 64,
-    height: 64,
+    width: 100,
+    height: 100,
     borderRadius: 16,
     backgroundColor: Colors.surface,
     justifyContent: 'center',
@@ -637,9 +637,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.primaryLight,
   },
   categoryText: {
+    width: 80,
     fontSize: 12,
     fontWeight: '600',
     marginTop: Spacing.xs,
+    textAlign: 'center',
   },
   inactiveCategoryText: {
     color: Colors.primary,
@@ -766,7 +768,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   bannerContainer: {
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
     height: 160,
     width: width,
   },

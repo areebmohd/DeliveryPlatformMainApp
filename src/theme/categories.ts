@@ -6,7 +6,7 @@ export interface Category {
 
 export const PRODUCT_CATEGORIES: Category[] = [
   { id: '1', name: 'Clothing & Accessories', icon: 'tshirt-crew-outline' },
-  { id: '2', name: 'Electronics', icon: 'laptop' },
+  { id: '2', name: 'Electronics & Appliances', icon: 'laptop' },
   { id: '3', name: 'Food & Beverages', icon: 'food-variant' },
   { id: '4', name: 'Health & Beauty', icon: 'medical-bag' },
   { id: '5', name: 'Home & Garden', icon: 'home-outline' },
