@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
+  Image,
 } from 'react-native';
 const { width } = Dimensions.get('window');
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,6 +41,8 @@ export const HomeScreen = ({ navigation }: any) => {
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
+  const [homeBanners, setHomeBanners] = useState<any[]>([]);
+  const [categoryImages, setCategoryImages] = useState<{[key: string]: string}>({});
   const { addItem, updateQuantity, items, sessionAddress, setSessionAddress } = useCart();
   const { user } = useAuth();
 
@@ -52,6 +55,8 @@ export const HomeScreen = ({ navigation }: any) => {
     fetchStores();
     fetchBestSellers();
     fetchSuggestions();
+    fetchHomeBanners();
+    fetchCategoryImages();
     if (user) {
       fetchAddresses();
     }
@@ -60,6 +65,8 @@ export const HomeScreen = ({ navigation }: any) => {
       if (user) {
         fetchAddresses();
         checkNotifications();
+        fetchHomeBanners();
+        fetchCategoryImages();
       }
     });
 
@@ -175,6 +182,36 @@ export const HomeScreen = ({ navigation }: any) => {
     }
   };
 
+  const fetchHomeBanners = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('home_banners')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setHomeBanners(data || []);
+    } catch (e) {
+      console.error('Error fetching home banners:', e);
+    }
+  };
+
+  const fetchCategoryImages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('category_images')
+        .select('*');
+      if (error) throw error;
+      const mapping: { [key: string]: string } = {};
+      data?.forEach((item: any) => {
+        mapping[item.category_name] = item.image_url;
+      });
+      setCategoryImages(mapping);
+    } catch (e) {
+      console.error('Error fetching category images:', e);
+    }
+  };
+
   const renderCategory = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={[
@@ -187,11 +224,15 @@ export const HomeScreen = ({ navigation }: any) => {
         styles.categoryIconContainer,
         selectedCategory === item.name ? styles.categoryIconActive : styles.inactiveCategoryBg
       ]}>
-        <Icon 
-          name={item.icon} 
-          size={24} 
-          color={selectedCategory === item.name ? Colors.white : Colors.primary} 
-        />
+        {categoryImages[item.name] ? (
+          <Image source={{ uri: categoryImages[item.name] }} style={styles.categoryImage} />
+        ) : (
+          <Icon 
+            name={item.icon} 
+            size={24} 
+            color={selectedCategory === item.name ? Colors.white : Colors.primary} 
+          />
+        )}
       </View>
       <Text style={[
         styles.categoryText,
@@ -293,6 +334,26 @@ export const HomeScreen = ({ navigation }: any) => {
           { paddingBottom: insets.bottom + 100 }
         ]}
       >
+        {/* Home Banners */}
+        {homeBanners.length > 0 && (
+          <View style={styles.bannerContainer}>
+            <ScrollView 
+              horizontal 
+              pagingEnabled 
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                // Could implement pagination dot update here
+              }}
+            >
+              {homeBanners.map((banner) => (
+                <View key={banner.id} style={styles.bannerWrapper}>
+                  <Image source={{ uri: banner.image_url }} style={styles.bannerImage} />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Categories */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Categories</Text>
@@ -703,5 +764,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  bannerContainer: {
+    marginTop: Spacing.md,
+    height: 160,
+    width: width,
+  },
+  bannerWrapper: {
+    width: width,
+    paddingHorizontal: Spacing.md,
+  },
+  bannerImage: {
+    width: width - Spacing.md * 2,
+    height: '100%',
+    borderRadius: 16,
+    resizeMode: 'cover',
+  },
+  categoryImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+    resizeMode: 'cover',
   },
 });
