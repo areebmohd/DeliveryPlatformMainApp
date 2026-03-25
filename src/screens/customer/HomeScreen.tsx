@@ -395,15 +395,21 @@ export const HomeScreen = ({ navigation }: any) => {
         {loading ? (
           <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
         ) : stores.length > 0 ? (
-          <View style={styles.storesContainer}>
-            {stores.map((store) => (
+          <FlatList
+            data={stores}
+            renderItem={({ item }) => (
               <StoreCard 
-                key={store.id} 
-                store={store} 
-                onPress={() => (navigation as any).navigate('StoreDetails', { store })} 
+                store={item} 
+                onPress={() => (navigation as any).navigate('StoreDetails', { store: item })} 
+                width={260}
+                horizontal
               />
-            ))}
-          </View>
+            )}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.storesList}
+          />
         ) : (
           <View style={styles.emptyContainer}>
             <Icon name="store-off-outline" size={64} color={Colors.border} />
@@ -671,8 +677,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  storesContainer: {
+  storesList: {
     paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   bestSellersList: {
     paddingHorizontal: Spacing.md,

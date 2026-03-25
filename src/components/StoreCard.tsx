@@ -6,6 +6,7 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  DimensionValue,
 } from 'react-native';
 import { Colors, Spacing, borderRadius } from '../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -23,16 +24,22 @@ interface StoreCardProps {
     banner_url?: string;
   };
   onPress: () => void;
+  width?: DimensionValue;
+  horizontal?: boolean;
 }
 
-export const StoreCard = ({ store, onPress }: StoreCardProps) => {
+export const StoreCard = ({ store, onPress, width, horizontal }: StoreCardProps) => {
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[
+        styles.container, 
+        width ? { width } : null,
+        horizontal ? { marginBottom: 0, marginRight: Spacing.md } : null
+      ]}
       onPress={onPress}
       activeOpacity={0.9}
     >
-      <View style={styles.imageContainer}>
+      <View style={[styles.imageContainer, horizontal ? { height: 120 } : null]}>
         {store.banner_url ? (
           <Image source={{ uri: store.banner_url }} style={styles.image} />
         ) : (
@@ -51,7 +58,7 @@ export const StoreCard = ({ store, onPress }: StoreCardProps) => {
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>{store.category}</Text>
           </View>
-          {store.sector_area && (
+          {store.sector_area && !horizontal && (
             <View style={styles.categoryBadge}>
               <Text style={styles.categoryText}>{store.sector_area}</Text>
             </View>
