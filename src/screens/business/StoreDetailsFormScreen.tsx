@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   PermissionsAndroid,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Geolocation from '@react-native-community/geolocation';
@@ -24,6 +25,7 @@ import { MapPickerView } from '../../components/address/MapPickerView';
 
 import { useAlert } from '../../context/AlertContext';
 import { TimeSlotPicker } from '../../components/ui/TimeSlotPicker';
+import { PRODUCT_CATEGORIES } from '../../theme/categories';
 
 const { width } = Dimensions.get('window');
 const BANNER_HEIGHT = width * (10 / 16);
@@ -57,6 +59,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [ownerNumber, setOwnerNumber] = useState(store?.owner_number || '');
   const [verificationImages, setVerificationImages] = useState<string[]>(store?.verification_images || []);
   const [isUploadingVerification, setIsUploadingVerification] = useState(false);
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
   const { showAlert, showToast } = useAlert();
 
@@ -318,7 +321,18 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Store Profile</Text>
           <Input label="Store Name *" value={name} onChangeText={setName} placeholder="e.g. Daily Needs Supermarket" />
-          <Input label="Category *" value={category} onChangeText={setCategory} placeholder="e.g. Grocery, Pharmacy" />
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Category *</Text>
+            <TouchableOpacity 
+              style={styles.dropdownTrigger}
+              onPress={() => setCategoryModalVisible(true)}
+            >
+              <Text style={[styles.dropdownValue, !category && { color: Colors.textSecondary }]}>
+                {category || "Select a category"}
+              </Text>
+              <Icon name="chevron-down" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
           <Input label="Description" value={description} onChangeText={setDescription} placeholder="About your store..." multiline numberOfLines={3} />
         </View>
 
@@ -441,6 +455,39 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
           style={styles.submitButton}
         />
       </ScrollView>
+
+      <Modal
+        visible={categoryModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.categoryModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choose Category</Text>
+              <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={styles.categoryList}>
+              {PRODUCT_CATEGORIES.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={styles.categoryOption}
+                  onPress={() => {
+                    setCategory(cat.name);
+                    setCategoryModalVisible(false);
+                  }}
+                >
+                  <Icon name={cat.icon} size={24} color={Colors.primary} />
+                  <Text style={styles.categoryOptionText}>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Global AlertModal handles alerts now */}
     </View>
@@ -674,5 +721,68 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700',
     marginTop: 4,
+  },
+  inputContainer: {
+    marginBottom: Spacing.md,
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    borderRadius: borderRadius.md,
+    minHeight: 56,
+  },
+  dropdownValue: {
+    fontSize: 16,
+    color: Colors.text,
+    lineHeight: 22,
+    paddingVertical: 2,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  categoryModalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '70%',
+    paddingBottom: Spacing.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  categoryList: {
+    padding: Spacing.md,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: Spacing.xs,
+  },
+  categoryOptionText: {
+    fontSize: 16,
+    color: Colors.text,
+    marginLeft: 16,
+    fontWeight: '500',
   },
 });

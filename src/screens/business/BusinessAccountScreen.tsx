@@ -102,7 +102,6 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
             </View>
             <View style={styles.profileDetails}>
               <Text style={styles.storeName}>{store?.name || 'Your Store'}</Text>
-              <Text style={styles.categoryValue}>{store?.category || 'General Store'}</Text>
             </View>
           </View>
         </View>
