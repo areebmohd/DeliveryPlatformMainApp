@@ -49,7 +49,6 @@ export const FavouritesScreen = ({ navigation }: any) => {
             name,
             banner_url,
             category,
-            sector_area,
             city,
             address,
             description

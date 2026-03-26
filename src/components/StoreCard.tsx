@@ -19,7 +19,6 @@ interface StoreCardProps {
     name: string;
     description: string;
     category: string;
-    sector_area?: string;
     city?: string;
     banner_url?: string;
   };
@@ -58,11 +57,6 @@ export const StoreCard = ({ store, onPress, width, horizontal }: StoreCardProps)
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>{store.category}</Text>
           </View>
-          {store.sector_area && !horizontal && (
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{store.sector_area}</Text>
-            </View>
-          )}
           {store.city && (
             <View style={styles.categoryBadge}>
               <Text style={styles.categoryText}>{store.city}</Text>

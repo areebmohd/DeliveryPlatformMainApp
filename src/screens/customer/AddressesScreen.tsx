@@ -119,8 +119,7 @@ export const AddressesScreen = ({ navigation }: any) => {
           )}
         </View>
         <Text style={styles.addressText}>
-          {item.address_line}, {item.sector_area ? `${item.sector_area}, ` : ''}
-          {item.city}, {item.state} - {item.pincode}
+          {item.address_line}, {item.city}, {item.state} - {item.pincode}
         </Text>
         
         <View style={styles.actionRow}>

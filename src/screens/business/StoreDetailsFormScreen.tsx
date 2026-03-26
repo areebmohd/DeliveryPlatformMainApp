@@ -50,7 +50,6 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [whatsappNumber, setWhatsappNumber] = useState(store?.whatsapp_number || '');
   const [addressLine1, setAddressLine1] = useState(store?.address_line_1 || '');
   const [pincode, setPincode] = useState(store?.pincode || '');
-  const [sectorArea, setSectorArea] = useState(store?.sector_area || '');
   const [city, setCity] = useState(store?.city || '');
   const [state, setState] = useState(store?.state || '');
   const [location, setLocation] = useState<any>(null);
@@ -90,7 +89,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   // Listen for location from MapSelectionScreen
   useEffect(() => {
     if (route.params?.selectedLocation) {
-      const { latitude, longitude, preservedFormData } = route.params.selectedLocation;
+      const { latitude, longitude, details, preservedFormData } = route.params.selectedLocation;
       setLocation({ latitude, longitude });
       
       if (preservedFormData) {
@@ -107,13 +106,19 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         setWhatsappNumber(preservedFormData.whatsappNumber);
         setAddressLine1(preservedFormData.addressLine1);
         setPincode(preservedFormData.pincode);
-        setSectorArea(preservedFormData.sectorArea);
         setCity(preservedFormData.city);
         setState(preservedFormData.state);
         setOwnerName(preservedFormData.ownerName);
         setOwnerNumber(preservedFormData.ownerNumber);
         setVerificationImages(preservedFormData.verificationImages);
         if (preservedFormData.store) setStore(preservedFormData.store);
+      }
+
+      // Auto-fill from map details (overwrites preserved data if available)
+      if (details) {
+        if (details.pincode) setPincode(details.pincode);
+        if (details.city) setCity(details.city);
+        if (details.state) setState(details.state);
       }
       
       // Clean up params to avoid re-triggering
@@ -225,7 +230,6 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         city,
         state,
         pincode,
-        sector_area: sectorArea,
         category,
         upi_id: upiId,
         banner_url: bannerUrl,
@@ -348,7 +352,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
               preservedFormData: {
                 name, description, category, upiId, bannerUrl, openingHours, 
                 phone, email, instagramUrl, facebookUrl, whatsappNumber, 
-                addressLine1, pincode, sectorArea, city, state, 
+                addressLine1, pincode, city, state, 
                 ownerName, ownerNumber, verificationImages,
                 store
               }
@@ -361,20 +365,16 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
           <Input label="Address Line 1 *" value={addressLine1} onChangeText={setAddressLine1} placeholder="Flat/House No, Building, Street" />
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Input label="Pin Code *" value={pincode} onChangeText={setPincode} placeholder="122001" keyboardType="numeric" />
-            </View>
-            <View style={{ width: 16 }} />
-            <View style={{ flex: 1 }}>
-              <Input label="Sector/Area (Optional)" value={sectorArea} onChangeText={setSectorArea} placeholder="Sector 45" />
+              <Input label="Pin Code *" value={pincode} onChangeText={setPincode} placeholder="122001" keyboardType="numeric" editable={false} />
             </View>
           </View>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Input label="City *" value={city} onChangeText={setCity} placeholder="Gurugram" />
+              <Input label="City *" value={city} onChangeText={setCity} placeholder="Gurugram" editable={false} />
             </View>
             <View style={{ width: 16 }} />
             <View style={{ flex: 1 }}>
-              <Input label="State *" value={state} onChangeText={setState} placeholder="Haryana" />
+              <Input label="State *" value={state} onChangeText={setState} placeholder="Haryana" editable={false} />
             </View>
           </View>
         </View>

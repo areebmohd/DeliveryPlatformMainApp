@@ -19,16 +19,17 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
 import { MapPickerView } from '../../components/address/MapPickerView';
 
-const InputField = ({ label, value, onChangeText, placeholder, keyboardType = 'default', required = true }: any) => (
+const InputField = ({ label, value, onChangeText, placeholder, keyboardType = 'default', required = true, editable = true }: any) => (
   <View style={styles.inputContainer}>
     <Text style={styles.inputLabel}>{label}{required && <Text style={styles.required}> *</Text>}</Text>
     <TextInput
-      style={styles.input}
+      style={[styles.input, !editable && { backgroundColor: '#F1F3F5', color: Colors.textSecondary }]}
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
       placeholderTextColor={Colors.textSecondary}
       keyboardType={keyboardType}
+      editable={editable}
     />
   </View>
 );
@@ -113,7 +114,6 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
     address_line: editingAddress?.address_line || '',
     pincode: editingAddress?.pincode || '',
     city: editingAddress?.city || '',
-    sector_area: editingAddress?.sector_area || '',
     state: editingAddress?.state || '',
     location: initialLocation,
   });
@@ -126,10 +126,12 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
       setFormData(prev => ({
         ...(preservedFormData || prev),
         location: { latitude, longitude },
-        // Text fields remain manual as per user request
+        pincode: details?.pincode || (preservedFormData || prev).pincode || '',
+        city: details?.city || (preservedFormData || prev).city || '',
+        state: details?.state || (preservedFormData || prev).state || '',
       }));
       
-      // Clean up params to avoid re-triggering
+      // Fields are now read-only and filled from map details
       navigation.setParams({ selectedLocation: undefined });
     }
   }, [route.params?.selectedLocation]);
@@ -251,6 +253,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
                 value={formData.pincode}
                 onChangeText={(t: string) => setFormData({ ...formData, pincode: t })}
                 keyboardType="numeric"
+                editable={false}
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -259,21 +262,16 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
                 placeholder="City Name" 
                 value={formData.city}
                 onChangeText={(t: string) => setFormData({ ...formData, city: t })}
+                editable={false}
               />
             </View>
           </View>
-          <InputField 
-            label="Sector / Area" 
-            placeholder="e.g. Sector 15, Civil Lines" 
-            required={false}
-            value={formData.sector_area}
-            onChangeText={(t: string) => setFormData({ ...formData, sector_area: t })}
-          />
           <InputField 
             label="State" 
             placeholder="State Name" 
             value={formData.state}
             onChangeText={(t: string) => setFormData({ ...formData, state: t })}
+            editable={false}
           />
 
           <View style={{ marginVertical: 12 }}>

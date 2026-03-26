@@ -361,13 +361,6 @@ export const StoreScreen = ({ navigation }: any) => {
               {store?.category || 'General Store'}
             </Text>
           </View>
-          {store?.sector_area && (
-            <View style={styles.headerCategoryBadge}>
-              <Text style={styles.headerCategoryText}>
-                {store.sector_area}
-              </Text>
-            </View>
-          )}
           {store?.city && (
             <View style={styles.headerCategoryBadge}>
               <Text style={styles.headerCategoryText}>
@@ -637,7 +630,6 @@ export const StoreScreen = ({ navigation }: any) => {
                         {store?.address_line_1 ||
                           store?.address ||
                           'Location required for deliveries'}
-                        {store?.sector_area ? `\n${store.sector_area}` : ''}
                         {store?.pincode ? ` - ${store.pincode}` : ''}
                         {store?.city ? `\n${store.city}` : ''}
                         {store?.state ? `, ${store.state}` : ''}

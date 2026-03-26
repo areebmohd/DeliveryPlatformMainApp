@@ -208,11 +208,6 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
             <View style={styles.categoryBadge}>
               <Text style={styles.categoryText}>{store.category}</Text>
             </View>
-            {store.sector_area && (
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryText}>{store.sector_area}</Text>
-              </View>
-            )}
             {store.city && (
               <View style={styles.categoryBadge}>
                 <Text style={styles.categoryText}>{store.city}</Text>
@@ -316,7 +311,6 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.infoValue}>
                         {store.address_line_1 || store.address}
-                        {store.sector_area ? `\n${store.sector_area}` : ''}
                         {store.pincode ? ` - ${store.pincode}` : ''}
                         {store.city ? `\n${store.city}` : ''}
                         {store.state ? `, ${store.state}` : ''}
