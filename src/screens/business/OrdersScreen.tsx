@@ -75,7 +75,7 @@ export const OrdersScreen = () => {
       .select(`
         *,
         customer:profiles!orders_customer_id_fkey (full_name, phone),
-        rider:profiles!orders_rider_id_fkey (full_name),
+        rider:profiles!orders_rider_id_fkey (full_name, phone),
         order_items!inner (*, products!inner(store_id))
       `)
       .eq('order_items.products.store_id', id)
@@ -266,7 +266,7 @@ export const OrdersScreen = () => {
               </View>
               <View>
                 <Text style={[styles.personName, { color: Colors.secondary }]}>{item.rider.full_name}</Text>
-                <Text style={styles.personRole}>Delivery Partner</Text>
+                <Text style={styles.personRole}>Delivery Partner • {item.rider.phone || 'No phone'}</Text>
               </View>
             </View>
           )}
