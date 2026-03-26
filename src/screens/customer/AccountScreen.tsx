@@ -65,8 +65,12 @@ export const AccountScreen = ({ navigation }: any) => {
     }
   };
 
-  const OptionItem = ({ icon, label, onPress }: { icon: string; label: string; onPress?: () => void }) => (
-    <TouchableOpacity style={styles.optionItem} onPress={onPress}>
+  const OptionItem = ({ icon, label, onPress, isLast }: { icon: string; label: string; onPress?: () => void; isLast?: boolean }) => (
+    <TouchableOpacity 
+      style={[styles.optionItem, isLast && styles.noBorder]} 
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.optionLeft}>
         <Icon name={icon} size={22} color={Colors.primary} />
         <Text style={styles.optionLabel}>{label}</Text>
@@ -177,7 +181,7 @@ export const AccountScreen = ({ navigation }: any) => {
             onPress={() => navigation.navigate('Favourites')} 
           />
           <OptionItem icon="cash-refund" label="Refunds" onPress={() => {}} />
-          <OptionItem icon="headset" label="Customer Support" onPress={() => {}} />
+          <OptionItem icon="headset" label="Customer Support" onPress={() => {}} isLast={true} />
         </View>
 
         {/* Sign Out Box */}
@@ -324,6 +328,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border + '50',
+  },
+  noBorder: {
+    borderBottomWidth: 0,
   },
   optionLeft: {
     flexDirection: 'row',
