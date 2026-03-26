@@ -148,9 +148,27 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.divider} />
 
           <Text style={styles.sectionTitle}>Description</Text>
-          <Text style={styles.description}>
-            {product.description || 'No description available for this product.'}
-          </Text>
+          {(() => {
+            try {
+              if (!product.description) return <Text style={styles.description}>No description available.</Text>;
+              const parsed = JSON.parse(product.description);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                return (
+                  <View style={styles.specList}>
+                    {parsed.map((item: any, idx: number) => (
+                      <View key={idx} style={styles.specItem}>
+                        <Text style={styles.specLabel}>{item.title || 'Info'}</Text>
+                        <Text style={styles.specValue}>{item.text}</Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              }
+              return <Text style={styles.description}>{product.description}</Text>;
+            } catch (e) {
+              return <Text style={styles.description}>{product.description}</Text>;
+            }
+          })()}
         </View>
       </ScrollView>
 
@@ -311,10 +329,33 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   description: {
-    fontSize: 16,
+    fontSize: 15,
     color: Colors.textSecondary,
-    lineHeight: 24,
+    lineHeight: 22,
     fontWeight: '500',
+  },
+  specList: {
+    marginTop: Spacing.sm,
+  },
+  specItem: {
+    marginBottom: 20,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    padding: 12,
+    borderRadius: 8,
+  },
+  specLabel: {
+    fontSize: 11,
+    color: '#6c757d',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 6,
+  },
+  specValue: {
+    fontSize: 16,
+    color: '#121212',
+    lineHeight: 22,
+    fontWeight: '600',
   },
   bottomContainer: {
     position: 'absolute',

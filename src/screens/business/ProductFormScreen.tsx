@@ -29,7 +29,20 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [productType, setProductType] = useState<string>(product?.product_type || selectedType || initialType || mode || 'barcode');
   
   const [name, setName] = useState(product?.name || '');
-  const [description, setDescription] = useState(product?.description || '');
+  
+  // Description as key-value pairs (title/text)
+  const getInitialDescription = () => {
+    try {
+      if (!product?.description) return [{ title: '', text: '' }];
+      const parsed = JSON.parse(product.description);
+      if (Array.isArray(parsed)) return parsed;
+      return [{ title: 'Description', text: product.description }];
+    } catch (e) {
+      return [{ title: 'Description', text: product.description || '' }];
+    }
+  };
+  const [descriptionPairs, setDescriptionPairs] = useState<any[]>(getInitialDescription());
+  
   const [price, setPrice] = useState(product?.price?.toString() || '');
   const [weight, setWeight] = useState(product?.weight_kg?.toString() || '');
   const [category, setCategory] = useState(product?.category || '');
@@ -94,7 +107,23 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       setHasSearchedBarcode(true);
       if (data) {
         setName(data.name);
-        setDescription(data.description || '');
+        
+        // Handle description pairs from barcode lookup
+        try {
+          if (data.description) {
+            const parsed = JSON.parse(data.description);
+            if (Array.isArray(parsed)) {
+              setDescriptionPairs(parsed);
+            } else {
+              setDescriptionPairs([{ title: 'Description', text: data.description }]);
+            }
+          } else {
+            setDescriptionPairs([{ title: '', text: '' }]);
+          }
+        } catch (e) {
+          setDescriptionPairs([{ title: 'Description', text: data.description || '' }]);
+        }
+
         setPrice(data.price.toString());
         setWeight(data.weight_kg?.toString() || '');
         setCategory(data.category || '');
@@ -194,7 +223,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       const productData = {
         store_id: storeId,
         name: name.trim(),
-        description: description.trim(),
+        description: JSON.stringify(descriptionPairs.filter(p => p.title.trim() || p.text.trim())),
         price: parseFloat(price),
         weight_kg: manualWeight,
         category: category.trim(),
@@ -356,15 +385,54 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               <Icon name="chevron-down" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
-          <Input
-            label="Description"
-            placeholder="Details..."
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-            editable={canEditDetails}
-          />
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Description</Text>
+            {descriptionPairs.map((pair, index) => (
+              <View key={index} style={styles.pairContainer}>
+                <View style={styles.pairInputs}>
+                  <Input
+                    placeholder="Title (e.g. Material)"
+                    value={pair.title}
+                    onChangeText={(val) => {
+                      const newPairs = [...descriptionPairs];
+                      newPairs[index].title = val;
+                      setDescriptionPairs(newPairs);
+                    }}
+                    containerStyle={{ marginBottom: 8 }}
+                    editable={canEditDetails}
+                  />
+                  <Input
+                    placeholder="Text (e.g. 100% Cotton)"
+                    value={pair.text}
+                    onChangeText={(val) => {
+                      const newPairs = [...descriptionPairs];
+                      newPairs[index].text = val;
+                      setDescriptionPairs(newPairs);
+                    }}
+                    multiline
+                    editable={canEditDetails}
+                  />
+                </View>
+                {canEditDetails && descriptionPairs.length > 1 && (
+                  <TouchableOpacity 
+                    onPress={() => setDescriptionPairs(descriptionPairs.filter((_, i) => i !== index))}
+                    style={styles.removePairBtn}
+                  >
+                    <Icon name="delete-outline" size={20} color={Colors.error} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+            {canEditDetails && (
+              <TouchableOpacity 
+                style={styles.addPairBtn}
+                onPress={() => setDescriptionPairs([...descriptionPairs, { title: '', text: '' }])}
+              >
+                <Icon name="plus-circle-outline" size={20} color={Colors.primary} />
+                <Text style={styles.addPairText}>Add More Details</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -380,21 +448,21 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               editable={canEditDetails}
             />
             <Input
-              label="Stock"
-              placeholder="0"
-              value={stockQuantity}
-              onChangeText={setStockQuantity}
+              label="Weight (kg) *"
+              placeholder="0.5"
+              value={weight}
+              onChangeText={setWeight}
               keyboardType="numeric"
               containerStyle={{ flex: 1 }}
+              editable={canEditDetails}
             />
           </View>
           <Input
-            label="Weight (kg) *"
-            placeholder="0.5"
-            value={weight}
-            onChangeText={setWeight}
+            label="Stock"
+            placeholder="0"
+            value={stockQuantity}
+            onChangeText={setStockQuantity}
             keyboardType="numeric"
-            editable={canEditDetails}
           />
 
           <View style={styles.logisticsSection}>
@@ -732,5 +800,38 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 4,
     textAlign: 'center',
+  },
+  pairContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    padding: 12,
+    borderRadius: borderRadius.lg,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pairInputs: {
+    flex: 1,
+  },
+  removePairBtn: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  addPairBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderStyle: 'dotted',
+    borderColor: Colors.primary,
+    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+  },
+  addPairText: {
+    color: Colors.primary,
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
