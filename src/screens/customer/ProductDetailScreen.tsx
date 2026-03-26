@@ -127,7 +127,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
         {/* Info Section */}
         <View style={styles.infoContainer}>
-          <View style={styles.titleRow}>
+          <View style={styles.nameRow}>
             <Text style={styles.name}>{product.name}</Text>
             {product.category && (
               <View style={styles.categoryBadge}>
@@ -135,8 +135,8 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
               </View>
             )}
           </View>
-
-          <View style={styles.priceRow}>
+          
+          <View style={styles.priceContainer}>
             <Text style={styles.price}>₹{product.price}</Text>
             {product.weight_kg ? (
               <Text style={styles.weight}>
@@ -259,18 +259,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
   },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
   name: {
     fontSize: 24,
     fontWeight: '800',
     color: Colors.text,
-    flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+    marginBottom: Spacing.xs,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: Spacing.xs,
   },
   categoryBadge: {
     backgroundColor: Colors.primaryLight,
@@ -283,11 +287,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700',
     textTransform: 'uppercase',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: Spacing.xs,
   },
   price: {
     fontSize: 22,
