@@ -18,6 +18,8 @@ interface CustomerProductCardProps {
     weight_kg?: number;
     category?: string;
     image_url?: string;
+    barcode?: string;
+    product_type?: string;
   };
   onAdd?: (product: any) => void;
   quantity?: number;
@@ -79,7 +81,9 @@ export const CustomerProductCard = ({
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.name} numberOfLines={1}>{product.name}</Text>
+        <Text style={styles.name} numberOfLines={1}>
+          {product.name || `Barcode: ${product.barcode}`}
+        </Text>
         <View style={styles.priceRow}>
           <Text style={styles.price}>₹{product.price}</Text>
           {product.weight_kg ? (

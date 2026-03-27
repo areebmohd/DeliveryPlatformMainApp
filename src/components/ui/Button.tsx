@@ -2,6 +2,7 @@ import React from 'react';
 import {
   TouchableOpacity,
   Text,
+  View,
   StyleSheet,
   ActivityIndicator,
   ViewStyle,
@@ -17,6 +18,8 @@ interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'outline';
   style?: ViewStyle;
   textStyle?: TextStyle;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
 export const Button = ({
@@ -27,6 +30,8 @@ export const Button = ({
   variant = 'primary',
   style,
   textStyle,
+  leftIcon,
+  rightIcon,
 }: ButtonProps) => {
   const getButtonStyle = () => {
     switch (variant) {
@@ -58,7 +63,11 @@ export const Button = ({
       {loading ? (
         <ActivityIndicator color={variant === 'outline' ? Colors.primary : Colors.white} />
       ) : (
-        <Text style={[styles.textBase, getTextStyle(), textStyle]}>{title}</Text>
+        <View style={styles.contentContainer}>
+          {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+          <Text style={[styles.textBase, getTextStyle(), textStyle]}>{title}</Text>
+          {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -105,5 +114,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     shadowOpacity: 0,
     elevation: 0,
+  },
+  contentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconLeft: {
+    marginRight: Spacing.sm,
+  },
+  iconRight: {
+    marginLeft: Spacing.sm,
   },
 });

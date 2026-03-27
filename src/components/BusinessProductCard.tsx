@@ -21,6 +21,8 @@ interface ProductCardProps {
     weight_kg?: number;
     category?: string;
     image_url?: string;
+    barcode?: string;
+    product_type?: string;
   };
   onToggleStock: (id: string, currentStatus: boolean) => void;
   onEdit: (product: any) => void;
@@ -46,8 +48,12 @@ export const BusinessProductCard = ({
         
         <View style={styles.info}>
           <View>
-            <Text style={styles.name} numberOfLines={1}>{product.name}</Text>
-            <Text style={styles.category}>{product.category || 'General'}</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {product.name || `Barcode: ${product.barcode}`}
+            </Text>
+            <Text style={styles.category}>
+              {product.product_type === 'barcode' ? `Barcode: ${product.barcode}` : (product.category || 'General')}
+            </Text>
           </View>
           
           <View style={styles.detailsRow}>

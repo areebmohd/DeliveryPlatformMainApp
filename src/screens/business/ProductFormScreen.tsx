@@ -124,7 +124,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           setDescriptionPairs([{ title: 'Description', text: data.description || '' }]);
         }
 
-        setPrice(data.price.toString());
+        setPrice(data.price?.toString() || '');
         setWeight(data.weight_kg?.toString() || '');
         setCategory(data.category || '');
         setImageUrl(data.image_url || '');
@@ -132,8 +132,11 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         showToast('Product Found', 'success');
       } else {
         setIsBarcodeMatched(false);
-        // Look for common products by name if barcode not found (as a fallback or for common mode)
-        showAlert({ title: 'Not Found', message: 'Generic product not found. You can enter details manually.', type: 'warning' });
+        showAlert({ 
+          title: 'Product Not Found', 
+          message: 'We will soon add product details.', 
+          type: 'info' 
+        });
       }
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
@@ -142,10 +145,21 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const canEditDetails = isEditing || isPersonalMode || (isBarcodeMode && hasSearchedBarcode && !isBarcodeMatched) || isCommonMode;
+  // Only personal products can have images uploaded by stores.
+  // Common and Barcode images are managed by admin.
+  const canUploadImage = isPersonalMode;
+
+  // Stores can only edit stock and barcode for "barcode" products.
+  // For "common", they can edit details but not image.
+  // For "personal", they can edit everything.
+  const canEditDetails = isPersonalMode || isCommonMode;
+  const canEditBaseInfo = isPersonalMode || isCommonMode || isBarcodeMode;
 
   const pickImage = async () => {
-    if (!isPersonalMode) return;
+    if (!canUploadImage) {
+      showToast('Images for this product type are managed by Admin', 'info');
+      return;
+    }
     
     const result = await launchImageLibrary({
       mediaType: 'photo',
@@ -168,8 +182,20 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   };
 
   const handleSaveProduct = async () => {
-    if (!name || !price) {
-      showAlert({ title: 'Required Fields', message: 'Please enter product name and price.', type: 'warning' });
+    // For barcode products, name and price are not strictly required from store
+    if (!isBarcodeMode) {
+      if (!name) {
+        showAlert({ title: 'Required Fields', message: 'Please enter product name.', type: 'warning' });
+        return;
+      }
+      if (!price) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a price.', type: 'warning' });
+        return;
+      }
+    }
+    
+    if (isBarcodeMode && !barcode) {
+      showAlert({ title: 'Required Fields', message: 'Please enter a barcode.', type: 'warning' });
       return;
     }
 
@@ -222,9 +248,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
       const productData = {
         store_id: storeId,
-        name: name.trim(),
+        name: name.trim() || `Product ${barcode}`, // Use barcode as name if name is missing
         description: JSON.stringify(descriptionPairs.filter(p => p.title.trim() || p.text.trim())),
-        price: parseFloat(price),
+        price: parseFloat(price) || 0,
         weight_kg: manualWeight,
         category: category.trim(),
         image_url: finalImageUrl,
@@ -236,6 +262,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         width_cm: dimValue,
         height_cm: dimValue,
         needs_large_vehicle: needsLarge,
+        is_info_complete: isPersonalMode, // Admin must complete info for Other types
         updated_at: new Date().toISOString(),
       };
 
@@ -254,6 +281,23 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
       showToast(isEditing ? 'Product updated!' : 'Product added!', 'success');
       navigation.goBack();
+    } catch (e: any) {
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNeedChanges = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from('products')
+        .update({ needs_changes: true })
+        .eq('id', product.id);
+      
+      if (error) throw error;
+      showToast('Admin notified. Changes will be reviewed.', 'success');
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
@@ -311,15 +355,15 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                 value={barcode}
                 onChangeText={setBarcode}
                 keyboardType="numeric"
-                editable={!isEditing && !isBarcodeMatched}
+                editable={!isEditing}
               />
-              {!isEditing && !isBarcodeMatched && (
+              {!isEditing && (
                 <Button 
-                  title="Search Barcode" 
-                  onPress={handleBarcodeLookup} 
+                  title="Search Barcode"
+                  onPress={handleBarcodeLookup}
                   loading={searchingBarcode}
                   variant="outline"
-                  style={styles.lookupButton}
+                  style={styles.searchBarcodeStatusBtn}
                 />
               )}
             </View>
@@ -330,11 +374,11 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             <TouchableOpacity 
               style={[
                 styles.imagePreviewContainer, 
-                !isPersonalMode && styles.disabledInput,
+                !canUploadImage && styles.disabledInput,
                 uploading && styles.uploadingContainer
               ]}
               onPress={pickImage}
-              disabled={!isPersonalMode || uploading}
+              disabled={!canUploadImage || uploading}
             >
               {uploading ? (
                 <ActivityIndicator size="large" color={Colors.primary} />
@@ -350,7 +394,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                   <Text style={styles.placeholderText}>
                     {isPersonalMode 
                       ? "Tap to upload product photo" 
-                      : name ? `Searching library for "${name}"...` : "Image will be added by Admin"}
+                      : (isBarcodeMode || isCommonMode) ? "Image will be added by Admin" : "No image available"}
                   </Text>
                 </View>
               )}
@@ -358,13 +402,18 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             <Text style={styles.helperText}>
               {isPersonalMode 
                 ? "Upload a clear photo of your unique product." 
-                : "Images are managed globally. If a matching product image is found in our library, it will be added automatically."}
+                : "Images for this product type are managed by Administrators."}
             </Text>
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Product Details</Text>
+          {isBarcodeMode && (
+            <Text style={styles.barcodeHelperText}>
+              Product details will be added by admin. You can only add Stock amount.
+            </Text>
+          )}
           <Input
             label="Name"
             placeholder="e.g. Milk 1L"
@@ -498,6 +547,17 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             </View>
           </View>
         </View>
+
+        {isEditing && isBarcodeMode && (
+          <Button
+            title="Need Changes"
+            onPress={handleNeedChanges}
+            variant="outline"
+            style={styles.needChangesBtn}
+            textStyle={styles.needChangesText}
+            leftIcon={<Icon name="alert-circle-outline" size={18} color={Colors.error} />}
+          />
+        )}
 
         <Button
           title={isEditing ? "Save Changes" : "Confirm Product"}
@@ -674,6 +734,17 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     fontStyle: 'italic',
   },
+  barcodeHelperText: {
+    fontSize: 13,
+    color: Colors.primary,
+    marginBottom: Spacing.md,
+    fontWeight: '600',
+    backgroundColor: Colors.primary + '08',
+    padding: 10,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.primary,
+  },
   disabledInput: {
     backgroundColor: '#F1F3F5',
     opacity: 0.8,
@@ -694,6 +765,21 @@ const styles = StyleSheet.create({
   submitButton: {
     marginTop: Spacing.md,
     elevation: 4,
+  },
+  needChangesBtn: {
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.xs,
+    borderColor: Colors.error,
+    backgroundColor: Colors.errorLight,
+    borderWidth: 1.5,
+  },
+  needChangesText: {
+    color: Colors.error,
+    fontWeight: '700',
+  },
+  searchBarcodeStatusBtn: {
+    marginTop: Spacing.sm,
+    borderColor: Colors.primary,
   },
   dropdownTrigger: {
     flexDirection: 'row',
