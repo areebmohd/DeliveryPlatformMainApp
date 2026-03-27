@@ -22,6 +22,7 @@ export const OrdersScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
   const [store, setStore] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
   const insets = useSafeAreaInsets();
 
   const { showAlert } = useAlert();
@@ -40,7 +41,7 @@ export const OrdersScreen = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [store?.id]);
+  }, [store?.id, activeTab]);
 
   const fetchStoreAndOrders = async () => {
     try {
@@ -83,10 +84,11 @@ export const OrdersScreen = () => {
 
     if (error) console.error('Error fetching orders:', error);
     else {
-      // Filter out completed and cancelled orders
-      const visibleOrders = (data || []).filter((o: any) => 
-        o.status !== 'delivered' && o.status !== 'cancelled'
-      );
+      // Filter based on active tab
+      const visibleOrders = (data || []).filter((o: any) => {
+        const isPast = o.status === 'delivered' || o.status === 'cancelled';
+        return activeTab === 'active' ? !isPast : isPast;
+      });
       setOrders(visibleOrders);
     }
   };
@@ -200,7 +202,7 @@ export const OrdersScreen = () => {
   };
 
   const stats = {
-    active: orders.length,
+    count: orders.length,
   };
 
   // Group orders by date
@@ -326,11 +328,26 @@ export const OrdersScreen = () => {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <Text style={styles.title}>Orders</Text>
-        {stats.active > 0 && (
+        {stats.count > 0 && (
           <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>{stats.active} Active</Text>
+            <Text style={styles.headerBadgeText}>{stats.count} {activeTab === 'active' ? 'Active' : 'Past'}</Text>
           </View>
         )}
+      </View>
+
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'active' && styles.activeTab]}
+          onPress={() => setActiveTab('active')}
+        >
+          <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>Active</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'past' && styles.activeTab]}
+          onPress={() => setActiveTab('past')}
+        >
+          <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>Past Orders</Text>
+        </TouchableOpacity>
       </View>
       {loading && !refreshing ? (
         <View style={styles.center}>
@@ -378,6 +395,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    borderRadius: borderRadius.lg,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: borderRadius.md,
+  },
+  activeTab: {
+    backgroundColor: Colors.white,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  activeTabText: {
+    color: Colors.primary,
   },
   title: {
     fontSize: 22,
