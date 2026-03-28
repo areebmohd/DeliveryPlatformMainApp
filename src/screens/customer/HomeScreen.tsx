@@ -646,7 +646,6 @@ const styles = StyleSheet.create({
     width: 80,
     fontSize: 12,
     fontWeight: '600',
-    marginTop: Spacing.xs,
     textAlign: 'center',
   },
   inactiveCategoryText: {
