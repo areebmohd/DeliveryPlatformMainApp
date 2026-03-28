@@ -98,8 +98,9 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container]}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+      <View style={{ height: insets.top, backgroundColor: Colors.background }} />
       
       <ScrollView 
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom }]}

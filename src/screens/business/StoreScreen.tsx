@@ -11,6 +11,7 @@ import {
   Platform,
   Linking,
   RefreshControl,
+  StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -471,6 +472,8 @@ export const StoreScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+      <View style={{ height: insets.top, backgroundColor: Colors.background }} />
       <ScrollView
         stickyHeaderIndices={[store && !store.is_active ? 5 : 4]}
         contentContainerStyle={styles.scrollContent}
@@ -479,7 +482,6 @@ export const StoreScreen = ({ navigation }: any) => {
           <RefreshControl refreshing={loading} onRefresh={onRefresh} colors={[Colors.primary]} />
         }
       >
-        <View style={{ paddingTop: insets.top }} />
         {renderHeader()}
         {renderBanner()}
         {renderVerificationAlert()}

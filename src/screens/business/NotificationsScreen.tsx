@@ -89,8 +89,8 @@ export const NotificationsScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
-      
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+      <View style={{ height: insets.top, backgroundColor: Colors.background }} />
+      <View style={[styles.header, { paddingTop: Spacing.sm }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
