@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
@@ -76,105 +83,101 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
     }
   };
 
-  const AccountOption = ({ icon, title, onPress, color = Colors.text }: any) => (
-    <TouchableOpacity style={styles.optionItem} onPress={onPress}>
+  const OptionItem = ({ icon, label, onPress, isLast }: { icon: string; label: string; onPress?: () => void; isLast?: boolean }) => (
+    <TouchableOpacity 
+      style={[styles.optionItem, isLast && styles.noBorder]} 
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.optionLeft}>
-        <View style={[styles.iconContainer, { backgroundColor: Colors.primaryLight }]}>
-          <Icon name={icon} size={22} color={color === Colors.primary || color === Colors.secondary ? Colors.black : color} />
-        </View>
-        <Text style={[styles.optionTitle, { color: Colors.text }]}>{title}</Text>
+        <Icon name={icon} size={22} color={Colors.primary} />
+        <Text style={styles.optionLabel}>{label}</Text>
       </View>
       <Icon name="chevron-right" size={20} color={Colors.textSecondary} />
     </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Text style={styles.title}>Business Account</Text>
-      </View>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Box 1: Profile */}
-        <View style={styles.card}>
-          <View style={styles.profileInfo}>
-            <View style={styles.avatar}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+      
+      <ScrollView 
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.headerTitle}>Business Account</Text>
+
+        {/* Store Info Box */}
+        <View style={[styles.box, { paddingVertical: Spacing.lg }]}>
+          <View style={styles.storeHeader}>
+            <View style={styles.userCircle}>
               <Icon name="store" size={30} color={Colors.primary} />
             </View>
-            <View style={styles.profileDetails}>
-              <Text style={styles.storeName}>{store?.name || 'Your Store'}</Text>
+            <View style={styles.storeText}>
+              <Text style={styles.storeName} numberOfLines={1}>{store?.name || 'Your Store'}</Text>
+              <Text style={styles.storeCategory}>{store?.category || 'No Category'}</Text>
             </View>
           </View>
         </View>
 
-        {/* Box 2: Features */}
-        <View style={styles.card}>
-          <AccountOption 
+        {/* Options Box */}
+        <View style={styles.box}>
+          <OptionItem 
             icon="bell-outline" 
-            title="Notifications" 
+            label="Notifications" 
             onPress={() => navigation.navigate('Notifications')} 
-            color={Colors.primary}
           />
-          <View style={styles.separator} />
-          <AccountOption 
+          <OptionItem 
             icon="crown-outline" 
-            title="Premium" 
+            label="Premium" 
             onPress={() => navigation.navigate('Premium')} 
-            color="#FFD700"
           />
-          <View style={styles.separator} />
-          <AccountOption 
+          <OptionItem 
             icon="chart-areaspline" 
-            title="Dashboard" 
+            label="Dashboard" 
             onPress={() => navigation.navigate('Dashboard')} 
-            color={Colors.secondary}
           />
-          <View style={styles.separator} />
-          <AccountOption 
+          <OptionItem 
             icon="credit-card-outline" 
-            title="Payments" 
+            label="Payments" 
             onPress={() => navigation.navigate('Payments')} 
-            color="#4CAF50"
           />
-          <View style={styles.separator} />
-          <AccountOption 
+          <OptionItem 
             icon="chat-question-outline" 
-            title="Business Support" 
+            label="Business Support" 
             onPress={() => navigation.navigate('Support')} 
-            color="#2196F3"
           />
-          <View style={styles.separator} />
-          <AccountOption 
+          <OptionItem 
             icon="bullhorn-outline" 
-            title="Advertise" 
+            label="Advertise" 
             onPress={() => navigation.navigate('Advertise')} 
-            color="#FF5722"
+            isLast={true}
           />
         </View>
 
-        {/* Box 3: Account */}
-        <View style={styles.card}>
-          <View style={styles.emailContainer}>
-            <View style={styles.optionLeft}>
-              <View style={[styles.iconContainer, { backgroundColor: Colors.textSecondary + '15' }]}>
-                <Icon name="email-outline" size={22} color={Colors.textSecondary} />
-              </View>
-              <View>
-                <Text style={styles.emailLabel}>Logged in as</Text>
-                <Text style={styles.emailValue}>{user?.email}</Text>
-              </View>
+        {/* Sign Out Box */}
+        <View style={styles.box}>
+          <View style={styles.signOutHeader}>
+            <View style={styles.userCircle}>
+              <Icon name="store" size={30} color={Colors.primary} />
+            </View>
+            <View style={styles.signOutText}>
+              <Text style={styles.loggedInAs}>Logged in as</Text>
+              <Text style={styles.userEmail} numberOfLines={1}>{user?.email}</Text>
             </View>
           </View>
-          <View style={styles.separator} />
-          <AccountOption 
-            icon="logout" 
-            title="Sign Out" 
-            onPress={handleSignOut} 
-            color={Colors.error}
-          />
+          <TouchableOpacity 
+            style={styles.signOutBtnPremium} 
+            onPress={handleSignOut}
+          >
+            <View style={styles.signOutBtnContent}>
+              <Icon name="logout-variant" size={24} color={Colors.error} />
+              <Text style={styles.signOutBtnText}>Sign Out from Business</Text>
+            </View>
+            <Icon name="chevron-right" size={24} color={Colors.error + '50'} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Global AlertModal handles alerts now */}
     </View>
   );
 };
@@ -182,97 +185,154 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.sm,
+    backgroundColor: Colors.background,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
+    padding: Spacing.md,
   },
-  title: {
+  headerTitle: {
     fontSize: 22,
     fontWeight: '800',
     color: Colors.text,
+    marginBottom: Spacing.lg,
   },
-  card: {
+  box: {
     backgroundColor: Colors.white,
-    borderRadius: borderRadius.lg,
-    padding: Spacing.sm,
-    marginBottom: Spacing.md,
+    borderRadius: 24,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowRadius: 8,
   },
-  profileInfo: {
+  boxHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  boxTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  storeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.xs,
   },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.primary + '10',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  profileDetails: {
+  storeText: {
     flex: 1,
   },
   storeName: {
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  storeCategory: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  infoList: {
+    gap: Spacing.md,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  infoValue: {
+    fontSize: 15,
+    color: Colors.text,
     fontWeight: '700',
-    color: Colors.text,
-  },
-  categoryValue: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  emailValue: {
-    fontSize: 14,
-    color: Colors.text,
-    fontWeight: '600',
-  },
-  emailLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  emailContainer: {
-    paddingVertical: Spacing.sm,
   },
   optionItem: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + '50',
+  },
+  noBorder: {
+    borderBottomWidth: 0,
   },
   optionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  optionTitle: {
+  optionLabel: {
     fontSize: 16,
     fontWeight: '600',
+    color: Colors.text,
   },
-  separator: {
-    height: 1,
-    backgroundColor: '#F1F3F5',
-    marginLeft: 56,
-    marginVertical: 4,
+  signOutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  userCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: Colors.white,
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  signOutText: {
+    flex: 1,
+  },
+  loggedInAs: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  userEmail: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text,
+    marginTop: 2,
+  },
+  signOutBtnPremium: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFF1F2',
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+  },
+  signOutBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  signOutBtnText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: Colors.error,
   },
 });
