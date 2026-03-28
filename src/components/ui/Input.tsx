@@ -13,6 +13,7 @@ interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   containerStyle?: ViewStyle;
+  rightIcon?: React.ReactNode;
 }
 
 export const Input = ({
@@ -21,6 +22,7 @@ export const Input = ({
   containerStyle,
   onFocus,
   onBlur,
+  rightIcon,
   ...props
 }: InputProps) => {
   const [isFocused, setIsFocused] = React.useState(false);
@@ -43,13 +45,20 @@ export const Input = ({
         isFocused && styles.focusedBorder,
         error ? styles.errorBorder : null
       ]}>
-        <TextInput
-          style={styles.input}
-          placeholderTextColor={Colors.textSecondary}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          {...props}
-        />
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            placeholderTextColor={Colors.textSecondary}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            {...props}
+          />
+          {rightIcon && (
+            <View style={styles.rightIconContainer}>
+              {rightIcon}
+            </View>
+          )}
+        </View>
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
@@ -83,10 +92,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   input: {
+    flex: 1,
     fontSize: 16,
     color: Colors.text,
     height: '100%',
     fontWeight: '500',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  rightIconContainer: {
+    paddingLeft: Spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   errorBorder: {
     borderColor: Colors.error,

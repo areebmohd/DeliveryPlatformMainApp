@@ -20,6 +20,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
 import { Modal } from 'react-native';
+import { BarcodeScannerModal } from '../../components/ui/BarcodeScannerModal';
 
 export const ProductFormScreen = ({ route, navigation }: any) => {
   const { storeId, product, selectedType, initialType, mode } = route.params || {};
@@ -57,6 +58,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   // Barcode & Stock states
   const [barcode, setBarcode] = useState(product?.barcode || '');
   const [isBarcodeMatched, setIsBarcodeMatched] = useState(false);
+  const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [searchingBarcode, setSearchingBarcode] = useState(false);
   const [hasSearchedBarcode, setHasSearchedBarcode] = useState(false);
 
@@ -359,6 +361,13 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                 onChangeText={setBarcode}
                 keyboardType="numeric"
                 editable={!isEditing}
+                rightIcon={
+                  !isEditing && (
+                    <TouchableOpacity onPress={() => setIsScannerVisible(true)}>
+                      <Icon name="barcode-scan" size={24} color={Colors.primary} />
+                    </TouchableOpacity>
+                  )
+                }
               />
               {!isEditing && (
                 <Button 
@@ -603,7 +612,13 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         </View>
       </Modal>
 
-      {/* Global AlertModal handles alerts now */}
+      <BarcodeScannerModal
+        isVisible={isScannerVisible}
+        onClose={() => setIsScannerVisible(false)}
+        onScan={(code) => {
+          setBarcode(code);
+        }}
+      />
     </View>
   );
 };

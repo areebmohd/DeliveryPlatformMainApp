@@ -25,6 +25,8 @@
     "mappls-search-widgets-react-native": "^2.0.0",
     "react": "19.2.3",
     "react-native": "0.84.1",
+    "react-native-android-location-enabler": "^3.0.1",
+    "react-native-barcode-mask": "^1.2.4",
     "react-native-dotenv": "^3.4.11",
     "react-native-gesture-handler": "^2.30.0",
     "react-native-get-random-values": "^2.0.0",
@@ -32,9 +34,11 @@
     "react-native-linear-gradient": "^2.8.3",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
+    "react-native-simple-toast": "^3.3.2",
     "react-native-upi-payment": "^1.0.5",
     "react-native-url-polyfill": "^3.0.0",
-    "react-native-vector-icons": "^10.3.0"
+    "react-native-vector-icons": "^10.3.0",
+    "react-native-vision-camera": "^4.7.3"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
