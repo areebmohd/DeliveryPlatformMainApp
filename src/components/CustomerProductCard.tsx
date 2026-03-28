@@ -9,6 +9,8 @@ import {
 import { Colors, Spacing, borderRadius } from '../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+import { formatPriceShort } from '../utils/format';
+
 interface CustomerProductCardProps {
   product: {
     id: string;
@@ -85,7 +87,7 @@ export const CustomerProductCard = ({
           {product.name || `Barcode: ${product.barcode}`}
         </Text>
         <View style={styles.priceRow}>
-          <Text style={styles.price}>₹{product.price}</Text>
+          <Text style={styles.price}>₹{formatPriceShort(product.price)}</Text>
           {product.weight_kg ? (
             <Text style={styles.weight}>
                / {product.weight_kg < 1 ? `${product.weight_kg * 1000}gm` : `${product.weight_kg}kg`}

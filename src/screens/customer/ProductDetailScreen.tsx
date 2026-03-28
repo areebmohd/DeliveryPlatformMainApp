@@ -18,6 +18,8 @@ import { supabase } from '../../api/supabase';
 
 const { width } = Dimensions.get('window');
 
+import { formatPriceFull } from '../../utils/format';
+
 export const ProductDetailScreen = ({ route, navigation }: any) => {
   const { product, store } = route.params;
   const insets = useSafeAreaInsets();
@@ -137,7 +139,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           </View>
           
           <View style={styles.priceContainer}>
-            <Text style={styles.price}>₹{product.price}</Text>
+            <Text style={styles.price}>₹{formatPriceFull(product.price)}</Text>
             {product.weight_kg ? (
               <Text style={styles.weight}>
                 ({product.weight_kg < 1 ? `${product.weight_kg * 1000}gm` : `${product.weight_kg}kg`})
