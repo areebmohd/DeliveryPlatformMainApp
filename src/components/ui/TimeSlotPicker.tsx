@@ -145,7 +145,7 @@ export const TimeSlotPicker = ({ value, onChange }: TimeSlotPickerProps) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.label}>Operating Hours</Text>
+        <Text style={styles.label}>Operating Hours *</Text>
         <TouchableOpacity style={styles.addButton} onPress={addSlot}>
           <Icon name="plus" size={20} color={Colors.primary} />
           <Text style={styles.addButtonText}>Add Slot</Text>

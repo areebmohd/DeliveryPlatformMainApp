@@ -200,6 +200,20 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     if (!category) missingFields.push('Category');
     if (!addressLine1 || !city || !state || !pincode) missingFields.push('Complete Address');
     if (!location) missingFields.push('Live Location');
+    
+    // Check opening hours (must have at least one slot)
+    let hasSlots = false;
+    try {
+      if (openingHours) {
+        const parsed = JSON.parse(openingHours);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          hasSlots = true;
+        }
+      }
+    } catch (e) {}
+    
+    if (!hasSlots) missingFields.push('Opening Hours');
+
     if (!phone) missingFields.push('Store Number');
     if (!upiId) missingFields.push('UPI ID');
     if (!ownerName) missingFields.push('Owner Name');
@@ -341,8 +355,8 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Store Location</Text>
-          <Text style={styles.subtitle}>Pinpoint your store's exact location for riders</Text>
+          <Text style={styles.sectionTitle}>Store Location *</Text>
+          <Text style={styles.subtitle}>Pinpoint your store's exact location on given map for riders and customers.</Text>
           
           <MapPickerView 
             location={location}
