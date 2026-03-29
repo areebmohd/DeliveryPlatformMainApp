@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View } from 'react-native';
 import { StoreScreen } from '../screens/business/StoreScreen';
@@ -21,31 +22,32 @@ import { AdvertiseScreen } from '../screens/business/AdvertiseScreen';
 import { MapSelectionScreen } from '../screens/customer/MapSelectionScreen';
 
 const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+const StoreStackNav = createNativeStackNavigator();
+const AccountStackNav = createNativeStackNavigator();
 
 const StoreStack = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="StoreDashboard" component={StoreScreen} />
-      <Stack.Screen name="ManageProducts" component={ManageProductsScreen} />
-      <Stack.Screen name="ProductForm" component={ProductFormScreen} />
-      <Stack.Screen name="StoreDetailsForm" component={StoreDetailsFormScreen} />
-      <Stack.Screen name="MapSelection" component={MapSelectionScreen} />
-    </Stack.Navigator>
+    <StoreStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <StoreStackNav.Screen name="StoreDashboard" component={StoreScreen} />
+      <StoreStackNav.Screen name="ManageProducts" component={ManageProductsScreen} />
+      <StoreStackNav.Screen name="ProductForm" component={ProductFormScreen} />
+      <StoreStackNav.Screen name="StoreDetailsForm" component={StoreDetailsFormScreen} />
+      <StoreStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
+    </StoreStackNav.Navigator>
   );
 };
 
 const AccountStack = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="AccountMain" component={BusinessAccountScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      <Stack.Screen name="Premium" component={PremiumScreen} />
-      <Stack.Screen name="Dashboard" component={DashboardScreen} />
-      <Stack.Screen name="Payments" component={PaymentsScreen} />
-      <Stack.Screen name="Support" component={SupportScreen} />
-      <Stack.Screen name="Advertise" component={AdvertiseScreen} />
-    </Stack.Navigator>
+    <AccountStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <AccountStackNav.Screen name="AccountMain" component={BusinessAccountScreen} />
+      <AccountStackNav.Screen name="Notifications" component={NotificationsScreen} />
+      <AccountStackNav.Screen name="Premium" component={PremiumScreen} />
+      <AccountStackNav.Screen name="Dashboard" component={DashboardScreen} />
+      <AccountStackNav.Screen name="Payments" component={PaymentsScreen} />
+      <AccountStackNav.Screen name="Support" component={SupportScreen} />
+      <AccountStackNav.Screen name="Advertise" component={AdvertiseScreen} />
+    </AccountStackNav.Navigator>
   );
 };
 
@@ -54,38 +56,48 @@ export const BusinessNavigator = () => {
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarStyle: {
-          height: 60 + insets.bottom,
-          paddingBottom: insets.bottom + 8,
-          paddingTop: 2,
-          backgroundColor: Colors.white,
-          borderTopColor: Colors.border,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '700',
-        },
-        tabBarIcon: ({ focused, size }) => {
-          let iconName = '';
-          if (route.name === 'Store') iconName = 'storefront';
-          else if (route.name === 'Orders') iconName = 'clipboard-text-clock';
-          else if (route.name === 'Account') iconName = 'account';
+      screenOptions={({ route }) => {
+        const routeName = getFocusedRouteNameFromRoute(route);
+        const hideOnScreens = [
+          'ManageProducts', 'ProductForm', 'StoreDetailsForm', 'MapSelection',
+          'Notifications', 'Premium', 'Dashboard', 'Payments', 'Support', 'Advertise'
+        ];
+        const isTabVisible = !hideOnScreens.includes(routeName as string);
 
-          return (
-            <Icon 
-              name={focused ? iconName : `${iconName}-outline`} 
-              size={size} 
-              color={focused ? Colors.primary : '#9CA3AF'} 
-            />
-          );
-        },
-      })}
+        return {
+          headerShown: false,
+          tabBarActiveTintColor: Colors.primary,
+          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarStyle: {
+            display: isTabVisible ? 'flex' : 'none',
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom + 8,
+            paddingTop: 2,
+            backgroundColor: Colors.white,
+            borderTopColor: Colors.border,
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: '700',
+          },
+          tabBarIcon: ({ focused, size }) => {
+            let iconName = '';
+            if (route.name === 'Store') iconName = 'storefront';
+            else if (route.name === 'Orders') iconName = 'clipboard-text-clock';
+            else if (route.name === 'Account') iconName = 'account';
+
+            return (
+              <Icon 
+                name={focused ? iconName : `${iconName}-outline`} 
+                size={size} 
+                color={focused ? Colors.primary : '#9CA3AF'} 
+              />
+            );
+          },
+        };
+      }}
     >
       <Tab.Screen name="Store" component={StoreStack} />
       <Tab.Screen name="Orders" component={OrdersScreen} />

@@ -18,14 +18,12 @@ export const PremiumScreen = ({ navigation }: any) => {
         <Text style={styles.headerTitle}>Premium</Text>
       </View>
       <View style={styles.content}>
-        <Icon name="crown" size={80} color="#FFD700" />
-        <Text style={styles.title}>Go Premium</Text>
-        <Text style={styles.subtitle}>
+        <Icon name="crown" size={80} color={Colors.primary} />
+        <Text style={styles.comingSoonTitle}>Go Premium</Text>
+        <Text style={styles.comingSoonSubtitle}>
           Unlock advanced features and grow your business faster.
         </Text>
-        <View style={styles.comingSoon}>
-          <Text style={styles.comingSoonText}>Coming Soon</Text>
-        </View>
+        <Text style={styles.badge}>COMING SOON</Text>
       </View>
     </View>
   );
@@ -64,28 +62,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.xl,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
+  comingSoonTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: Colors.text,
     marginTop: Spacing.lg,
   },
-  subtitle: {
-    fontSize: 16,
+  comingSoonSubtitle: {
+    fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: Spacing.sm,
+    marginBottom: Spacing.xl,
   },
-  comingSoon: {
-    marginTop: Spacing.xl,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: borderRadius.round,
-  },
-  comingSoonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.textSecondary,
+  badge: {
+    backgroundColor: Colors.primary + '20',
+    color: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

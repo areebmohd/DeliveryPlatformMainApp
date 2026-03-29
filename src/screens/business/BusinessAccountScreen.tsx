@@ -124,6 +124,11 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
         {/* Options Box */}
         <View style={styles.box}>
           <OptionItem 
+            icon="credit-card-outline" 
+            label="Payments" 
+            onPress={() => navigation.navigate('Payments')} 
+          />
+          <OptionItem 
             icon="bell-outline" 
             label="Notifications" 
             onPress={() => navigation.navigate('Notifications')} 
@@ -139,19 +144,14 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
             onPress={() => navigation.navigate('Dashboard')} 
           />
           <OptionItem 
-            icon="credit-card-outline" 
-            label="Payments" 
-            onPress={() => navigation.navigate('Payments')} 
+            icon="bullhorn-outline" 
+            label="Advertise" 
+            onPress={() => navigation.navigate('Advertise')} 
           />
           <OptionItem 
             icon="chat-question-outline" 
             label="Business Support" 
             onPress={() => navigation.navigate('Support')} 
-          />
-          <OptionItem 
-            icon="bullhorn-outline" 
-            label="Advertise" 
-            onPress={() => navigation.navigate('Advertise')} 
             isLast={true}
           />
         </View>

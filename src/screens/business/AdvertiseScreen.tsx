@@ -18,16 +18,12 @@ export const AdvertiseScreen = ({ navigation }: any) => {
         <Text style={styles.headerTitle}>Advertise</Text>
       </View>
       <View style={styles.content}>
-        <Icon name="bullhorn-outline" size={80} color={Colors.border} />
-        <Text style={styles.placeholderTitle}>Grow Your Business</Text>
-        <Text style={styles.placeholderSubtitle}>
+        <Icon name="bullhorn" size={80} color={Colors.primary} />
+        <Text style={styles.comingSoonTitle}>Grow Your Business</Text>
+        <Text style={styles.comingSoonSubtitle}>
           Promote your store and products to more customers in your area. Run ads, create offers, and boost your sales!
         </Text>
-        
-        <TouchableOpacity style={styles.contactBtn}>
-          <Icon name="rocket-launch-outline" size={20} color={Colors.white} />
-          <Text style={styles.contactBtnText}>Start Advertising</Text>
-        </TouchableOpacity>
+        <Text style={styles.badge}>COMING SOON</Text>
       </View>
     </View>
   );
@@ -66,32 +62,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 40,
   },
-  placeholderTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+  comingSoonTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: Colors.text,
-    marginTop: 20,
+    marginTop: Spacing.lg,
   },
-  placeholderSubtitle: {
-    fontSize: 16,
+  comingSoonSubtitle: {
+    fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 24,
-    marginBottom: 30,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xl,
   },
-  contactBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 16,
-  },
-  contactBtnText: {
-    color: Colors.white,
+  badge: {
+    backgroundColor: Colors.primary + '20',
+    color: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    fontSize: 12,
     fontWeight: '800',
-    fontSize: 16,
-    marginLeft: 10,
   },
 });

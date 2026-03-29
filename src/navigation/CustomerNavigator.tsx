@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { HomeScreen } from '../screens/customer/HomeScreen';
 import { StoreDetailsScreen } from '../screens/customer/StoreDetailsScreen';
 import { CartScreen } from '../screens/customer/CartScreen';
@@ -22,49 +23,51 @@ import { NotificationsScreen } from '../screens/customer/NotificationsScreen';
 import { MapSelectionScreen } from '../screens/customer/MapSelectionScreen';
 
 const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+const HomeStackNav = createNativeStackNavigator();
+const CartStackNav = createNativeStackNavigator();
+const AccountStackNav = createNativeStackNavigator();
 
 const HomeStack = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="HomeMain" component={HomeScreen} />
-      <Stack.Screen name="StoreDetails" component={StoreDetailsScreen} />
-      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-      <Stack.Screen name="AddAddress" component={AddAddressScreen} />
-      <Stack.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
-      <Stack.Screen name="Search" component={SearchScreen} />
-      <Stack.Screen name="Category" component={CategoryScreen} />
-      <Stack.Screen name="MapSelection" component={MapSelectionScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-    </Stack.Navigator>
+    <HomeStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <HomeStackNav.Screen name="HomeMain" component={HomeScreen} />
+      <HomeStackNav.Screen name="StoreDetails" component={StoreDetailsScreen} />
+      <HomeStackNav.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <HomeStackNav.Screen name="AddAddress" component={AddAddressScreen} />
+      <HomeStackNav.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
+      <HomeStackNav.Screen name="Search" component={SearchScreen} />
+      <HomeStackNav.Screen name="Category" component={CategoryScreen} />
+      <HomeStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
+      <HomeStackNav.Screen name="Notifications" component={NotificationsScreen} />
+    </HomeStackNav.Navigator>
   );
 };
 
 const AccountStack = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="AccountMain" component={AccountScreen} />
-      <Stack.Screen name="Favourites" component={FavouritesScreen} />
-      <Stack.Screen name="CustomerOrders" component={CustomerOrdersScreen} />
-      <Stack.Screen name="Addresses" component={AddressesScreen} />
-      <Stack.Screen name="AddAddress" component={AddAddressScreen} />
-      <Stack.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
-      <Stack.Screen name="StoreDetails" component={StoreDetailsScreen} />
-      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      <Stack.Screen name="MapSelection" component={MapSelectionScreen} />
-    </Stack.Navigator>
+    <AccountStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <AccountStackNav.Screen name="AccountMain" component={AccountScreen} />
+      <AccountStackNav.Screen name="Favourites" component={FavouritesScreen} />
+      <AccountStackNav.Screen name="CustomerOrders" component={CustomerOrdersScreen} />
+      <AccountStackNav.Screen name="Addresses" component={AddressesScreen} />
+      <AccountStackNav.Screen name="AddAddress" component={AddAddressScreen} />
+      <AccountStackNav.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
+      <AccountStackNav.Screen name="StoreDetails" component={StoreDetailsScreen} />
+      <AccountStackNav.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <AccountStackNav.Screen name="Notifications" component={NotificationsScreen} />
+      <AccountStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
+    </AccountStackNav.Navigator>
   );
 };
 
 const CartStack = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="CartMain" component={CartScreen} />
-      <Stack.Screen name="AddAddress" component={AddAddressScreen} />
-      <Stack.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
-      <Stack.Screen name="MapSelection" component={MapSelectionScreen} />
-    </Stack.Navigator>
+    <CartStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <CartStackNav.Screen name="CartMain" component={CartScreen} />
+      <CartStackNav.Screen name="AddAddress" component={AddAddressScreen} />
+      <CartStackNav.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
+      <CartStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
+    </CartStackNav.Navigator>
   );
 };
 
@@ -73,38 +76,49 @@ export const CustomerNavigator = () => {
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarStyle: {
-          height: 60 + insets.bottom,
-          paddingBottom: insets.bottom + 8,
-          paddingTop: 2,
-          backgroundColor: Colors.white,
-          borderTopColor: Colors.border,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '700',
-        },
-        tabBarIcon: ({ focused, size }) => {
-          let iconName = '';
-          if (route.name === 'Home') iconName = 'home-variant';
-          else if (route.name === 'Cart') iconName = 'cart';
-          else if (route.name === 'Account') iconName = 'account';
+      screenOptions={({ route }) => {
+        const routeName = getFocusedRouteNameFromRoute(route);
+        const hideOnScreens = [
+          'StoreDetails', 'ProductDetail', 'AddAddress', 'AddLiveLocation', 
+          'Search', 'Category', 'MapSelection', 'Notifications', 
+          'Favourites', 'CustomerOrders', 'Addresses'
+        ];
+        const isTabVisible = !hideOnScreens.includes(routeName as string);
 
-          return (
-            <Icon 
-              name={focused ? iconName : `${iconName}-outline`} 
-              size={size} 
-              color={focused ? Colors.primary : '#9CA3AF'} 
-            />
-          );
-        },
-      })}
+        return {
+          headerShown: false,
+          tabBarActiveTintColor: Colors.primary,
+          tabBarInactiveTintColor: '#9CA3AF',
+          tabBarStyle: {
+            display: isTabVisible ? 'flex' : 'none',
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom + 8,
+            paddingTop: 2,
+            backgroundColor: Colors.white,
+            borderTopColor: Colors.border,
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: '700',
+          },
+          tabBarIcon: ({ focused, size }) => {
+            let iconName = '';
+            if (route.name === 'Home') iconName = 'home-variant';
+            else if (route.name === 'Cart') iconName = 'cart';
+            else if (route.name === 'Account') iconName = 'account';
+
+            return (
+              <Icon 
+                name={focused ? iconName : `${iconName}-outline`} 
+                size={size} 
+                color={focused ? Colors.primary : '#9CA3AF'} 
+              />
+            );
+          },
+        };
+      }}
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Cart" component={CartStack} />
