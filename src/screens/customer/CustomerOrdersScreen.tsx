@@ -206,6 +206,27 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             <Text style={styles.totalLabel}>Grand Total</Text>
             <Text style={styles.totalAmount}>₹{item.total_amount}</Text>
           </View>
+
+          {item.payment_method === 'pay_online' && (
+            <View style={styles.paymentDetailsContainer}>
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Payment Method:</Text>
+                <Text style={styles.paymentValue}>Online (UPI)</Text>
+              </View>
+              {item.utr_number && (
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>UTR Number:</Text>
+                  <Text style={styles.paymentValue}>{item.utr_number}</Text>
+                </View>
+              )}
+              {item.payer_name && (
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Payer Name:</Text>
+                  <Text style={styles.paymentValue}>{item.payer_name}</Text>
+                </View>
+              )}
+            </View>
+          )}
           
           {canCancel && (
             <TouchableOpacity 
@@ -508,5 +529,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Colors.text,
+  },
+  paymentDetailsContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  paymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  paymentLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  paymentValue: {
+    fontSize: 12,
+    color: Colors.text,
+    fontWeight: '700',
   },
 });

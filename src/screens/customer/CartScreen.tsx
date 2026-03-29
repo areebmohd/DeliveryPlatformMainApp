@@ -8,6 +8,7 @@ import {
   StatusBar,
   ActivityIndicator,
   Modal,
+  TextInput,
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,7 +39,11 @@ export const CartScreen = ({ navigation }: any) => {
     content: ''
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<'pay_now' | 'pay_on_delivery'>('pay_now');
+  const [paymentMethod, setPaymentMethod] = useState<'pay_online' | 'pay_on_delivery'>('pay_online');
+  const [showPaymentDetailsModal, setShowPaymentDetailsModal] = useState(false);
+  const [tempUtr, setTempUtr] = useState('');
+  const [tempPayerName, setTempPayerName] = useState('');
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   const { showAlert, showToast } = useAlert();
@@ -410,7 +415,7 @@ export const CartScreen = ({ navigation }: any) => {
       if (itemsError) throw itemsError;
 
       // 6. Payment Logic
-      if (paymentMethod === 'pay_now') {
+      if (paymentMethod === 'pay_online') {
         if (RNUpiPayment && RNUpiPayment.initializePayment) {
           RNUpiPayment.initializePayment(
             {
@@ -420,14 +425,13 @@ export const CartScreen = ({ navigation }: any) => {
               transactionNote: `Order #${order.order_number}`,
               transactionRef: order.id,
             },
-            async () => {
-              await supabase
-                .from('orders')
-                .update({ payment_status: 'verified' })
-                .eq('id', order.id);
-              
-              clearCart();
-              navigation.navigate('Account', { screen: 'CustomerOrders' });
+            async (response: any) => {
+              // Capture Transaction ID if available from library
+              if (response && response.txnId) {
+                setTempUtr(response.txnId);
+              }
+              setActiveOrderId(order.id);
+              setShowPaymentDetailsModal(true);
             },
             async () => {
               await supabase
@@ -440,12 +444,8 @@ export const CartScreen = ({ navigation }: any) => {
           );
         } else {
           // Mock success for local testing
-          await supabase
-            .from('orders')
-            .update({ payment_status: 'verified' })
-            .eq('id', order.id);
-          clearCart();
-          navigation.navigate('Account', { screen: 'CustomerOrders' });
+          setActiveOrderId(order.id);
+          setShowPaymentDetailsModal(true);
         }
       } else {
         // Pay on Delivery
@@ -455,6 +455,34 @@ export const CartScreen = ({ navigation }: any) => {
 
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmPaymentDetails = async () => {
+    if (!activeOrderId) return;
+    
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          payment_status: 'verified',
+          utr_number: tempUtr,
+          payer_name: tempPayerName
+        })
+        .eq('id', activeOrderId);
+
+      if (error) throw error;
+      
+      setShowPaymentDetailsModal(false);
+      clearCart();
+      navigation.navigate('Account', { screen: 'CustomerOrders' });
+      showToast('Order placed successfully!', 'success');
+    } catch (e: any) {
+      console.error('Error confirming payment:', e);
+      showAlert({ title: 'Error', message: 'Failed to save payment details. Please try again.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -653,27 +681,27 @@ export const CartScreen = ({ navigation }: any) => {
             <TouchableOpacity 
               style={[
                 styles.paymentOption, 
-                paymentMethod === 'pay_now' && styles.paymentOptionSelected
+                paymentMethod === 'pay_online' && styles.paymentOptionSelected
               ]}
-              onPress={() => setPaymentMethod('pay_now')}
+              onPress={() => setPaymentMethod('pay_online')}
             >
               <View style={styles.paymentOptionHeader}>
                 <Icon 
                   name="flash-outline" 
                   size={24} 
-                  color={paymentMethod === 'pay_now' ? Colors.primary : Colors.textSecondary} 
+                  color={paymentMethod === 'pay_online' ? Colors.primary : Colors.textSecondary} 
                 />
                 <View style={[
                   styles.radioOuter, 
-                  paymentMethod === 'pay_now' && styles.radioOuterSelected
+                  paymentMethod === 'pay_online' && styles.radioOuterSelected
                 ]}>
-                  {paymentMethod === 'pay_now' && <View style={styles.radioInner} />}
+                  {paymentMethod === 'pay_online' && <View style={styles.radioInner} />}
                 </View>
               </View>
               <Text style={[
                 styles.paymentOptionTitle,
-                paymentMethod === 'pay_now' && styles.paymentOptionTitleSelected
-              ]}>Pay Now</Text>
+                paymentMethod === 'pay_online' && styles.paymentOptionTitleSelected
+              ]}>Pay Online</Text>
               <Text style={styles.paymentOptionSub}>Pay instantly via UPI</Text>
             </TouchableOpacity>
 
@@ -831,6 +859,56 @@ export const CartScreen = ({ navigation }: any) => {
       </Modal>
 
       {/* No local AlertModals needed anymore as they are handled globally */}
+
+      {/* Payment Details Modal */}
+      <Modal
+        visible={showPaymentDetailsModal}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.centeredModalOverlay}>
+          <View style={[styles.infoModalCard, { padding: 24 }]}>
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+              <Icon name="check-decagram" size={60} color={Colors.success} />
+              <Text style={[styles.modalTitle, { marginTop: 12 }]}>Payment Successful!</Text>
+              <Text style={{ color: Colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+                Please provide your transaction details for quick verification.
+              </Text>
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textSecondary, marginBottom: 8, textTransform: 'uppercase' }}>UTR Number / Transaction ID</Text>
+              <TextInput
+                style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 12, fontSize: 16, color: Colors.text, backgroundColor: '#F9FAFB' }}
+                placeholder="Enter 12-digit UTR number"
+                value={tempUtr}
+                onChangeText={setTempUtr}
+                keyboardType="number-pad"
+              />
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textSecondary, marginBottom: 8, textTransform: 'uppercase' }}>Payer Account Name</Text>
+              <TextInput
+                style={{ borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 12, fontSize: 16, color: Colors.text, backgroundColor: '#F9FAFB' }}
+                placeholder="Account Holder's Name"
+                value={tempPayerName}
+                onChangeText={setTempPayerName}
+              />
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.modalCloseBtn, { margin: 0, marginTop: 24, opacity: loading ? 0.7 : 1 }]}
+              onPress={handleConfirmPaymentDetails}
+              disabled={loading}
+            >
+              <Text style={styles.modalCloseBtnText}>
+                {loading ? 'Saving...' : 'Confirm Order'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
