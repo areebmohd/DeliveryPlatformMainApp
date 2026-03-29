@@ -45,6 +45,7 @@ export const CategoryScreen = ({ navigation, route }: any) => {
         .ilike('category', `%${categoryName}%`)
         .eq('stores.is_active', true)
         .eq('is_deleted', false)
+        .eq('is_info_complete', true)
         .eq('in_stock', true);
 
       // Fetch Stores in this category

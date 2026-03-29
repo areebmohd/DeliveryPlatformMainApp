@@ -105,6 +105,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         .select('*')
         .eq('store_id', store.id)
         .eq('is_deleted', false)
+        .eq('is_info_complete', true)
         .eq('in_stock', true);
 
       if (error) throw error;

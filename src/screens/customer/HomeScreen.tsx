@@ -149,6 +149,7 @@ export const HomeScreen = ({ navigation }: any) => {
         .select('*, stores:stores_view!inner(*)')
         .eq('stores.is_active', true)
         .eq('is_deleted', false)
+        .eq('is_info_complete', true)
         .eq('in_stock', true)
         .limit(10);
 
@@ -169,6 +170,7 @@ export const HomeScreen = ({ navigation }: any) => {
         .select('*, stores:stores_view!inner(*)')
         .eq('stores.is_active', true)
         .eq('is_deleted', false)
+        .eq('is_info_complete', true)
         .eq('in_stock', true)
         .order('id', { ascending: false })
         .limit(12);

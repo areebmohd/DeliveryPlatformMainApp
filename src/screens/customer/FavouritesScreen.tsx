@@ -81,7 +81,8 @@ export const FavouritesScreen = ({ navigation }: any) => {
           )
         `)
         .eq('user_id', user.id)
-        .not('product_id', 'is', null);
+        .not('product_id', 'is', null)
+        .eq('products.is_info_complete', true);
 
       if (productsError) throw productsError;
       setFavProducts(productsData?.map(item => item.products) || []);

@@ -55,6 +55,7 @@ export const SearchScreen = ({ navigation, route }: any) => {
         .ilike('name', `%${searchQuery}%`)
         .eq('stores.is_active', true)
         .eq('is_deleted', false)
+        .eq('is_info_complete', true)
         .eq('in_stock', true)
         .limit(20);
 
