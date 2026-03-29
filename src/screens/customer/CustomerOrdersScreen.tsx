@@ -8,8 +8,10 @@ import {
   RefreshControl,
   TouchableOpacity,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -49,6 +51,19 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        navigation.navigate('AccountMain');
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [navigation])
+  );
 
   const fetchOrders = async () => {
     try {
@@ -257,7 +272,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
       <View style={styles.screenHeader}>
         <TouchableOpacity 
           style={styles.backButton} 
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.navigate('AccountMain')}
         >
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>

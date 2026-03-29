@@ -61,7 +61,7 @@ export const Button = ({
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? Colors.primary : Colors.white} />
+        <ActivityIndicator color={Colors.primary} />
       ) : (
         <View style={styles.contentContainer}>
           {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
