@@ -57,11 +57,19 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [uploading, setUploading] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
+  // Mode calculations (moved up before state usage)
+  const isEditing = !!product;
+  const isBarcodeMode = productType === 'barcode';
+  const isCommonMode = productType === 'common';
+  const isPersonalMode = productType === 'personal';
+
   // Barcode & Stock states
   const [barcode, setBarcode] = useState(product?.barcode || '');
-  const [isBarcodeMatched, setIsBarcodeMatched] = useState(false);
+  const [isBarcodeMatched, setIsBarcodeMatched] = useState(!!product?.name);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(product?.raw_image_url || null);
+  const showAllFields = !isBarcodeMode || isBarcodeMatched;
+  
   const [capturingRaw, setCapturingRaw] = useState(false);
   const [searchingBarcode, setSearchingBarcode] = useState(false);
   const [hasSearchedBarcode, setHasSearchedBarcode] = useState(false);
@@ -70,12 +78,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   
   // Logistics state
   const [isOversized, setIsOversized] = useState(product?.needs_large_vehicle || false);
-
-
-  const isEditing = !!product;
-  const isBarcodeMode = productType === 'barcode';
-  const isCommonMode = productType === 'common';
-  const isPersonalMode = productType === 'personal';
+  const setIsOversizedValue = (val: boolean) => setIsOversized(val);
 
   // Update productType if it changes in params (initially)
   useEffect(() => {
@@ -459,7 +462,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          {!isBarcodeMode && (
+          {showAllFields && (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Product Image</Text>
               <TouchableOpacity 
@@ -501,12 +504,12 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Product Details</Text>
-          {isBarcodeMode && (
+          {isBarcodeMode && !isBarcodeMatched && (
             <Text style={styles.barcodeHelperText}>
               Product details and image will be added by admin. You can only add stock amount.
             </Text>
           )}
-          {!isBarcodeMode && (
+          {showAllFields && (
             <>
               <Input
                 label="Name"
@@ -582,7 +585,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pricing & Inventory</Text>
-          {!isBarcodeMode && (
+          {showAllFields && (
             <View style={styles.row}>
               <Input
                 label="Price (₹)"
@@ -612,7 +615,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             keyboardType="numeric"
           />
 
-          {!isBarcodeMode && (
+          {showAllFields && (
             <View style={styles.logisticsSection}>
               <Text style={styles.logisticsTitle}>Delivery Details</Text>
               <View style={styles.deliveryOptionsRow}>
