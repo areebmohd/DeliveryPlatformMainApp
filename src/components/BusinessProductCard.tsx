@@ -25,6 +25,7 @@ interface ProductCardProps {
     image_url?: string;
     barcode?: string;
     product_type?: string;
+    raw_image_url?: string;
   };
   onToggleStock: (id: string, currentStatus: boolean) => void;
   onEdit: (product: any) => void;
@@ -40,8 +41,11 @@ export const BusinessProductCard = ({
   return (
     <View style={styles.container}>
       <View style={styles.mainContent}>
-        {product.image_url ? (
-          <Image source={{ uri: product.image_url }} style={styles.productImage} />
+        {product.image_url || product.raw_image_url ? (
+          <Image 
+            source={{ uri: product.image_url || product.raw_image_url }} 
+            style={styles.productImage} 
+          />
         ) : (
           <View style={[styles.productImage, styles.imagePlaceholder]}>
             <Icon name="package-variant" size={28} color={Colors.textSecondary} />

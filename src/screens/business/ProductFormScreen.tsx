@@ -8,15 +8,17 @@ import {
   Image,
   ActivityIndicator,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { supabase, uploadImage } from '../../api/supabase';
+import { supabase, uploadImage, deleteFile } from '../../api/supabase';
 import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { launchImageLibrary } from 'react-native-image-picker';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
 import { Modal } from 'react-native';
@@ -59,6 +61,8 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [barcode, setBarcode] = useState(product?.barcode || '');
   const [isBarcodeMatched, setIsBarcodeMatched] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
+  const [rawImageUrl, setRawImageUrl] = useState<string | null>(product?.raw_image_url || null);
+  const [capturingRaw, setCapturingRaw] = useState(false);
   const [searchingBarcode, setSearchingBarcode] = useState(false);
   const [hasSearchedBarcode, setHasSearchedBarcode] = useState(false);
 
@@ -109,6 +113,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
       setHasSearchedBarcode(true);
       if (data) {
+        setHasSearchedBarcode(true);
         setName(data.name);
         
         // Handle description pairs from barcode lookup
@@ -131,14 +136,20 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         setWeight(data.weight_kg?.toString() || '');
         setCategory(data.category || '');
         setImageUrl(data.image_url || '');
+        setRawImageUrl(data.raw_image_url || null);
         setIsBarcodeMatched(true);
         showToast('Product Found', 'success');
       } else {
+        setHasSearchedBarcode(true);
         setIsBarcodeMatched(false);
         showAlert({ 
           title: 'Product Not Found', 
-          message: 'We will soon add product details.', 
-          type: 'info' 
+          message: 'We will soon add product details. Click and submit a clear picture of product from front side.', 
+          type: 'info',
+          primaryAction: {
+            text: 'OK',
+            onPress: takeRawPhoto,
+          }
         });
       }
     } catch (e: any) {
@@ -158,6 +169,37 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const canEditDetails = isPersonalMode || isCommonMode;
   const canEditBaseInfo = isPersonalMode || isCommonMode || isBarcodeMode;
 
+  const takeRawPhoto = async () => {
+    const result = await launchCamera({
+      mediaType: 'photo',
+      quality: 0.8,
+      includeBase64: true,
+      includeExtra: true,
+    });
+
+    if (result.assets && result.assets[0].uri && user) {
+      try {
+        setCapturingRaw(true);
+        const fileName = `raw_images/${user.id}/${barcode}_${Date.now()}.jpg`;
+        
+        // Passing base64 data instead of URI
+        const publicUrl = await uploadImage('products', fileName, result.assets[0].base64!);
+        
+        // If there was an old raw image, delete it now
+        if (rawImageUrl) {
+          await deleteFile('products', rawImageUrl);
+        }
+        
+        setRawImageUrl(publicUrl);
+        showToast('Raw image captured successfully!', 'success');
+      } catch (error: any) {
+        showAlert({ title: 'Error', message: error.message, type: 'error' });
+      } finally {
+        setCapturingRaw(false);
+      }
+    }
+  };
+
   const pickImage = async () => {
     if (!canUploadImage) {
       showToast('Images for this product type are managed by Admin', 'info');
@@ -167,13 +209,15 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     const result = await launchImageLibrary({
       mediaType: 'photo',
       quality: 0.8,
+      includeBase64: true,
     });
 
     if (result.assets && result.assets[0].uri && user) {
       try {
         setUploading(true);
         const fileName = `products/${user.id}/${Date.now()}.jpg`;
-        const publicUrl = await uploadImage('store-logos', fileName, result.assets[0].uri);
+        // Passing base64 data instead of URI
+        const publicUrl = await uploadImage('products', fileName, result.assets[0].base64!);
         setImageUrl(publicUrl);
         showToast('Image uploaded successfully!', 'success');
       } catch (error: any) {
@@ -266,6 +310,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         height_cm: dimValue,
         needs_large_vehicle: needsLarge,
         is_info_complete: isPersonalMode, // Admin must complete info for Other types
+        raw_image_url: rawImageUrl,
         updated_at: new Date().toISOString(),
       };
 
@@ -322,7 +367,12 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         <View style={{ width: 40 }} /> 
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Product Type Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Product Type</Text>
@@ -381,143 +431,179 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Product Image</Text>
-            <TouchableOpacity 
-              style={[
-                styles.imagePreviewContainer, 
-                !canUploadImage && styles.disabledInput,
-                uploading && styles.uploadingContainer
-              ]}
-              onPress={pickImage}
-              disabled={!canUploadImage || uploading}
-            >
-              {uploading ? (
-                <ActivityIndicator size="large" color={Colors.primary} />
-              ) : imageUrl ? (
-                <Image source={{ uri: imageUrl }} style={styles.previewImage} />
-              ) : (
-                <View style={styles.placeholderContainer}>
-                  <Icon 
-                    name={isPersonalMode ? "camera-plus" : "image-search"} 
-                    size={40} 
-                    color={Colors.textSecondary} 
-                  />
-                  <Text style={styles.placeholderText}>
-                    {isPersonalMode 
-                      ? "Tap to upload product photo" 
-                      : (isBarcodeMode || isCommonMode) ? "Image will be added by Admin" : "No image available"}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <Text style={styles.helperText}>
-              {isPersonalMode 
-                ? "Upload a clear photo of your unique product." 
-                : "Images for this product type are managed by Administrators."}
-            </Text>
-          </View>
+          {isBarcodeMode && (
+            <View style={[styles.inputContainer, { marginTop: Spacing.md }]}>
+              <Text style={styles.label}>Raw Image</Text>
+              <TouchableOpacity 
+                style={styles.imagePreviewContainer}
+                onPress={takeRawPhoto}
+              >
+                {capturingRaw ? (
+                  <ActivityIndicator size="large" color={Colors.primary} />
+                ) : rawImageUrl ? (
+                  <>
+                    <Image source={{ uri: rawImageUrl }} style={styles.previewImage} />
+                    <View style={styles.retakeOverlay}>
+                      <Icon name="camera-retake" size={18} color={Colors.white} />
+                      <Text style={styles.retakeLabel}>Retake Photo</Text>
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.placeholderContainer}>
+                    <Icon name="camera-plus" size={40} color={Colors.textSecondary} />
+                    <Text style={styles.placeholderText}>Tap to capture front-side product photo</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <Text style={styles.helperText}>A clear photo of the product front side helps us identify it correctly.</Text>
+            </View>
+          )}
+
+          {!isBarcodeMode && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Product Image</Text>
+              <TouchableOpacity 
+                style={[
+                  styles.imagePreviewContainer, 
+                  !canUploadImage && styles.disabledInput,
+                  uploading && styles.uploadingContainer
+                ]}
+                onPress={pickImage}
+                disabled={!canUploadImage || uploading}
+              >
+                {uploading ? (
+                  <ActivityIndicator size="large" color={Colors.primary} />
+                ) : imageUrl ? (
+                  <Image source={{ uri: imageUrl }} style={styles.previewImage} />
+                ) : (
+                  <View style={styles.placeholderContainer}>
+                    <Icon 
+                      name={isPersonalMode ? "camera-plus" : "image-search"} 
+                      size={40} 
+                      color={Colors.textSecondary} 
+                    />
+                    <Text style={styles.placeholderText}>
+                      {isPersonalMode 
+                        ? "Tap to upload product photo" 
+                        : isCommonMode ? "Image will be added by Admin" : "No image available"}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <Text style={styles.helperText}>
+                {isPersonalMode 
+                  ? "Upload a clear photo of your unique product." 
+                  : "Images for this product type are managed by Administrators."}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Product Details</Text>
           {isBarcodeMode && (
             <Text style={styles.barcodeHelperText}>
-              Product details will be added by admin. You can only add Stock amount.
+              Product details and image will be added by admin. You can only add stock amount.
             </Text>
           )}
-          <Input
-            label="Name"
-            placeholder="e.g. Milk 1L"
-            value={name}
-            onChangeText={setName}
-            editable={canEditDetails}
-          />
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Category</Text>
-            <TouchableOpacity 
-              style={[styles.dropdownTrigger, !canEditDetails && styles.disabledInput]}
-              onPress={() => canEditDetails && setCategoryModalVisible(true)}
-              disabled={!canEditDetails}
-            >
-              <Text style={[styles.dropdownValue, !category && { color: Colors.textSecondary }]}>
-                {category || "Select a category"}
-              </Text>
-              <Icon name="chevron-down" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Description</Text>
-            {descriptionPairs.map((pair, index) => (
-              <View key={index} style={styles.pairContainer}>
-                <View style={styles.pairInputs}>
-                  <Input
-                    placeholder="Title (e.g. Material)"
-                    value={pair.title}
-                    onChangeText={(val) => {
-                      const newPairs = [...descriptionPairs];
-                      newPairs[index].title = val;
-                      setDescriptionPairs(newPairs);
-                    }}
-                    containerStyle={{ marginBottom: 8 }}
-                    editable={canEditDetails}
-                  />
-                  <Input
-                    placeholder="Text (e.g. 100% Cotton)"
-                    value={pair.text}
-                    onChangeText={(val) => {
-                      const newPairs = [...descriptionPairs];
-                      newPairs[index].text = val;
-                      setDescriptionPairs(newPairs);
-                    }}
-                    multiline
-                    editable={canEditDetails}
-                  />
-                </View>
-                {canEditDetails && descriptionPairs.length > 1 && (
+          {!isBarcodeMode && (
+            <>
+              <Input
+                label="Name"
+                placeholder="e.g. Milk 1L"
+                value={name}
+                onChangeText={setName}
+                editable={canEditDetails}
+              />
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Category</Text>
+                <TouchableOpacity 
+                  style={[styles.dropdownTrigger, !canEditDetails && styles.disabledInput]}
+                  onPress={() => canEditDetails && setCategoryModalVisible(true)}
+                  disabled={!canEditDetails}
+                >
+                  <Text style={[styles.dropdownValue, !category && { color: Colors.textSecondary }]}>
+                    {category || "Select a category"}
+                  </Text>
+                  <Icon name="chevron-down" size={20} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Description</Text>
+                {descriptionPairs.map((pair, index) => (
+                  <View key={index} style={styles.pairContainer}>
+                    <View style={styles.pairInputs}>
+                      <Input
+                        placeholder="Title (e.g. Material)"
+                        value={pair.title}
+                        onChangeText={(val) => {
+                          const newPairs = [...descriptionPairs];
+                          newPairs[index].title = val;
+                          setDescriptionPairs(newPairs);
+                        }}
+                        containerStyle={{ marginBottom: 8 }}
+                        editable={canEditDetails}
+                      />
+                      <Input
+                        placeholder="Text (e.g. 100% Cotton)"
+                        value={pair.text}
+                        onChangeText={(val) => {
+                          const newPairs = [...descriptionPairs];
+                          newPairs[index].text = val;
+                          setDescriptionPairs(newPairs);
+                        }}
+                        multiline
+                        editable={canEditDetails}
+                      />
+                    </View>
+                    {canEditDetails && descriptionPairs.length > 1 && (
+                      <TouchableOpacity 
+                        onPress={() => setDescriptionPairs(descriptionPairs.filter((_, i) => i !== index))}
+                        style={styles.removePairBtn}
+                      >
+                        <Icon name="delete-outline" size={20} color={Colors.error} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {canEditDetails && (
                   <TouchableOpacity 
-                    onPress={() => setDescriptionPairs(descriptionPairs.filter((_, i) => i !== index))}
-                    style={styles.removePairBtn}
+                    style={styles.addPairBtn}
+                    onPress={() => setDescriptionPairs([...descriptionPairs, { title: '', text: '' }])}
                   >
-                    <Icon name="delete-outline" size={20} color={Colors.error} />
+                    <Icon name="plus-circle-outline" size={20} color={Colors.primary} />
+                    <Text style={styles.addPairText}>Add More Details</Text>
                   </TouchableOpacity>
                 )}
               </View>
-            ))}
-            {canEditDetails && (
-              <TouchableOpacity 
-                style={styles.addPairBtn}
-                onPress={() => setDescriptionPairs([...descriptionPairs, { title: '', text: '' }])}
-              >
-                <Icon name="plus-circle-outline" size={20} color={Colors.primary} />
-                <Text style={styles.addPairText}>Add More Details</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+            </>
+          )}
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pricing & Inventory</Text>
-          <View style={styles.row}>
-            <Input
-              label="Price (₹)"
-              placeholder="0.00"
-              value={price}
-              onChangeText={setPrice}
-              keyboardType="numeric"
-              containerStyle={{ flex: 1, marginRight: Spacing.sm }}
-              editable={canEditDetails}
-            />
-            <Input
-              label="Weight (kg) *"
-              placeholder="0.5"
-              value={weight}
-              onChangeText={setWeight}
-              keyboardType="numeric"
-              containerStyle={{ flex: 1 }}
-              editable={canEditDetails}
-            />
-          </View>
+          {!isBarcodeMode && (
+            <View style={styles.row}>
+              <Input
+                label="Price (₹)"
+                placeholder="0.00"
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="numeric"
+                containerStyle={{ flex: 1, marginRight: Spacing.sm }}
+                editable={canEditDetails}
+              />
+              <Input
+                label="Weight (kg) *"
+                placeholder="0.5"
+                value={weight}
+                onChangeText={setWeight}
+                keyboardType="numeric"
+                containerStyle={{ flex: 1 }}
+                editable={canEditDetails}
+              />
+            </View>
+          )}
           <Input
             label="Stock"
             placeholder="0"
@@ -526,38 +612,40 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             keyboardType="numeric"
           />
 
-          <View style={styles.logisticsSection}>
-            <Text style={styles.logisticsTitle}>Delivery Details</Text>
-            <View style={styles.deliveryOptionsRow}>
-              <TouchableOpacity 
-                style={[styles.deliveryOptionCard, !isOversized && styles.deliveryOptionActive]}
-                onPress={() => setIsOversized(false)}
-                activeOpacity={0.7}
-              >
-                <Icon 
-                  name="motorbike" 
-                  size={32} 
-                  color={!isOversized ? Colors.primary : Colors.textSecondary} 
-                />
-                <Text style={[styles.deliveryOptionLabel, !isOversized && { color: Colors.primary }]}>Standard Bike</Text>
-                <Text style={styles.deliveryOptionSub}>Fits in 40x40x40cm bag</Text>
-              </TouchableOpacity>
+          {!isBarcodeMode && (
+            <View style={styles.logisticsSection}>
+              <Text style={styles.logisticsTitle}>Delivery Details</Text>
+              <View style={styles.deliveryOptionsRow}>
+                <TouchableOpacity 
+                  style={[styles.deliveryOptionCard, !isOversized && styles.deliveryOptionActive]}
+                  onPress={() => setIsOversized(false)}
+                  activeOpacity={0.7}
+                >
+                  <Icon 
+                    name="motorbike" 
+                    size={32} 
+                    color={!isOversized ? Colors.primary : Colors.textSecondary} 
+                  />
+                  <Text style={[styles.deliveryOptionLabel, !isOversized && { color: Colors.primary }]}>Standard Bike</Text>
+                  <Text style={styles.deliveryOptionSub}>Fits in 40x40x40cm bag</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.deliveryOptionCard, isOversized && styles.deliveryOptionActive]}
-                onPress={() => setIsOversized(true)}
-                activeOpacity={0.7}
-              >
-                <Icon 
-                  name="truck-delivery" 
-                  size={32} 
-                  color={isOversized ? Colors.primary : Colors.textSecondary} 
-                />
-                <Text style={[styles.deliveryOptionLabel, isOversized && { color: Colors.primary }]}>Large Vehicle</Text>
-                <Text style={styles.deliveryOptionSub}>Greater than 40cm</Text>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.deliveryOptionCard, isOversized && styles.deliveryOptionActive]}
+                  onPress={() => setIsOversized(true)}
+                  activeOpacity={0.7}
+                >
+                  <Icon 
+                    name="truck-delivery" 
+                    size={32} 
+                    color={isOversized ? Colors.primary : Colors.textSecondary} 
+                  />
+                  <Text style={[styles.deliveryOptionLabel, isOversized && { color: Colors.primary }]}>Large Vehicle</Text>
+                  <Text style={styles.deliveryOptionSub}>Greater than 40cm</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
         {isEditing && isBarcodeMode && (
@@ -578,6 +666,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           style={styles.submitButton}
         />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <Modal
         visible={categoryModalVisible}
@@ -652,7 +741,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.md,
-    paddingBottom: 40,
+    paddingBottom: 120,
   },
   section: {
     backgroundColor: Colors.white,
@@ -722,6 +811,7 @@ const styles = StyleSheet.create({
   },
   imagePreviewContainer: {
     height: 200,
+    width: '100%',
     borderRadius: borderRadius.lg,
     backgroundColor: Colors.surface,
     borderWidth: 1,
@@ -937,5 +1027,22 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700',
     fontSize: 14,
+  },
+  retakeOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 8,
+  },
+  retakeLabel: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
