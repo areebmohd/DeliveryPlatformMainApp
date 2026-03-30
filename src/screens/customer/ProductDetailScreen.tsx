@@ -158,9 +158,19 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                 return (
                   <View style={styles.specList}>
                     {parsed.map((item: any, idx: number) => (
-                      <View key={idx} style={styles.specItem}>
-                        <Text style={styles.specLabel}>{item.title || 'Info'}</Text>
-                        <Text style={styles.specValue}>{item.text}</Text>
+                      <View 
+                        key={idx} 
+                        style={[
+                          styles.specItem, 
+                          idx === parsed.length - 1 && { borderBottomWidth: 0 }
+                        ]}
+                      >
+                        <View style={styles.specLabelContainer}>
+                          <Text style={styles.specLabel}>{item.title || 'Info'}</Text>
+                        </View>
+                        <View style={styles.specValueContainer}>
+                          <Text style={styles.specValue}>{item.text}</Text>
+                        </View>
                       </View>
                     ))}
                   </View>
@@ -338,26 +348,43 @@ const styles = StyleSheet.create({
   },
   specList: {
     marginTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: Colors.white,
   },
   specItem: {
-    marginBottom: 20,
-    backgroundColor: 'rgba(0,0,0,0.02)',
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#D1D1D6',
+    minHeight: 48,
+  },
+  specLabelContainer: {
+    width: '35%',
+    backgroundColor: '#EDEEF0',
     padding: 12,
-    borderRadius: 8,
+    borderRightWidth: 1,
+    borderRightColor: '#D1D1D6',
+    justifyContent: 'center',
   },
   specLabel: {
-    fontSize: 11,
-    color: '#6c757d',
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: 6,
+    fontSize: 13,
+    color: Colors.text,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  specValueContainer: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
   },
   specValue: {
-    fontSize: 16,
-    color: '#121212',
-    lineHeight: 22,
-    fontWeight: '600',
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    fontWeight: '500',
   },
   bottomContainer: {
     position: 'absolute',

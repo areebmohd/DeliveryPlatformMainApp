@@ -10,6 +10,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -536,28 +537,35 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                 {descriptionPairs.map((pair, index) => (
                   <View key={index} style={styles.pairContainer}>
                     <View style={styles.pairInputs}>
-                      <Input
-                        placeholder="Title (e.g. Material)"
-                        value={pair.title}
-                        onChangeText={(val) => {
-                          const newPairs = [...descriptionPairs];
-                          newPairs[index].title = val;
-                          setDescriptionPairs(newPairs);
-                        }}
-                        containerStyle={{ marginBottom: 8 }}
-                        editable={canEditDetails}
-                      />
-                      <Input
-                        placeholder="Text (e.g. 100% Cotton)"
-                        value={pair.text}
-                        onChangeText={(val) => {
-                          const newPairs = [...descriptionPairs];
-                          newPairs[index].text = val;
-                          setDescriptionPairs(newPairs);
-                        }}
-                        multiline
-                        editable={canEditDetails}
-                      />
+                      <View style={styles.pairTitleCol}>
+                        <TextInput
+                          placeholder="Title"
+                          placeholderTextColor={Colors.textSecondary}
+                          value={pair.title}
+                          onChangeText={(val) => {
+                            const newPairs = [...descriptionPairs];
+                            newPairs[index].title = val;
+                            setDescriptionPairs(newPairs);
+                          }}
+                          style={styles.pairInput}
+                          editable={canEditDetails}
+                        />
+                      </View>
+                      <View style={styles.pairTextCol}>
+                        <TextInput
+                          placeholder="Text"
+                          placeholderTextColor={Colors.textSecondary}
+                          value={pair.text}
+                          onChangeText={(val) => {
+                            const newPairs = [...descriptionPairs];
+                            newPairs[index].text = val;
+                            setDescriptionPairs(newPairs);
+                          }}
+                          multiline
+                          style={[styles.pairInput, { textAlignVertical: 'top' }]}
+                          editable={canEditDetails}
+                        />
+                      </View>
                     </View>
                     {canEditDetails && descriptionPairs.length > 1 && (
                       <TouchableOpacity 
@@ -1001,19 +1009,39 @@ const styles = StyleSheet.create({
   pairContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: 12,
-    borderRadius: borderRadius.lg,
+    backgroundColor: Colors.white,
+    borderRadius: borderRadius.md,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#D1D1D6',
+    overflow: 'hidden',
   },
   pairInputs: {
     flex: 1,
+    flexDirection: 'row',
+  },
+  pairTitleCol: {
+    width: '35%',
+    borderRightWidth: 1,
+    borderRightColor: '#D1D1D6',
+    backgroundColor: '#EDEEF0',
+  },
+  pairTextCol: {
+    flex: 1,
+  },
+  pairInput: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 48,
   },
   removePairBtn: {
-    padding: 8,
-    marginLeft: 8,
+    padding: 10,
+    borderLeftWidth: 1,
+    borderLeftColor: '#D1D1D6',
+    backgroundColor: Colors.white,
   },
   addPairBtn: {
     flexDirection: 'row',
