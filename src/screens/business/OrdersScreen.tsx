@@ -85,10 +85,14 @@ export const OrdersScreen = () => {
 
     if (error) console.error('Error fetching orders:', error);
     else {
-      // Filter based on active tab
+      // Filter based on active tab and only show the specified statuses
+      const allowedActiveStatuses = ['pending_verification', 'accepted', 'preparing', 'ready', 'picked_up'];
+      const allowedPastStatuses = ['delivered', 'cancelled'];
+      
       const visibleOrders = (data || []).filter((o: any) => {
-        const isPast = o.status === 'delivered' || o.status === 'cancelled';
-        return activeTab === 'active' ? !isPast : isPast;
+        const isActive = allowedActiveStatuses.includes(o.status);
+        const isPast = allowedPastStatuses.includes(o.status);
+        return activeTab === 'active' ? isActive : isPast;
       });
       setOrders(visibleOrders);
     }
@@ -191,9 +195,9 @@ export const OrdersScreen = () => {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending_verification': return 'New Order';
-      case 'accepted': return 'Accepted';
-      case 'preparing': return 'Preparing';
+      case 'pending_verification':
+      case 'accepted':
+      case 'preparing':
       case 'ready': return 'Waiting for Pickup';
       case 'picked_up': return 'Picked Up';
       case 'delivered': return 'Delivered';
@@ -302,23 +306,7 @@ export const OrdersScreen = () => {
           </View>
           
           <View style={styles.actionButtons}>
-            {item.status === 'pending_verification' && (
-              <TouchableOpacity 
-                style={[styles.actionBtn, { backgroundColor: Colors.primary }]}
-                onPress={() => updateStatus(item.id, 'accepted')}
-              >
-                <Text style={styles.actionBtnText}>Accept Order</Text>
-              </TouchableOpacity>
-            )}
-            
-            {(item.status === 'accepted' || item.status === 'preparing') && (
-              <TouchableOpacity 
-                style={[styles.actionBtn, { backgroundColor: Colors.success }]}
-                onPress={() => updateStatus(item.id, 'ready')}
-              >
-                <Text style={styles.actionBtnText}>Mark As Ready</Text>
-              </TouchableOpacity>
-            )}
+            {/* Action buttons removed from store account as per user request */}
           </View>
         </View>
       </View>

@@ -369,7 +369,7 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
-  const processOrder = async () => {
+  const finalizeOrderCreation = async (payment_status: string, utr_number: string | null = null) => {
     try {
       setLoading(true);
 
@@ -398,7 +398,6 @@ export const CartScreen = ({ navigation }: any) => {
         finalAddressId = tempAddr.id;
       }
       
-      // 4. Create ONE order for the entire cart
       const storesInCart = [...new Set(items.map(i => i.store_id))];
       const isMultiStore = storesInCart.length > 1;
 
@@ -414,7 +413,8 @@ export const CartScreen = ({ navigation }: any) => {
           platform_fee: platformFee,
           status: 'pending_verification',
           payment_method: paymentMethod,
-          payment_status: 'pending',
+          payment_status: payment_status,
+          utr_number: utr_number,
           transport_type: isLargeVehicle ? 'heavy' : 'standard',
           total_weight_kg: items.reduce((sum, i) => sum + (i.weight_kg * i.quantity), 0),
           has_helper: hasHelper,
@@ -425,7 +425,6 @@ export const CartScreen = ({ navigation }: any) => {
 
       if (orderError) throw orderError;
 
-      // 5. Insert all items for this order
       const orderItems = items.map(item => ({
         order_id: order.id,
         product_id: item.id,
@@ -440,73 +439,53 @@ export const CartScreen = ({ navigation }: any) => {
 
       if (itemsError) throw itemsError;
 
-      // 6. Payment Logic
-      if (paymentMethod === 'pay_online') {
-        if (RNUpiPayment && RNUpiPayment.initializePayment) {
-          // Important: Turn off loading before launching native intent to avoid UI conflicts
-          setLoading(false); 
-          
-          RNUpiPayment.initializePayment(
-            {
-              vpa: 'aashu9105628720-1@okicici', // Standard VPA for testing
-              payeeName: 'Ashu',
-              amount: grandTotal.toFixed(2),
-              transactionNote: `Order #${order.order_number}`,
-              transactionRef: order.id,
-            },
-            (response: any) => {
-              const finalizeOrder = async () => {
-                let finalUtr = (response && response.txnId) ? response.txnId : 'N/A';
-                await supabase
-                  .from('orders')
-                  .update({ 
-                    payment_status: 'verified',
-                    utr_number: finalUtr
-                  })
-                  .eq('id', order.id);
-                
-                clearCart();
-                navigation.navigate('Account', { screen: 'CustomerOrders' });
-                showToast('Order placed successfully!', 'success');
-              };
-              finalizeOrder();
-            },
-            () => {
-              const cancelOrder = async () => {
-                await supabase
-                  .from('orders')
-                  .update({ status: 'cancelled', payment_status: 'failed' })
-                  .eq('id', order.id);
-                
-                showAlert({ title: 'Payment Failed', message: 'Order was not placed. Please try again or choose Pay on Delivery.', type: 'error' });
-              };
-              cancelOrder();
-            }
-          );
-        } else {
-          // Mock success for local testing
-          await supabase
-            .from('orders')
-            .update({ 
-              payment_status: 'verified',
-              utr_number: 'MOCK_UTR_' + Math.floor(Math.random() * 1000000)
-            })
-            .eq('id', order.id);
-            
-          clearCart();
-          navigation.navigate('Account', { screen: 'CustomerOrders' });
-          showToast('Order placed successfully (Mock)!', 'success');
-        }
-      } else {
-        // Pay on Delivery
-        clearCart();
-        navigation.navigate('Account', { screen: 'CustomerOrders' });
-      }
+      clearCart();
+      navigation.navigate('Account', { screen: 'CustomerOrders' });
+      showToast('Order placed successfully!', 'success');
 
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const processOrder = async () => {
+    if (paymentMethod === 'pay_online') {
+      if (RNUpiPayment && RNUpiPayment.initializePayment) {
+        // Important: Turn off loading before launching native intent to avoid UI conflicts
+        setLoading(false); 
+        
+        // Generate a temporary reference since we don't have the order ID yet
+        const tempRef = `TXN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        RNUpiPayment.initializePayment(
+          {
+            vpa: 'aashu9105628720-1@okicici', // Standard VPA for testing
+            payeeName: 'Ashu',
+            amount: grandTotal.toFixed(2),
+            transactionNote: `Delivery Order - ₹${grandTotal.toFixed(2)}`,
+            transactionRef: tempRef,
+          },
+          (response: any) => {
+            const utr = (response && response.txnId) ? response.txnId : 'N/A';
+            finalizeOrderCreation('verified', utr);
+          },
+          () => {
+            showAlert({ 
+              title: 'Payment Failed', 
+              message: 'Order was not placed. Please try again or choose Pay on Delivery.', 
+              type: 'error' 
+            });
+          }
+        );
+      } else {
+        // Mock success for local testing environments where RNUpiPayment is missing
+        finalizeOrderCreation('verified', 'MOCK_UTR_' + Math.floor(Math.random() * 1000000));
+      }
+    } else {
+      // Pay on Delivery - order creation happens immediately after user confirmation
+      finalizeOrderCreation('pending');
     }
   };
 

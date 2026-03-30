@@ -180,7 +180,7 @@ export const AccountScreen = ({ navigation }: any) => {
             onPress={() => navigation.navigate('Favourites')} 
           />
           <OptionItem icon="crown-outline" label="Premium" onPress={() => {}} />
-          <OptionItem icon="cash-refund" label="Refunds" onPress={() => {}} />
+          <OptionItem icon="cash-refund" label="Refunds" onPress={() => navigation.navigate('Refunds')} />
           <OptionItem icon="headset" label="Customer Support" onPress={() => {}} isLast={true} />
         </View>
 
