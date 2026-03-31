@@ -286,9 +286,21 @@ export const OrdersScreen = () => {
               <View style={styles.itemQuantityBox}>
                 <Text style={styles.itemQuantityText}>{product.quantity}x</Text>
               </View>
-              <Text style={styles.itemRowText} numberOfLines={1}>
-                {product.product_name}
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemRowText} numberOfLines={1}>
+                  {product.product_name}
+                </Text>
+                {product.selected_options && Object.keys(product.selected_options).length > 0 && (
+                  <View style={styles.optionsBadgeContainer}>
+                    {Object.entries(product.selected_options).map(([k, v], idx) => (
+                      <View key={idx} style={styles.optionBadge}>
+                        <Text style={styles.optionBadgeLabel}>{k}:</Text>
+                        <Text style={styles.optionBadgeValue}>{v as string}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
               <Text style={styles.itemPriceText}>₹{product.product_price * product.quantity}</Text>
               {isModifiable && (
                 <TouchableOpacity onPress={() => handleRemoveItem(item, product)} style={styles.removeBtn}>
@@ -481,6 +493,33 @@ const styles = StyleSheet.create({
     color: Colors.black,
     letterSpacing: 0.5,
   },
+  optionsBadgeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  optionBadge: {
+    flexDirection: 'row',
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    alignItems: 'center',
+  },
+  optionBadgeLabel: {
+    fontSize: 9,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    marginRight: 2,
+  },
+  optionBadgeValue: {
+    fontSize: 9,
+    color: Colors.text,
+    fontWeight: '800',
+  },
   orderTime: {
     fontSize: 12,
     color: Colors.textSecondary,
@@ -564,8 +603,13 @@ const styles = StyleSheet.create({
   itemRowText: {
     fontSize: 14,
     color: Colors.text,
+    fontWeight: '700',
+  },
+  itemOptionsText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
     fontWeight: '500',
-    flex: 1,
+    marginTop: 1,
   },
   itemPriceText: {
     fontSize: 14,

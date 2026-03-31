@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useCart } from '../../context/CartContext';
+import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../api/supabase';
 
 const { width } = Dimensions.get('window');
@@ -26,6 +27,8 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   const { addItem, updateQuantity, items } = useCart();
   const [isFavourite, setIsFavourite] = React.useState(false);
   const [favLoading, setFavLoading] = React.useState(false);
+  const [selectedOptions, setSelectedOptions] = React.useState<Record<string, string>>({});
+  const { showAlert } = useAlert();
 
   React.useEffect(() => {
     checkFavourite();
@@ -81,7 +84,10 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const cartItem = items.find(item => item.id === product.id);
+  const cartItem = items.find(item => 
+    item.id === product.id && 
+    JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions)
+  );
   const quantity = cartItem ? cartItem.quantity : 0;
 
   return (
@@ -149,6 +155,45 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
           <View style={styles.divider} />
 
+          {product.options && Array.isArray(product.options) && product.options.map((opt: any, idx: number) => (
+            <View key={idx} style={styles.optionGroup}>
+              <View style={styles.optionHeader}>
+                <Text style={styles.optionTitle}>{opt.title}</Text>
+                {!selectedOptions[opt.title] && (
+                  <View style={styles.requiredBadge}>
+                    <Text style={styles.requiredText}>Choose One</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.optionsContainer}>
+                {opt.values.map((val: string, vIdx: number) => {
+                  const isSelected = selectedOptions[opt.title] === val;
+                  return (
+                    <TouchableOpacity 
+                      key={vIdx}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.optionChip,
+                        isSelected && styles.optionChipSelected
+                      ]}
+                      onPress={() => setSelectedOptions({ ...selectedOptions, [opt.title]: val })}
+                    >
+                      {isSelected && (
+                        <Icon name="check-circle" size={16} color={Colors.white} style={{ marginRight: 6 }} />
+                      )}
+                      <Text style={[
+                        styles.optionChipText,
+                        isSelected && styles.optionChipSelectedText
+                      ]}>{val}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+
+          <View style={styles.divider} />
+
           <Text style={styles.sectionTitle}>Description</Text>
           {(() => {
             try {
@@ -190,14 +235,14 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.cartControls}>
             <TouchableOpacity 
               style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product.id, -1)}
+              onPress={() => updateQuantity(product.id, -1, selectedOptions)}
             >
               <Icon name="minus" size={20} color={Colors.white} />
             </TouchableOpacity>
             <Text style={styles.quantityText}>{quantity}</Text>
             <TouchableOpacity 
               style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product.id, 1)}
+              onPress={() => updateQuantity(product.id, 1, selectedOptions)}
             >
               <Icon name="plus" size={20} color={Colors.white} />
             </TouchableOpacity>
@@ -205,7 +250,18 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
         ) : (
           <TouchableOpacity 
             style={styles.addToCartBtn}
-            onPress={() => addItem(product, store)}
+            onPress={() => {
+              // Validate all options are selected
+                const missing = product.options?.find((opt: any) => !selectedOptions[opt.title]);
+                if (missing) {
+                  return showAlert?.({
+                    title: 'Selection Required',
+                    message: `Please select a ${missing.title} for this product.`,
+                    type: 'warning'
+                  });
+                }
+              addItem({ ...product, selectedOptions }, store);
+            }}
           >
             <Icon name="cart-plus" size={20} color={Colors.white} style={{ marginRight: 8 }} />
             <Text style={styles.addToCartText}>Add To Cart</Text>
@@ -391,11 +447,71 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.background,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+  },
+  optionGroup: {
+    marginBottom: Spacing.lg,
+  },
+  optionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  optionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  requiredBadge: {
+    backgroundColor: Colors.error + '10',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  requiredText: {
+    fontSize: 10,
+    color: Colors.error,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  optionChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: '#E5E5EA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 60,
+    justifyContent: 'center',
+  },
+  optionChipSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+    elevation: 3,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  optionChipText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  optionChipSelectedText: {
+    color: Colors.white,
+    fontWeight: '700',
   },
   addToCartBtn: {
     backgroundColor: Colors.primary,

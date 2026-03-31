@@ -197,12 +197,24 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
               <Text style={styles.storeName}>{sName}</Text>
               <View style={styles.itemsList}>
                 {groups[sName].map((oi: any, idx: number) => (
-                  <View key={idx} style={styles.orderItemRow}>
-                    <View style={styles.itemLeft}>
-                      <Text style={styles.itemQty}>{oi.quantity} x</Text>
-                      <Text style={styles.itemName} numberOfLines={1}>{oi.product_name}</Text>
+                  <View key={idx} style={styles.orderItemWrapper}>
+                    <View style={styles.orderItemRow}>
+                      <View style={styles.itemLeft}>
+                        <Text style={styles.itemQty}>{oi.quantity} x</Text>
+                        <Text style={styles.itemName} numberOfLines={1}>{oi.product_name}</Text>
+                      </View>
+                      <Text style={styles.itemPrice}>₹{oi.product_price * oi.quantity}</Text>
                     </View>
-                    <Text style={styles.itemPrice}>₹{oi.product_price * oi.quantity}</Text>
+                    {oi.selected_options && Object.keys(oi.selected_options).length > 0 && (
+                      <View style={styles.optionsBadgeContainer}>
+                        {Object.entries(oi.selected_options).map(([k, v], idx) => (
+                          <View key={idx} style={styles.optionBadge}>
+                            <Text style={styles.optionBadgeLabel}>{k}:</Text>
+                            <Text style={styles.optionBadgeValue}>{v as string}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>
@@ -404,11 +416,13 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     marginBottom: Spacing.md,
   },
+  orderItemWrapper: {
+    marginBottom: 10,
+  },
   orderItemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
   itemLeft: {
     flexDirection: 'row',
@@ -432,6 +446,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Colors.text,
+  },
+  optionsBadgeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  optionBadge: {
+    flexDirection: 'row',
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    alignItems: 'center',
+  },
+  optionBadgeLabel: {
+    fontSize: 9,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    marginRight: 2,
+  },
+  optionBadgeValue: {
+    fontSize: 9,
+    color: Colors.text,
+    fontWeight: '800',
   },
   cardFooter: {
     borderTopWidth: 1,

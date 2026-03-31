@@ -53,6 +53,15 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [category, setCategory] = useState(product?.category || '');
   const [imageUrl, setImageUrl] = useState(product?.image_url || '');
   const [stockQuantity, setStockQuantity] = useState(product?.stock_quantity?.toString() || '0');
+  const [productOptions, setProductOptions] = useState<any[]>(
+    product?.options?.length 
+      ? product.options.map((opt: any) => ({ 
+          ...opt, 
+          values: opt.values?.length ? opt.values : [''], 
+          currentInput: '' 
+        }))
+      : [{ title: '', values: [''], currentInput: '' }]
+  );
   const [inStock, setInStock] = useState(product?.in_stock !== false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -88,6 +97,57 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       setProductType(passedType);
     }
   }, [route.params?.selectedType, route.params?.initialType, route.params?.type, route.params?.mode]);
+
+  // FRESH FETCH STRATEGY: If editing, fetch the latest data from DB to avoid staleness
+  useEffect(() => {
+    const fetchFreshProduct = async () => {
+      if (isEditing && product?.id) {
+        try {
+          const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', product.id)
+            .single();
+          
+          if (error) throw error;
+          if (data) {
+            console.log('Fresh Product Data Loaded:', data.id);
+            setName(data.name || '');
+            setPrice(data.price?.toString() || '');
+            setWeight(data.weight_kg?.toString() || '');
+            setCategory(data.category || '');
+            setImageUrl(data.image_url || '');
+            setStockQuantity(data.stock_quantity?.toString() || '0');
+            setInStock(data.in_stock !== false);
+            setRawImageUrl(data.raw_image_url || null);
+            setIsOversized(data.needs_large_vehicle || false);
+            
+            // Re-initialize lists with fresh data
+            if (data.description) {
+              try {
+                const parsed = JSON.parse(data.description);
+                setDescriptionPairs(Array.isArray(parsed) ? parsed : [{ title: 'Description', text: data.description }]);
+              } catch {
+                setDescriptionPairs([{ title: 'Description', text: data.description }]);
+              }
+            }
+            
+            if (data.options) {
+              setProductOptions(data.options.map((opt: any) => ({
+                ...opt,
+                values: opt.values?.length ? opt.values : [''],
+                currentInput: ''
+              })));
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching fresh product:', err);
+        }
+      }
+    };
+
+    fetchFreshProduct();
+  }, [isEditing, product?.id]);
 
   const getProductTypeDescription = () => {
     switch (productType) {
@@ -297,10 +357,26 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         }
       }
 
-      const productData = {
+      // Final Sanitization before sending
+      const sanitizedDescription = descriptionPairs
+        .filter(p => p.title.trim() || p.text.trim())
+        .map(p => ({ title: p.title.trim(), text: p.text.trim() }));
+      
+      const sanitizedOptions = productOptions
+        .map(o => ({
+          title: o.title.trim(),
+          values: o.values.map((v: string) => v.trim()).filter((v: string) => v !== '')
+        }))
+        .filter(o => o.title !== '' || o.values.length > 0);
+
+      // Ensure completion status (Required for customer app visibility)
+      const isComplete = !!(name.trim() && (parseFloat(price) > 0));
+
+      const productData: any = {
         store_id: storeId,
-        name: name.trim() || `Product ${barcode}`, // Use barcode as name if name is missing
-        description: JSON.stringify(descriptionPairs.filter(p => p.title.trim() || p.text.trim())),
+        name: name.trim() || `Product ${barcode}`,
+        description: JSON.stringify(sanitizedDescription),
+        options: sanitizedOptions,
         price: parseFloat(price) || 0,
         weight_kg: manualWeight,
         category: category.trim(),
@@ -313,26 +389,61 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         width_cm: dimValue,
         height_cm: dimValue,
         needs_large_vehicle: needsLarge,
-        is_info_complete: isPersonalMode, // Admin must complete info for Other types
+        is_info_complete: isComplete, // Mark as complete once saved with details
         raw_image_url: rawImageUrl,
         updated_at: new Date().toISOString(),
       };
 
+      console.log('--- SAVING PRODUCT ---');
+      console.log('ID:', product?.id);
+      console.log('Payload:', JSON.stringify(productData, null, 2));
+
       if (isEditing) {
-        const { error } = await supabase
+        const { data: updatedData, error } = await supabase
           .from('products')
           .update(productData)
-          .eq('id', product.id);
-        if (error) throw error;
+          .eq('id', product.id)
+          .select();
+        
+        if (error) {
+          console.error('SUPABASE UPDATE ERROR:', error);
+          throw error;
+        }
+        
+        if (!updatedData || updatedData.length === 0) {
+          console.error('UPDATE FAILED: No rows were affected. Check RLS or ID matching.');
+          throw new Error('Product could not be updated. Please ensure you have permission to edit this item.');
+        }
+        
+        console.log('UPDATE SUCCESS:', updatedData[0]);
       } else {
+        // INSERT MODE
         const { error } = await supabase
           .from('products')
           .insert(productData);
-        if (error) throw error;
+        
+        if (error) {
+          console.error('SUPABASE INSERT ERROR:', error);
+          throw error;
+        }
+        console.log('INSERT SUCCESS');
       }
-
+      
       showToast(isEditing ? 'Product updated!' : 'Product added!', 'success');
-      navigation.goBack();
+      
+      // Detailed confirmation for the user
+      const descCount = sanitizedDescription.length;
+      const optCount = sanitizedOptions.length;
+      
+      showAlert({
+        title: isEditing ? 'Changes Saved' : 'Product Created',
+        message: `Successfully confirmed on server.\n- ${descCount} description field(s)\n- ${optCount} variant group(s)`,
+        type: 'success',
+        primaryAction: {
+          text: 'OK',
+          onPress: () => navigation.goBack()
+        }
+      });
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
     } finally {
@@ -376,7 +487,11 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Product Type Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Product Type</Text>
@@ -513,39 +628,44 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           {showAllFields && (
             <>
               <Input
-                label="Name"
-                placeholder="e.g. Milk 1L"
+                label="Product Name"
+                placeholder="Product name"
                 value={name}
                 onChangeText={setName}
                 editable={canEditDetails}
+                containerStyle={styles.inputSpacing}
               />
-              <View style={styles.inputContainer}>
+
+              <TouchableOpacity 
+                style={styles.categoryTrigger}
+                onPress={() => canEditDetails && setCategoryModalVisible(true)}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.label}>Category</Text>
-                <TouchableOpacity 
-                  style={[styles.dropdownTrigger, !canEditDetails && styles.disabledInput]}
-                  onPress={() => canEditDetails && setCategoryModalVisible(true)}
-                  disabled={!canEditDetails}
-                >
-                  <Text style={[styles.dropdownValue, !category && { color: Colors.textSecondary }]}>
-                    {category || "Select a category"}
+                <View style={styles.categoryValueRow}>
+                  <Text style={[styles.categoryValueText, !category && { color: Colors.textSecondary }]}>
+                    {category || 'Select a category'}
                   </Text>
                   <Icon name="chevron-down" size={20} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Description</Text>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.descriptionSection}>
+                <View style={styles.specHeader}>
+                  <Text style={styles.label}>Description</Text>
+                </View>
                 {descriptionPairs.map((pair, index) => (
                   <View key={index} style={styles.pairContainer}>
                     <View style={styles.pairInputs}>
                       <View style={styles.pairTitleCol}>
                         <TextInput
-                          placeholder="Title"
+                          placeholder="e.g., Material"
                           placeholderTextColor={Colors.textSecondary}
                           value={pair.title}
                           onChangeText={(val) => {
-                            const newPairs = [...descriptionPairs];
-                            newPairs[index].title = val;
-                            setDescriptionPairs(newPairs);
+                            const next = [...descriptionPairs];
+                            next[index] = { ...next[index], title: val };
+                            setDescriptionPairs(next);
                           }}
                           style={styles.pairInput}
                           editable={canEditDetails}
@@ -553,13 +673,13 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                       </View>
                       <View style={styles.pairTextCol}>
                         <TextInput
-                          placeholder="Text"
+                          placeholder="e.g., Cotton"
                           placeholderTextColor={Colors.textSecondary}
                           value={pair.text}
                           onChangeText={(val) => {
-                            const newPairs = [...descriptionPairs];
-                            newPairs[index].text = val;
-                            setDescriptionPairs(newPairs);
+                            const next = [...descriptionPairs];
+                            next[index] = { ...next[index], text: val };
+                            setDescriptionPairs(next);
                           }}
                           multiline
                           style={[styles.pairInput, { textAlignVertical: 'top' }]}
@@ -586,6 +706,113 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                     <Text style={styles.addPairText}>Add More Details</Text>
                   </TouchableOpacity>
                 )}
+
+                {/* Sub-section: Options */}
+                <View style={styles.optionsSubSection}>
+                  <Text style={styles.label}>Options</Text>
+                  <View style={styles.optionsList}>
+                    {productOptions.map((opt, oIdx) => (
+                      <View key={oIdx} style={styles.optionEntry}>
+                        <View style={styles.optionMainRow}>
+                          <View style={styles.optionTitleField}>
+                            <Text style={styles.tinyLabel}>Title</Text>
+                          <View style={styles.optionInputWithAction}>
+                            <TextInput
+                              placeholder="e.g. Color, Size, etc."
+                              placeholderTextColor={Colors.textSecondary + '70'}
+                              value={opt.title}
+                              onChangeText={(val) => {
+                                setProductOptions(prev => {
+                                  const next = [...prev];
+                                  next[oIdx].title = val;
+                                  return next;
+                                });
+                              }}
+                              style={styles.optionTitleInput}
+                              editable={canEditDetails}
+                            />
+                            {canEditDetails && productOptions.length > 1 && (
+                              <TouchableOpacity 
+                                onPress={() => setProductOptions(prev => prev.filter((_, i) => i !== oIdx))}
+                                style={styles.deleteOptionBtn}
+                              >
+                                <Icon name="trash-can-outline" size={20} color={Colors.error} />
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                        </View>
+                        <View style={styles.optionValuesField}>
+                          <Text style={styles.tinyLabel}>Values</Text>
+                          <View style={styles.valuesList}>
+                            {(opt.values.length > 0 ? opt.values : ['']).map((val: string, vIdx: number) => (
+                              <View key={vIdx} style={[styles.optionInputWithAction, { marginBottom: 8 }]}>
+                                <TextInput
+                                  placeholder="e.g. Red, XL, etc."
+                                  placeholderTextColor={Colors.textSecondary + '70'}
+                                  value={val}
+                                  onChangeText={(newVal) => {
+                                    setProductOptions(prev => {
+                                      const next = [...prev];
+                                      const updatedValues = [...next[oIdx].values];
+                                      updatedValues[vIdx] = newVal;
+                                      next[oIdx] = { ...next[oIdx], values: updatedValues };
+                                      return next;
+                                    });
+                                  }}
+                                  style={styles.optionValueInput}
+                                  editable={canEditDetails}
+                                />
+                                {canEditDetails && (
+                                  vIdx === 0 ? (
+                                    <TouchableOpacity 
+                                      onPress={() => {
+                                        setProductOptions(prev => {
+                                          const next = [...prev];
+                                          const updatedValues = [...next[oIdx].values, ''];
+                                          next[oIdx] = { ...next[oIdx], values: updatedValues };
+                                          return next;
+                                        });
+                                      }}
+                                      style={styles.deleteOptionBtn}
+                                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    >
+                                      <Icon name="plus-circle-outline" size={20} color={Colors.primary} />
+                                    </TouchableOpacity>
+                                  ) : (
+                                    <TouchableOpacity 
+                                      onPress={() => {
+                                        setProductOptions(prev => {
+                                          const next = [...prev];
+                                          const updatedValues = next[oIdx].values.filter((_: any, i: number) => i !== vIdx);
+                                          next[oIdx] = { ...next[oIdx], values: updatedValues };
+                                          return next;
+                                        });
+                                      }}
+                                      style={styles.deleteOptionBtn}
+                                    >
+                                      <Icon name="trash-can-outline" size={20} color={Colors.error} />
+                                    </TouchableOpacity>
+                                  )
+                                )}
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+
+                  {canEditDetails && (
+                    <TouchableOpacity 
+                      style={styles.addPairBtn}
+                      onPress={() => setProductOptions(prev => [...prev, { title: '', values: [''], currentInput: '' }])}
+                    >
+                      <Icon name="plus-circle-outline" size={20} color={Colors.primary} />
+                      <Text style={styles.addPairText}>Add More Variant Groups</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             </>
           )}
@@ -764,6 +991,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
   },
   sectionTitle: {
     fontSize: 14,
@@ -1042,6 +1275,152 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderLeftColor: '#D1D1D6',
     backgroundColor: Colors.white,
+  },
+  specHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  addSmallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  addSmallText: {
+    color: Colors.primary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  optionsSubSection: {
+    marginTop: 20,
+    paddingTop: 0,
+  },
+  optionsSubTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: Spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  inputSpacing: {
+    marginBottom: Spacing.md,
+  },
+  categoryTrigger: {
+    marginBottom: Spacing.md,
+  },
+  categoryValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 12,
+    backgroundColor: Colors.white,
+  },
+  categoryValueText: {
+    fontSize: 14,
+    color: Colors.text,
+    fontWeight: '500',
+  },
+  descriptionSection: {
+    marginTop: 12,
+  },
+  optionsList: {
+    marginTop: Spacing.xs,
+  },
+  optionEntry: {
+    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    marginBottom: 12,
+  },
+  optionMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  optionTitleField: {
+    flex: 1,
+  },
+  deleteOptionBtn: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  tinyLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.primary,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  optionTitleInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '400',
+    color: Colors.text,
+    padding: 8,
+    backgroundColor: Colors.white,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  optionInputWithAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  optionValueInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text,
+    padding: 8,
+    backgroundColor: Colors.white,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    fontWeight: '400',
+  },
+  optionValuesField: {
+    paddingTop: 5,
+  },
+  valuesList: {
+    marginTop: 4,
+  },
+  addValueSmallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+  },
+  addValueSmallText: {
+    color: Colors.primary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  emptyOptionsPlaceholder: {
+    paddingVertical: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#E5E5EA',
+    borderRadius: 16,
+  },
+  emptyOptionsText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.text,
+    marginTop: 10,
+  },
+  emptyOptionsSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 4,
   },
   addPairBtn: {
     flexDirection: 'row',

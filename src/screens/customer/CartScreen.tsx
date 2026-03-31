@@ -430,7 +430,8 @@ export const CartScreen = ({ navigation }: any) => {
         product_id: item.id,
         product_name: item.name,
         product_price: item.price,
-        quantity: item.quantity
+        quantity: item.quantity,
+        selected_options: item.selected_options || {}
       }));
 
       const { error: itemsError } = await supabase
@@ -551,10 +552,21 @@ export const CartScreen = ({ navigation }: any) => {
               <Icon name="storefront-outline" size={20} color={Colors.text} />
               <Text style={styles.storeName}>{storeData.name}</Text>
             </View>
-            {storeData.items.map((item: any) => (
+            <View style={styles.storeItemsList}>
+              {storeData.items.map((item: any) => (
               <View key={item.id} style={styles.itemCard}>
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName}>{item.name}</Text>
+                  {item.selected_options && Object.keys(item.selected_options).length > 0 && (
+                    <View style={styles.optionsBadgeContainer}>
+                      {Object.entries(item.selected_options).map(([k, v], idx) => (
+                        <View key={idx} style={styles.optionBadge}>
+                          <Text style={styles.optionBadgeLabel}>{k}:</Text>
+                          <Text style={styles.optionBadgeValue}>{v as string}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                   <Text style={styles.itemPrice}>₹{item.price}</Text>
                 </View>
                 <View style={styles.quantityControls}>
@@ -567,7 +579,8 @@ export const CartScreen = ({ navigation }: any) => {
                   </TouchableOpacity>
                 </View>
               </View>
-            ))}
+              ))}
+            </View>
           </View>
         ))}
 
@@ -947,6 +960,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: Colors.text,
+  },
+  optionsBadgeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  optionBadge: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    alignItems: 'center',
+  },
+  optionBadgeLabel: {
+    fontSize: 10,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    marginRight: 4,
+  },
+  optionBadgeValue: {
+    fontSize: 10,
+    color: Colors.text,
+    fontWeight: '800',
+  },
+  storeItemsList: {
+    paddingLeft: Spacing.md,
   },
   itemPrice: {
     fontSize: 14,

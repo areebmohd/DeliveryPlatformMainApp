@@ -15,13 +15,14 @@ interface CartItem {
   needs_large_vehicle: boolean;
   store_lat: number;
   store_lng: number;
+  selected_options: Record<string, string>;
 }
 
 interface CartContextType {
   items: CartItem[];
   addItem: (item: any, store: any) => void;
   removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, delta: number) => void;
+  updateQuantity: (productId: string, delta: number, selectedOptions?: Record<string, string>) => void;
   clearCart: () => void;
   totalItems: number;
   subtotal: number;
@@ -74,7 +75,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 height_cm: product.height_cm || 0,
                 needs_large_vehicle: productNeedsLarge,
                 store_lat: storeLat,
-                store_lng: storeLng
+                store_lng: storeLng,
+                selected_options: product.selectedOptions || {}
               }]);
             }
           }
@@ -83,13 +85,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    const selectedOptions = product.selectedOptions || {};
+
     setItems(prev => {
-      // 3. Normal Add Logic (Multi-Store allowed)
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => 
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
+      // 3. Normal Add Logic (Differentiate by ID + Selected Options)
+      const existingIdx = prev.findIndex(item => 
+        item.id === product.id && 
+        JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions)
+      );
+
+      if (existingIdx > -1) {
+        const newItems = [...prev];
+        newItems[existingIdx] = { 
+          ...newItems[existingIdx], 
+          quantity: newItems[existingIdx].quantity + 1 
+        };
+        return newItems;
       }
 
       return [...prev, { 
@@ -105,7 +116,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         height_cm: product.height_cm || 0,
         needs_large_vehicle: productNeedsLarge,
         store_lat: storeLat,
-        store_lng: storeLng
+        store_lng: storeLng,
+        selected_options: selectedOptions
       }];
     });
   };
@@ -114,10 +126,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setItems(prev => prev.filter(item => item.id !== productId));
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const updateQuantity = (productId: string, delta: number, selectedOptions?: Record<string, string>) => {
     setItems(prev => {
       return prev.map(item => {
-        if (item.id === productId) {
+        const isMatch = item.id === productId && 
+          (!selectedOptions || JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions));
+        
+        if (isMatch) {
           const newQty = item.quantity + delta;
           return newQty > 0 ? { ...item, quantity: newQty } : null;
         }
