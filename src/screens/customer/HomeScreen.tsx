@@ -21,6 +21,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StoreCard } from '../../components/StoreCard';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
+import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
 import { supabase } from '../../api/supabase';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
@@ -43,12 +44,21 @@ export const HomeScreen = ({ navigation }: any) => {
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const [homeBanners, setHomeBanners] = useState<any[]>([]);
   const [categoryImages, setCategoryImages] = useState<{[key: string]: string}>({});
+  const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const { addItem, updateQuantity, items, sessionAddress, setSessionAddress } = useCart();
   const { user } = useAuth();
 
   const getQuantity = (productId: string) => {
     const item = items.find(i => i.id === productId);
     return item ? item.quantity : 0;
+  };
+
+  const handleAddToCart = (product: any, store: any) => {
+    if (product.options && product.options.length > 0) {
+      setSelectedProductOptions({ product, store });
+    } else {
+      addItem(product, store);
+    }
   };
 
   useEffect(() => {
@@ -250,7 +260,7 @@ export const HomeScreen = ({ navigation }: any) => {
       <CustomerProductCard 
         product={item}
         onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
-        onAdd={() => addItem(item, item.stores)}
+        onAdd={() => handleAddToCart(item, item.stores)}
         quantity={getQuantity(item.id)}
         onIncrease={() => updateQuantity(item.id, 1)}
         onDecrease={() => updateQuantity(item.id, -1)}
@@ -264,7 +274,7 @@ export const HomeScreen = ({ navigation }: any) => {
       key={item.id}
       product={item}
       onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
-      onAdd={() => addItem(item, item.stores)}
+      onAdd={() => handleAddToCart(item, item.stores)}
       quantity={getQuantity(item.id)}
       onIncrease={() => updateQuantity(item.id, 1)}
       onDecrease={() => updateQuantity(item.id, -1)}
@@ -507,6 +517,13 @@ export const HomeScreen = ({ navigation }: any) => {
           </View>
         </View>
       </Modal>
+
+      <ProductOptionsModal
+        visible={!!selectedProductOptions}
+        product={selectedProductOptions?.product}
+        onClose={() => setSelectedProductOptions(null)}
+        onConfirm={(options) => addItem({ ...selectedProductOptions.product, selectedOptions: options }, selectedProductOptions.store)}
+      />
     </View>
   );
 };

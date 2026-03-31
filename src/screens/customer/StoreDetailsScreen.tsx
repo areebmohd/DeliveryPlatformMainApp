@@ -17,6 +17,7 @@ import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { supabase } from '../../api/supabase';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
+import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
 import { useCart } from '../../context/CartContext';
 
 const formatOpeningHours = (hoursJson: string) => {
@@ -40,6 +41,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'products' | 'info'>('products');
   const [isFavourite, setIsFavourite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
+  const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -114,6 +116,14 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
       console.error('Error fetching products:', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddToCart = (product: any) => {
+    if (product.options && product.options.length > 0) {
+      setSelectedProductOptions(product);
+    } else {
+      addItem(product, store);
     }
   };
 
@@ -267,7 +277,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                   <CustomerProductCard
                     key={product.id}
                     product={product}
-                    onAdd={() => addItem(product, store)}
+                    onAdd={() => handleAddToCart(product)}
                     quantity={getQuantity(product.id)}
                     onIncrease={() => updateQuantity(product.id, 1)}
                     onDecrease={() => updateQuantity(product.id, -1)}
@@ -420,6 +430,13 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
           </View>
         </TouchableOpacity>
       )}
+
+      <ProductOptionsModal
+        visible={!!selectedProductOptions}
+        product={selectedProductOptions}
+        onClose={() => setSelectedProductOptions(null)}
+        onConfirm={(options) => addItem({ ...selectedProductOptions, selectedOptions: options }, store)}
+      />
     </View>
   );
 };

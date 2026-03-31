@@ -201,20 +201,17 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
                     <View style={styles.orderItemRow}>
                       <View style={styles.itemLeft}>
                         <Text style={styles.itemQty}>{oi.quantity} x</Text>
-                        <Text style={styles.itemName} numberOfLines={1}>{oi.product_name}</Text>
+                        <Text style={styles.itemName} numberOfLines={1}>
+                          {oi.product_name}
+                          {oi.selected_options && Object.keys(oi.selected_options).length > 0 && (
+                            <Text style={styles.itemOptionsText}>
+                              {` (${Object.values(oi.selected_options).join(', ')})`}
+                            </Text>
+                          )}
+                        </Text>
                       </View>
                       <Text style={styles.itemPrice}>₹{oi.product_price * oi.quantity}</Text>
                     </View>
-                    {oi.selected_options && Object.keys(oi.selected_options).length > 0 && (
-                      <View style={styles.optionsBadgeContainer}>
-                        {Object.entries(oi.selected_options).map(([k, v], idx) => (
-                          <View key={idx} style={styles.optionBadge}>
-                            <Text style={styles.optionBadgeLabel}>{k}:</Text>
-                            <Text style={styles.optionBadgeValue}>{v as string}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
                   </View>
                 ))}
               </View>
@@ -437,10 +434,15 @@ const styles = StyleSheet.create({
     width: 25,
   },
   itemName: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  itemOptionsText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   itemPrice: {
     fontSize: 14,

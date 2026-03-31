@@ -556,17 +556,14 @@ export const CartScreen = ({ navigation }: any) => {
               {storeData.items.map((item: any) => (
               <View key={item.id} style={styles.itemCard}>
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  {item.selected_options && Object.keys(item.selected_options).length > 0 && (
-                    <View style={styles.optionsBadgeContainer}>
-                      {Object.entries(item.selected_options).map(([k, v], idx) => (
-                        <View key={idx} style={styles.optionBadge}>
-                          <Text style={styles.optionBadgeLabel}>{k}:</Text>
-                          <Text style={styles.optionBadgeValue}>{v as string}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
+                  <Text style={styles.itemName}>
+                    {item.name}
+                    {item.selected_options && Object.keys(item.selected_options).length > 0 && (
+                      <Text style={styles.itemOptionsText}>
+                        {` (${Object.values(item.selected_options).join(', ')})`}
+                      </Text>
+                    )}
+                  </Text>
                   <Text style={styles.itemPrice}>₹{item.price}</Text>
                 </View>
                 <View style={styles.quantityControls}>
@@ -958,8 +955,14 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Colors.text,
+    flex: 1,
+  },
+  itemOptionsText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   optionsBadgeContainer: {
     flexDirection: 'row',

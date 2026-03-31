@@ -256,8 +256,12 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                 if (missing) {
                   return showAlert?.({
                     title: 'Selection Required',
-                    message: `Please select a ${missing.title} for this product.`,
-                    type: 'warning'
+                    message: `Please select your preferred ${missing.title} for this product before adding it to the cart.`,
+                    type: 'info',
+                    primaryAction: {
+                      text: 'Select Now',
+                      onPress: () => {} // Just close
+                    }
                   });
                 }
               addItem({ ...product, selectedOptions }, store);
@@ -401,9 +405,11 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 22,
     fontWeight: '500',
+    marginBottom: Spacing.lg,
   },
   specList: {
     marginTop: Spacing.sm,
+    marginBottom: Spacing.xl,
     borderWidth: 1,
     borderColor: '#D1D1D6',
     borderRadius: borderRadius.md,
