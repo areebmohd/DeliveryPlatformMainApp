@@ -22,6 +22,7 @@ import { CategoryScreen } from '../screens/customer/CategoryScreen';
 import { NotificationsScreen } from '../screens/customer/NotificationsScreen';
 import { MapSelectionScreen } from '../screens/customer/MapSelectionScreen';
 import { RefundsScreen } from '../screens/customer/RefundsScreen';
+import { CustomerOffersScreen } from '../screens/customer/CustomerOffersScreen';
 
 const Tab = createBottomTabNavigator();
 const HomeStackNav = createNativeStackNavigator();
@@ -108,6 +109,7 @@ export const CustomerNavigator = () => {
           tabBarIcon: ({ focused, size }) => {
             let iconName = '';
             if (route.name === 'Home') iconName = 'home-variant';
+            else if (route.name === 'Offers') iconName = 'tag';
             else if (route.name === 'Cart') iconName = 'cart';
             else if (route.name === 'Account') iconName = 'account';
 
@@ -123,6 +125,7 @@ export const CustomerNavigator = () => {
       }}
     >
       <Tab.Screen name="Home" component={HomeStack} />
+      <Tab.Screen name="Offers" component={CustomerOffersScreen} />
       <Tab.Screen name="Cart" component={CartStack} />
       <Tab.Screen name="Account" component={AccountStack} />
     </Tab.Navigator>

@@ -18,6 +18,31 @@ interface CartItem {
   selected_options: Record<string, string>;
 }
 
+export type OfferType = 'free_cash' | 'discount' | 'free_delivery' | 'free_product' | 'cheap_product' | 'combo';
+
+export interface OfferCondition {
+  min_price?: number;
+  product_ids?: string[];
+  max_distance?: number;
+  applicable_orders?: number | 'all';
+  start_time?: string;
+  end_time?: string;
+}
+
+export interface Offer {
+  id: string;
+  store_id: string;
+  type: OfferType;
+  status: 'active' | 'inactive';
+  amount: number;
+  conditions: OfferCondition;
+  reward_data?: {
+    product_ids?: string[];
+  };
+  created_at: string;
+  store_name?: string; // Opt-in for display
+}
+
 interface CartContextType {
   items: CartItem[];
   addItem: (item: any, store: any) => void;
@@ -28,6 +53,8 @@ interface CartContextType {
   subtotal: number;
   sessionAddress: any | null;
   setSessionAddress: (address: any | null) => void;
+  appliedOffer: Offer | null;
+  setAppliedOffer: (offer: Offer | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -35,6 +62,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [sessionAddress, setSessionAddress] = useState<any | null>(null);
+  const [appliedOffer, setAppliedOffer] = useState<Offer | null>(null);
   const { showAlert } = useAlert();
 
   const addItem = (product: any, store: any) => {
@@ -141,7 +169,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const clearCart = () => setItems([]);
+  const clearCart = () => {
+    setItems([]);
+    setAppliedOffer(null);
+  };
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -156,7 +187,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       totalItems,
       subtotal,
       sessionAddress,
-      setSessionAddress
+      setSessionAddress,
+      appliedOffer,
+      setAppliedOffer
     }}>
       {children}
     </CartContext.Provider>

@@ -27,9 +27,10 @@ import Geolocation from '@react-native-community/geolocation';
 const { width, height } = Dimensions.get('window');
 
 export const CartScreen = ({ navigation }: any) => {
-  const { items, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress } = useCart();
+  const { items, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress, appliedOffer, setAppliedOffer } = useCart();
   const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
@@ -40,7 +41,7 @@ export const CartScreen = ({ navigation }: any) => {
     content: ''
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<'pay_online' | 'pay_on_delivery'>('pay_online');
+  const [paymentMethod, setPaymentMethod] = useState<'pay_online' | 'pay_on_delivery'>('pay_on_delivery');
   const [isOnlinePaymentEnabled, setIsOnlinePaymentEnabled] = useState(true);
   const insets = useSafeAreaInsets();
 
@@ -49,6 +50,11 @@ export const CartScreen = ({ navigation }: any) => {
   const [distance, setDistance] = useState(0);
   const [isLargeVehicle, setIsLargeVehicle] = useState(false);
   const [hasHelper, setHasHelper] = useState(false);
+  const [isOffersModalVisible, setIsOffersModalVisible] = useState(false);
+  const [activeStoreOffers, setActiveStoreOffers] = useState<any[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [isAutoApplyInProgress, setIsAutoApplyInProgress] = useState(false);
+  const [lastAutoAppliedId, setLastAutoAppliedId] = useState<string | null>(null);
 
   // Distance helper
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -61,6 +67,185 @@ export const CartScreen = ({ navigation }: any) => {
       Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
+  };
+
+  const getCoordinates = (location: any) => {
+    if (!location) return null;
+    if (typeof location === 'string') {
+      const match = location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/i);
+      if (match) return { lng: parseFloat(match[1]), lat: parseFloat(match[2]) };
+    }
+    if (typeof location === 'object' && location.coordinates) {
+      return { lng: location.coordinates[0], lat: location.coordinates[1] };
+    }
+    return null;
+  };
+
+  const fetchStoreOffers = async (storeId: string) => {
+    try {
+      setModalLoading(true);
+      setSelectedStoreId(storeId);
+      setIsOffersModalVisible(true);
+
+      const { data, error } = await supabase
+        .from('offers')
+        .select(`
+          *,
+          store:stores(name, location)
+        `)
+        .eq('store_id', storeId)
+        .eq('status', 'active');
+
+      if (error) throw error;
+      
+      const formatted = (data || []).map((o: any) => ({
+        ...o,
+        store_name: o.store?.name,
+        store_location: o.store?.location
+      }));
+      
+      setActiveStoreOffers(formatted);
+    } catch (e) {
+      console.error('Error fetching store offers:', e);
+      showAlert({ title: 'Error', message: 'Unable to load offers for this store.', type: 'error' });
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const checkOfferConditions = (offer: any) => {
+    const { conditions } = offer;
+    const errors: string[] = [];
+
+    if (conditions.min_price && subtotal < conditions.min_price) {
+      errors.push(`Minimum order ₹${conditions.min_price} required.`);
+    }
+
+    if (conditions.max_distance) {
+      const userCoords = getCoordinates(profile?.location);
+      const storeCoords = getCoordinates(offer.store_location);
+      if (userCoords && storeCoords) {
+        const dist = calculateDistance(userCoords.lat, userCoords.lng, storeCoords.lat, storeCoords.lng);
+        if (dist > conditions.max_distance) {
+          errors.push(`Max distance: ${conditions.max_distance}km. (Your: ${dist.toFixed(1)}km)`);
+        }
+      }
+    }
+
+    if (conditions.start_time && conditions.end_time) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      
+      const parseTimeToMinutes = (timeStr: string) => {
+        const [time, period] = timeStr.split(' ');
+        let [hours, minutes] = time.split(':').map(Number);
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        return hours * 60 + minutes;
+      };
+
+      const startMin = parseTimeToMinutes(conditions.start_time);
+      const endMin = parseTimeToMinutes(conditions.end_time);
+
+      if (currentMinutes < startMin || currentMinutes > endMin) {
+        errors.push(`Offer valid only between ${conditions.start_time} and ${conditions.end_time}.`);
+      }
+    }
+
+    if (conditions.product_ids && conditions.product_ids.length > 0) {
+      const hasProduct = items.some(item => conditions.product_ids.includes(item.id));
+      if (!hasProduct) {
+        errors.push("Missing required products for this offer.");
+      }
+    }
+
+    return errors;
+  };
+
+  const autoApplyBestOffer = async () => {
+    if (appliedOffer || isAutoApplyInProgress || items.length === 0) return;
+
+    try {
+      setIsAutoApplyInProgress(true);
+      const storesInCart = [...new Set(items.map(i => i.store_id))];
+      if (storesInCart.length === 0) return;
+
+      const storeId = storesInCart[0] as string;
+
+      const { data, error } = await supabase
+        .from('offers')
+        .select(`
+          *,
+          store:stores(name, location)
+        `)
+        .eq('store_id', storeId)
+        .eq('status', 'active');
+
+      if (error || !data) return;
+
+      const validOffers = data.filter(o => {
+        const formattedOffer = {
+          ...o,
+          store_location: o.store?.location
+        };
+        return checkOfferConditions(formattedOffer).length === 0;
+      });
+
+      if (validOffers.length === 0) return;
+
+      // Ranking: Cash > Discount > Delivery
+      const rankedOffers = validOffers.sort((a, b) => {
+        const typeOrder = { free_cash: 0, discount: 1, free_delivery: 2 };
+        const aOrder = (typeOrder as any)[a.type] ?? 99;
+        const bOrder = (typeOrder as any)[b.type] ?? 99;
+        
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return (b.amount || 0) - (a.amount || 0); // Higher amount first
+      });
+
+      const bestOffer = rankedOffers[0];
+      const bestOfferFormatted = {
+        ...bestOffer,
+        store_name: bestOffer.store?.name,
+        store_location: bestOffer.store?.location
+      };
+
+      // Don't auto-apply the same one we just removed or already applied
+      if (bestOffer.id !== lastAutoAppliedId) {
+        setAppliedOffer(bestOfferFormatted);
+        setLastAutoAppliedId(bestOffer.id);
+        showToast(`Offer "${bestOffer.type.replace('_', ' ')}" applied automatically!`, 'success');
+      }
+    } catch (e) {
+      console.error('Auto-apply error:', e);
+    } finally {
+      setIsAutoApplyInProgress(false);
+    }
+  };
+
+  const handleApplyOffer = (offer: any) => {
+    const errors = checkOfferConditions(offer);
+    if (errors.length > 0) {
+      showAlert({
+        title: 'Conditions Not Met',
+        message: errors.join('\n'),
+        type: 'warning'
+      });
+      return;
+    }
+
+    setAppliedOffer(offer);
+    setIsOffersModalVisible(false);
+    showToast('Offer applied successfully!', 'success');
+  };
+
+  const getOfferColor = (type: string) => {
+    switch(type) {
+      case 'free_delivery': return '#E0F2FE';
+      case 'free_cash': return '#DCFCE7';
+      case 'discount': return '#FEF3C7';
+      default: return '#F3F4F6';
+    }
   };
 
   useEffect(() => {
@@ -79,6 +264,15 @@ export const CartScreen = ({ navigation }: any) => {
     return unsubscribe;
   }, [user, navigation]);
 
+  useEffect(() => {
+    if (items.length > 0 && !appliedOffer) {
+      const timer = setTimeout(() => {
+        autoApplyBestOffer();
+      }, 1000); // 1s delay to avoid flickering
+      return () => clearTimeout(timer);
+    }
+  }, [items.length, subtotal, appliedOffer]);
+
   const fetchPaymentSettings = async () => {
     try {
       const { data, error } = await supabase
@@ -90,7 +284,6 @@ export const CartScreen = ({ navigation }: any) => {
       if (error) throw error;
       setIsOnlinePaymentEnabled(data.value);
       
-      // If online payment is disabled, switch to COD
       if (!data.value) {
         setPaymentMethod('pay_on_delivery');
       }
@@ -118,56 +311,6 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleUseCurrentLocation = () => {
-    Geolocation.getCurrentPosition(
-      (position) => {
-        setTempLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-        setAddressModalVisible(false);
-        handleSaveLiveLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      (error) => {
-        showAlert({ title: 'Location Error', message: 'Could not get your current location. Please check permissions.', type: 'error' });
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
-  };
-
-  const handleSaveLiveLocation = async (loc: any) => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('addresses')
-        .insert({
-          user_id: user?.id,
-          address_line: 'Current Location', 
-          city: 'Gurugram', 
-          pincode: '122001',
-          location: `SRID=4326;POINT(${loc.longitude} ${loc.latitude})`,
-          label: `${profile?.full_name || 'My'}'s Live Location`,
-          receiver_name: profile?.full_name || '',
-          receiver_phone: profile?.phone || '',
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      setSelectedAddress(data);
-      setSessionAddress(null);
-      fetchAddresses();
-    } catch (e: any) {
-      showAlert({ title: 'Error', message: e.message, type: 'error' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const calculateFees = async () => {
     if (items.length === 0 || (!selectedAddress && !sessionAddress)) {
       setDistance(0);
@@ -176,7 +319,6 @@ export const CartScreen = ({ navigation }: any) => {
     }
 
     try {
-      // 1. Check for vehicle type (already consistent in context)
       let totalWeight = 0;
       let oversized = false;
       let forcedLarge = false;
@@ -195,7 +337,6 @@ export const CartScreen = ({ navigation }: any) => {
       setIsLargeVehicle(needsLarge);
       if (!needsLarge) setHasHelper(false);
 
-      // 2. Multi-Store Route Calculation
       const userLocObj = sessionAddress || selectedAddress;
       if (!userLocObj) return;
       
@@ -207,12 +348,10 @@ export const CartScreen = ({ navigation }: any) => {
       const uLng = parseFloat(userMatch[1]);
       const uLat = parseFloat(userMatch[2]);
 
-      // Unique stores in cart
       const uniqueStores = Array.from(new Map(items.map(item => [item.store_id, { lat: item.store_lat, lng: item.store_lng }])).entries());
       
       if (uniqueStores.length === 0) return;
 
-      // Calculate distance to user for each store
       const storesWithUserDist = uniqueStores.map(([id, loc]) => ({
         id,
         lat: loc.lat,
@@ -220,17 +359,13 @@ export const CartScreen = ({ navigation }: any) => {
         distToUser: calculateDistance(loc.lat, loc.lng, uLat, uLng)
       }));
 
-      // Sort by distance to user descending (farthest first)
       storesWithUserDist.sort((a, b) => b.distToUser - a.distToUser);
 
-      // Route: Farthest -> ... -> Closest -> User
       let totalRouteDist = 0;
       for (let i = 0; i < storesWithUserDist.length; i++) {
         if (i === storesWithUserDist.length - 1) {
-          // Last store to User
           totalRouteDist += storesWithUserDist[i].distToUser;
         } else {
-          // Store i to Store i+1
           const distBetween = calculateDistance(
             storesWithUserDist[i].lat, storesWithUserDist[i].lng,
             storesWithUserDist[i+1].lat, storesWithUserDist[i+1].lng
@@ -248,18 +383,77 @@ export const CartScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     calculateFees();
+    validateAppliedOffer();
   }, [items, selectedAddress, sessionAddress]);
 
-  // Fees Logic
+  const validateAppliedOffer = () => {
+    if (!appliedOffer) return;
+
+    if (appliedOffer.conditions.min_price && subtotal < appliedOffer.conditions.min_price) {
+      setAppliedOffer(null);
+      showAlert({
+        title: 'Offer Removed',
+        message: `Your subtotal fell below ₹${appliedOffer.conditions.min_price}. The offer has been removed.`,
+        type: 'info'
+      });
+      return;
+    }
+
+    const hasStoreItems = items.some(item => item.store_id === appliedOffer.store_id);
+    if (!hasStoreItems) {
+      setAppliedOffer(null);
+      return;
+    }
+
+    if (appliedOffer.conditions.product_ids && appliedOffer.conditions.product_ids.length > 0) {
+      const hasProduct = items.some(item => appliedOffer.conditions.product_ids?.includes(item.id));
+      if (!hasProduct) {
+        setAppliedOffer(null);
+        showAlert({
+          title: 'Offer Removed',
+          message: 'The required products for this offer are no longer in your cart.',
+          type: 'info'
+        });
+      }
+    }
+  };
+
   const platformFee = subtotal >= 500 ? (subtotal * 0.01) : 5;
-  const deliveryFee = items.length === 0 ? 0 : (
+  const baseDeliveryFee = items.length === 0 ? 0 : (
     isLargeVehicle 
       ? 300 + (distance * 30)
       : 20 + (distance * 5)
   );
   const helperFee = hasHelper ? 400 : 0;
-  const grandTotal = subtotal + deliveryFee + platformFee + helperFee;
-  const totalWeight = items.reduce((sum, i) => sum + (i.weight_kg * i.quantity), 0);
+  const baseGrandTotal = subtotal + baseDeliveryFee + platformFee + helperFee;
+
+  let deliveryFee = baseDeliveryFee;
+  let offerDiscount = 0;
+  if (appliedOffer) {
+    if (appliedOffer.type === 'free_delivery') {
+      deliveryFee = 0;
+      offerDiscount = baseDeliveryFee;
+    } else if (appliedOffer.type === 'free_cash') {
+      offerDiscount = appliedOffer.amount;
+    } else if (appliedOffer.type === 'discount') {
+      offerDiscount = (subtotal * appliedOffer.amount) / 100;
+    } else if (appliedOffer.type === 'cheap_product') {
+      const eligibleItems = items.filter(item => appliedOffer.conditions.product_ids?.includes(item.id));
+      const eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      offerDiscount = (eligibleSubtotal * appliedOffer.amount) / 100;
+    } else if (appliedOffer.type === 'combo') {
+      const comboItems = items.filter(item => appliedOffer.reward_data?.product_ids?.includes(item.id));
+      const comboSubtotal = comboItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      offerDiscount = Math.max(0, comboSubtotal - appliedOffer.amount);
+    } else if (appliedOffer.type === 'free_product') {
+      const freeItem = items.find(item => appliedOffer.reward_data?.product_ids?.includes(item.id));
+      if (freeItem) {
+        offerDiscount = freeItem.price * 1;
+      }
+    }
+  }
+
+  const grandTotal = Math.max(0, baseGrandTotal - offerDiscount);
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
@@ -268,7 +462,6 @@ export const CartScreen = ({ navigation }: any) => {
       setLoading(true);
       const storesInCart = [...new Set(items.map(i => i.store_id))];
       
-      // 1. Check all stores in cart for availability
       for (const stId of storesInCart) {
         const { data: store, error: storeError } = await supabase
           .from('stores_view')
@@ -348,10 +541,8 @@ export const CartScreen = ({ navigation }: any) => {
       }
 
       if (paymentMethod === 'pay_online') {
-        // Direct online flow: no alert, just start processing
         processOrder();
       } else {
-        // Pay on Delivery still gets a confirmation alert
         showAlert({
           title: 'Place Order?',
           message: `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
@@ -375,7 +566,6 @@ export const CartScreen = ({ navigation }: any) => {
 
       let finalAddressId = selectedAddress?.id;
 
-      // If use session address, save it temporarily to get an ID
       if (sessionAddress) {
         const { data: tempAddr, error: addrError } = await supabase
           .from('addresses')
@@ -389,7 +579,7 @@ export const CartScreen = ({ navigation }: any) => {
             receiver_name: sessionAddress.receiver_name,
             receiver_phone: sessionAddress.receiver_phone,
             label: sessionAddress.label,
-            is_deleted: true // Hide it from the user's address book
+            is_deleted: true
           })
           .select()
           .single();
@@ -405,7 +595,7 @@ export const CartScreen = ({ navigation }: any) => {
         .from('orders')
         .insert({
           customer_id: user?.id,
-          store_id: isMultiStore ? null : storesInCart[0], // null for multi-store
+          store_id: isMultiStore ? null : storesInCart[0],
           delivery_address_id: finalAddressId,
           subtotal: subtotal,
           total_amount: grandTotal, 
@@ -454,15 +644,12 @@ export const CartScreen = ({ navigation }: any) => {
   const processOrder = async () => {
     if (paymentMethod === 'pay_online') {
       if (RNUpiPayment && RNUpiPayment.initializePayment) {
-        // Important: Turn off loading before launching native intent to avoid UI conflicts
         setLoading(false); 
-        
-        // Generate a temporary reference since we don't have the order ID yet
         const tempRef = `TXN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
         RNUpiPayment.initializePayment(
           {
-            vpa: 'aashu9105628720-1@okicici', // Standard VPA for testing
+            vpa: 'aashu9105628720-1@okicici',
             payeeName: 'Ashu',
             amount: grandTotal.toFixed(2),
             transactionNote: `Delivery Order - ₹${grandTotal.toFixed(2)}`,
@@ -481,16 +668,13 @@ export const CartScreen = ({ navigation }: any) => {
           }
         );
       } else {
-        // Mock success for local testing environments where RNUpiPayment is missing
         finalizeOrderCreation('verified', 'MOCK_UTR_' + Math.floor(Math.random() * 1000000));
       }
     } else {
-      // Pay on Delivery - order creation happens immediately after user confirmation
       finalizeOrderCreation('pending');
     }
   };
 
-  // Group items by store
   const groupedItems = items.reduce((acc: any, item: any) => {
     if (!acc[item.store_id]) {
       acc[item.store_id] = {
@@ -529,7 +713,6 @@ export const CartScreen = ({ navigation }: any) => {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 150 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Your Cart</Text>
           <TouchableOpacity 
@@ -545,12 +728,20 @@ export const CartScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        {/* Store-wise Items */}
         {Object.entries(groupedItems).map(([storeId, storeData]: [string, any]) => (
           <View key={storeId} style={styles.storeSection}>
             <View style={styles.storeHeader}>
-              <Icon name="storefront-outline" size={20} color={Colors.text} />
-              <Text style={styles.storeName}>{storeData.name}</Text>
+              <View style={styles.storeHeaderLeft}>
+                <Icon name="storefront-outline" size={20} color={Colors.text} />
+                <Text style={styles.storeName} numberOfLines={1}>{storeData.name}</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.viewOffersBtn}
+                onPress={() => fetchStoreOffers(storeId)}
+              >
+                <Icon name="tag-outline" size={14} color={Colors.white} />
+                <Text style={styles.viewOffersText}>View Offers</Text>
+              </TouchableOpacity>
             </View>
             <View style={styles.storeItemsList}>
               {storeData.items.map((item: any) => (
@@ -581,7 +772,6 @@ export const CartScreen = ({ navigation }: any) => {
           </View>
         ))}
 
-        {/* Address Selection */}
         <View style={styles.addressSection}>
           <Text style={styles.sectionTitle}>Delivery Address</Text>
           <TouchableOpacity 
@@ -607,7 +797,6 @@ export const CartScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        {/* Bill Details */}
         <View style={styles.billDetails}>
           <Text style={styles.sectionTitle}>Bill Details</Text>
           
@@ -681,11 +870,32 @@ export const CartScreen = ({ navigation }: any) => {
 
           <View style={[styles.billRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Grand Total</Text>
-            <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              {offerDiscount > 0 && (
+                <Text style={styles.originalTotalText}>₹{baseGrandTotal.toFixed(2)}</Text>
+              )}
+              <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
+            </View>
           </View>
+
+          {appliedOffer && (
+            <View style={styles.appliedOfferRow}>
+              <View style={styles.offerTag}>
+                <View style={styles.iconContainer}>
+                  <Icon name="tag-heart" size={20} color="#059669" />
+                </View>
+                <View style={styles.offerTagContent}>
+                  <Text style={styles.appliedOfferName}>{appliedOffer.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} Applied</Text>
+                  <Text style={styles.savingsText}>You saved ₹{offerDiscount.toFixed(2)}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setAppliedOffer(null)} style={styles.removeOfferBtn}>
+                <Text style={styles.removeOfferText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        {/* Payment Method Selection */}
         <View style={styles.paymentSection}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
           <View style={styles.paymentOptions}>
@@ -752,7 +962,6 @@ export const CartScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
-      {/* Place Order Box - Fixed Footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.lg }]}>
         <View style={styles.checkoutInfo}>
           <Text style={styles.checkoutTotal}>₹{grandTotal.toFixed(2)}</Text>
@@ -771,7 +980,6 @@ export const CartScreen = ({ navigation }: any) => {
         />
       </View>
 
-      {/* Address Selection Modal */}
       <Modal
         visible={addressModalVisible}
         animationType="slide"
@@ -823,7 +1031,7 @@ export const CartScreen = ({ navigation }: any) => {
                   style={[styles.savedAddressItem, !sessionAddress && selectedAddress?.id === addr.id && styles.selectedAddressItem]}
                   onPress={() => {
                     setSelectedAddress(addr);
-                    setSessionAddress(null); // Clear session address if saved one is selected
+                    setSessionAddress(null);
                     setAddressModalVisible(false);
                   }}
                 >
@@ -846,9 +1054,89 @@ export const CartScreen = ({ navigation }: any) => {
         </View>
       </Modal>
 
-      {/* Receiver Info Modal removed as user info is used directly */}
+      <Modal
+        visible={isOffersModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsOffersModalVisible(false)}
+      >
+        <View style={styles.offerModalOverlay}>
+          <View style={styles.offerModalContainer}>
+            <View style={styles.offerModalHeader}>
+              <Text style={styles.offerModalTitle}>Store Offers</Text>
+              <TouchableOpacity onPress={() => setIsOffersModalVisible(false)}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
 
-      {/* Fee Info Modal */}
+            {modalLoading ? (
+              <View style={styles.offerModalContentCenter}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+              </View>
+            ) : activeStoreOffers.length === 0 ? (
+              <View style={styles.offerModalContentCenter}>
+                <Icon name="tag-off-outline" size={48} color={Colors.border} />
+                <Text style={styles.emptyModalText}>No active offers from this store.</Text>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.offerModalList}>
+                {activeStoreOffers.map((offer) => {
+                  const isApplied = appliedOffer?.id === offer.id;
+                  const conditionErrors = isApplied ? [] : checkOfferConditions(offer);
+                  const canApply = conditionErrors.length === 0;
+
+                  return (
+                    <View key={offer.id} style={[styles.modalOfferCard, isApplied && styles.activeModalOfferCard]}>
+                      <View style={styles.modalOfferHeader}>
+                        <View style={[styles.offerBadge, { backgroundColor: getOfferColor(offer.type) }]}>
+                          <Text style={styles.offerBadgeText}>{offer.type.replace('_', ' ').toUpperCase()}</Text>
+                        </View>
+                        {isApplied && (
+                          <View style={styles.appliedBadge}>
+                            <Icon name="check-circle" size={14} color="#059669" />
+                            <Text style={styles.appliedBadgeText}>ACTIVE</Text>
+                          </View>
+                        )}
+                      </View>
+                      
+                      <Text style={styles.offerModalOfferTitle}>
+                        {offer.type === 'free_delivery' ? 'Free Delivery on this order!' :
+                         offer.type === 'free_cash' ? `Flat ₹${offer.amount} OFF` :
+                         offer.type === 'discount' ? `${offer.amount}% Discount` :
+                         offer.type === 'cheap_product' ? `${offer.amount}% OFF on select items` :
+                         offer.type === 'combo' ? `Combo reward of ₹${offer.amount}` :
+                         `Free Gift Available!`}
+                      </Text>
+
+                      {offer.conditions.min_price && (
+                        <Text style={styles.offerModalConditionText}>• Min. Order: ₹{offer.conditions.min_price}</Text>
+                      )}
+
+                      <TouchableOpacity 
+                        style={[
+                          styles.offerModalApplyBtn, 
+                          isApplied && styles.offerModalAppliedBtn,
+                          !canApply && !isApplied && styles.offerModalDisabledBtn
+                        ]}
+                        onPress={() => !isApplied && handleApplyOffer(offer)}
+                      >
+                        <Text style={[
+                          styles.offerModalApplyText, 
+                          isApplied && styles.offerModalAppliedText,
+                          !canApply && !isApplied && styles.offerModalDisabledText
+                        ]}>
+                          {isApplied ? 'Applied' : canApply ? 'Apply Deal' : 'Conditions Not Met'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={infoModal.visible}
         transparent={true}
@@ -1400,5 +1688,202 @@ const styles = StyleSheet.create({
     color: '#C53030',
     fontWeight: '700',
     lineHeight: 18,
+  },
+  removeOfferText: {
+    fontSize: 12,
+    color: '#DC2626', 
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  appliedOfferRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#10B981',
+    width: '100%',
+    overflow: 'hidden',
+  },
+  offerTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 4,
+  },
+  removeOfferBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 8,
+    flexShrink: 0,
+  },
+  offerTagContent: {
+    flex: 1,
+    marginRight: 4,
+  },
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#D1FAE5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  appliedOfferName: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#064E3B',
+  },
+  savingsText: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  originalTotalText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textDecorationLine: 'line-through',
+    fontWeight: '600',
+    marginBottom: -4,
+  },
+  storeHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  viewOffersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  viewOffersText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.white,
+  },
+  offerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  offerModalContainer: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    minHeight: height * 0.5,
+    maxHeight: height * 0.8,
+    padding: 24,
+  },
+  offerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  offerModalTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: Colors.text,
+  },
+  offerModalContentCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyModalText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  offerModalList: {
+    paddingBottom: 20,
+  },
+  modalOfferCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  activeModalOfferCard: {
+    borderColor: '#10B981',
+    backgroundColor: '#ECFDF5',
+  },
+  modalOfferHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  offerBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  offerBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.white,
+  },
+  appliedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  appliedBadgeText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#059669',
+  },
+  offerModalOfferTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  offerModalConditionText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  offerModalApplyBtn: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  offerModalAppliedBtn: {
+    backgroundColor: '#10B981',
+  },
+  offerModalDisabledBtn: {
+    backgroundColor: '#E2E8F0',
+  },
+  offerModalApplyText: {
+    color: Colors.white,
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  offerModalAppliedText: {
+    color: Colors.white,
+  },
+  offerModalDisabledText: {
+    color: Colors.textSecondary,
   },
 });

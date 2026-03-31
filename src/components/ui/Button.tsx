@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   ViewStyle,
   TextStyle,
+  StyleProp,
 } from 'react-native';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 
@@ -16,8 +17,8 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'outline';
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
 }
