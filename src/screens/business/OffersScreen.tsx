@@ -43,6 +43,9 @@ interface Offer {
   status: 'active' | 'inactive';
   amount: number;
   conditions: OfferCondition;
+  reward_data?: {
+    product_ids?: string[];
+  };
   created_at: string;
 }
 
@@ -70,7 +73,9 @@ export const OffersScreen = ({ navigation }: any) => {
   const [activePicker, setActivePicker] = useState<'start' | 'end' | null>(null);
 
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [selectedRewardProducts, setSelectedRewardProducts] = useState<string[]>([]);
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
+  const [productModalMode, setProductModalMode] = useState<'condition' | 'reward'>('condition');
   const [showProductModal, setShowProductModal] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
@@ -151,15 +156,27 @@ export const OffersScreen = ({ navigation }: any) => {
     }
 
     setSelectedProducts(offer.conditions.product_ids || []);
+    setSelectedRewardProducts(offer.reward_data?.product_ids || []);
     setSelectedType(offer.type);
     setShowFormModal(true);
   };
 
   const selectType = (type: OfferType) => {
-    if (type !== 'free_cash') {
+    // Check if store already has an offer of this type
+    const existingOffer = offers.find(o => o.type === type);
+    if (existingOffer) {
+      showAlert({
+        title: 'Limit Reached',
+        message: `You already have a ${type.replace('_', ' ')} offer. Please delete the existing one before creating a new one of same type.`,
+        type: 'warning'
+      });
+      return;
+    }
+
+    if (type !== 'free_cash' && type !== 'discount' && type !== 'free_delivery' && type !== 'free_product' && type !== 'cheap_product' && type !== 'combo') {
       showAlert({
         title: 'Coming Soon',
-        message: `${type.replace('_', ' ')} offers will be available in the next update!`,
+        message: `${(type as string).replace('_', ' ')} offers will be available in the next update!`,
         type: 'info'
       });
       return;
@@ -179,6 +196,7 @@ export const OffersScreen = ({ navigation }: any) => {
     setStartTimeActive(false);
     setEndTimeActive(false);
     setSelectedProducts([]);
+    setSelectedRewardProducts([]);
     setSelectedType(null);
     setEditingOffer(null);
     setShowFormModal(false);
@@ -186,8 +204,13 @@ export const OffersScreen = ({ navigation }: any) => {
   };
 
   const saveOffer = async () => {
-    if (!amount || isNaN(Number(amount))) {
-      showToast('Please enter a valid amount', 'error');
+    if ((selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo') && selectedRewardProducts.length === 0) {
+      showToast('Please select at least one product', 'error');
+      return;
+    }
+
+    if (selectedType !== 'free_delivery' && selectedType !== 'free_product' && (!amount || isNaN(Number(amount)))) {
+      showToast('Please enter a valid value', 'error');
       return;
     }
 
@@ -196,7 +219,7 @@ export const OffersScreen = ({ navigation }: any) => {
       const offerData = {
         store_id: store.id,
         type: selectedType,
-        amount: Number(amount),
+        amount: (selectedType === 'free_delivery' || selectedType === 'free_product') ? 0 : Number(amount),
         conditions: {
           min_price: minPrice ? Number(minPrice) : null,
           product_ids: selectedProducts.length > 0 ? selectedProducts : null,
@@ -205,6 +228,7 @@ export const OffersScreen = ({ navigation }: any) => {
           start_time: startTimeActive ? startTime : null,
           end_time: endTimeActive ? endTime : null,
         },
+        reward_data: (selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo') ? { product_ids: selectedRewardProducts } : {},
         status: editingOffer ? editingOffer.status : 'active'
       };
 
@@ -287,19 +311,88 @@ export const OffersScreen = ({ navigation }: any) => {
   const renderOfferCard = (offer: Offer) => (
     <View key={offer.id} style={styles.offerCard}>
       <View style={styles.offerHeader}>
-        <View style={styles.offerTypeBadge}>
-          <Icon name="cash" size={16} color={Colors.primary} />
-          <Text style={styles.offerTypeText}>Free Cash</Text>
+        <View style={[
+          styles.offerTypeBadge, 
+          offer.type === 'free_cash' && { backgroundColor: '#D1FAE5' },
+          offer.type === 'discount' && { backgroundColor: '#DBEAFE' },
+          offer.type === 'free_delivery' && { backgroundColor: '#FEF3C7' },
+          offer.type === 'free_product' && { backgroundColor: '#FCE7F3' },
+          offer.type === 'cheap_product' && { backgroundColor: '#EDE9FE' },
+          offer.type === 'combo' && { backgroundColor: '#FFEDD5' }
+        ]}>
+          <Icon 
+            name={
+              offer.type === 'free_cash' ? 'cash' : 
+              offer.type === 'discount' ? 'percent' : 
+              offer.type === 'free_delivery' ? 'truck-delivery' : 
+              offer.type === 'free_product' ? 'gift' : 
+              offer.type === 'cheap_product' ? 'tag-outline' : 
+              offer.type === 'combo' ? 'layers-outline' : 'cash'
+            } 
+            size={16} 
+            color={
+              offer.type === 'free_cash' ? '#10B981' : 
+              offer.type === 'discount' ? '#2563EB' : 
+              offer.type === 'free_delivery' ? '#D97706' : 
+              offer.type === 'free_product' ? '#DB2777' : 
+              offer.type === 'cheap_product' ? '#7C3AED' : 
+              offer.type === 'combo' ? '#EA580C' : Colors.primary
+            } 
+          />
+          <Text style={[
+            styles.offerTypeText, 
+            offer.type === 'free_cash' && { color: '#10B981' },
+            offer.type === 'discount' && { color: '#2563EB' },
+            offer.type === 'free_delivery' && { color: '#D97706' },
+            offer.type === 'free_product' && { color: '#DB2777' },
+            offer.type === 'cheap_product' && { color: '#7C3AED' },
+            offer.type === 'combo' && { color: '#EA580C' }
+          ]}>
+            {
+              offer.type === 'free_cash' ? 'Free Cash' : 
+              offer.type === 'discount' ? 'Instant Discount' : 
+              offer.type === 'free_delivery' ? 'Free Delivery' : 
+              offer.type === 'free_product' ? 'Free Product' : 
+              offer.type === 'cheap_product' ? 'Cheap Products' : 
+              offer.type === 'combo' ? 'Combo Offer' : 'Free Cash'
+            }
+          </Text>
         </View>
         <View style={styles.offerActions}>
           <TouchableOpacity onPress={() => handleEditOffer(offer)} style={styles.editBtn}>
-            <Icon name="pencil-outline" size={20} color={Colors.primary} />
+            <Icon 
+              name="pencil-outline" 
+              size={20} 
+              color={
+                offer.type === 'free_cash' ? '#10B981' : 
+                offer.type === 'discount' ? '#2563EB' : 
+                offer.type === 'free_delivery' ? '#D97706' : 
+                offer.type === 'free_product' ? '#DB2777' : 
+                offer.type === 'cheap_product' ? '#7C3AED' : 
+                offer.type === 'combo' ? '#EA580C' : Colors.primary
+              } 
+            />
           </TouchableOpacity>
           <Switch 
             value={offer.status === 'active'} 
             onValueChange={() => toggleOfferStatus(offer.id, offer.status)}
-            trackColor={{ false: '#767577', true: Colors.primaryLight }}
-            thumbColor={offer.status === 'active' ? Colors.primary : '#f4f3f4'}
+            trackColor={{ 
+              false: '#767577', 
+              true: offer.type === 'free_cash' ? '#A7F3D0' : 
+                    offer.type === 'discount' ? '#93C5FD' : 
+                    offer.type === 'free_delivery' ? '#FCD34D' : 
+                    offer.type === 'free_product' ? '#F9A8D4' : 
+                    offer.type === 'cheap_product' ? '#C4B5FD' : 
+                    offer.type === 'combo' ? '#FDBA74' : Colors.primaryLight 
+            }}
+            thumbColor={offer.status === 'active' 
+              ? (offer.type === 'free_cash' ? '#10B981' : 
+                 offer.type === 'discount' ? '#2563EB' : 
+                 offer.type === 'free_delivery' ? '#D97706' : 
+                 offer.type === 'free_product' ? '#DB2777' : 
+                 offer.type === 'cheap_product' ? '#7C3AED' : 
+                 offer.type === 'combo' ? '#EA580C' : Colors.primary) 
+              : '#f4f3f4'}
           />
           <TouchableOpacity onPress={() => deleteOffer(offer.id)} style={styles.deleteBtn}>
             <Icon name="delete-outline" size={20} color={Colors.error} />
@@ -307,7 +400,23 @@ export const OffersScreen = ({ navigation }: any) => {
         </View>
       </View>
       
-      <Text style={styles.offerAmount}>₹{offer.amount} Cashback</Text>
+      <Text style={styles.offerAmount}>
+        {
+          offer.type === 'discount' ? `${offer.amount}% Off` : 
+          offer.type === 'free_delivery' ? 'Free Delivery' : 
+          offer.type === 'free_product' ? (
+            offer.reward_data?.product_ids?.length === 1 
+              ? `Free ${storeProducts.find(p => p.id === offer.reward_data?.product_ids?.[0])?.name || 'Item'}`
+              : `${offer.reward_data?.product_ids?.length || 0} Free Items`
+          ) : offer.type === 'cheap_product' ? (
+            offer.reward_data?.product_ids?.length === 1 
+              ? `${offer.amount}% Off on ${storeProducts.find(p => p.id === offer.reward_data?.product_ids?.[0])?.name || 'Item'}`
+              : `${offer.amount}% Off on ${offer.reward_data?.product_ids?.length || 0} Items`
+          ) : offer.type === 'combo' ? (
+            `Combo at ₹${offer.amount}`
+          ) : `₹${offer.amount} Cashback`
+        }
+      </Text>
       
       <View style={styles.conditionsList}>
         {offer.conditions.min_price && (
@@ -390,19 +499,19 @@ export const OffersScreen = ({ navigation }: any) => {
                 { id: 'discount', icon: 'percent', label: 'Discounts', color: '#3B82F6' },
                 { id: 'free_delivery', icon: 'truck-delivery', label: 'Free Delivery', color: '#F59E0B' },
                 { id: 'free_product', icon: 'gift', label: 'Free Products', color: '#EC4899' },
-                { id: 'cheap_product', icon: 'tag-outline', label: 'Cheap Product', color: '#8B5CF6' },
+                { id: 'cheap_product', icon: 'tag-outline', label: 'Cheap Products', color: '#8B5CF6' },
                 { id: 'combo', icon: 'layers-outline', label: 'Combo Offer', color: '#F97316' },
               ].map(type => (
                 <TouchableOpacity 
                   key={type.id} 
-                  style={[styles.typeItem, type.id !== 'free_cash' && { opacity: 0.6 }]} 
+                  style={[styles.typeItem, (type.id !== 'free_cash' && type.id !== 'discount' && type.id !== 'free_delivery' && type.id !== 'free_product' && type.id !== 'cheap_product' && type.id !== 'combo') && { opacity: 0.6 }]} 
                   onPress={() => selectType(type.id as OfferType)}
                 >
                   <View style={[styles.typeIconBg, { backgroundColor: type.color + '20' }]}>
                     <Icon name={type.icon} size={28} color={type.color} />
                   </View>
                   <Text style={styles.typeLabel}>{type.label}</Text>
-                  {type.id !== 'free_cash' && <Text style={styles.soonText}>Soon</Text>}
+                  {(type.id !== 'free_cash' && type.id !== 'discount' && type.id !== 'free_delivery' && type.id !== 'free_product' && type.id !== 'cheap_product' && type.id !== 'combo') && <Text style={styles.soonText}>Soon</Text>}
                 </TouchableOpacity>
               ))}
             </View>
@@ -417,7 +526,12 @@ export const OffersScreen = ({ navigation }: any) => {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalTitle}>Free Cash Offer</Text>
+                  <Text style={styles.modalTitle}>
+                    {selectedType === 'discount' ? 'Instant Discount' : 
+                     selectedType === 'free_delivery' ? 'Free Delivery Offer' : 
+                     selectedType === 'free_product' ? 'Free Product Offer' : 
+                     selectedType === 'cheap_product' ? 'Cheap Product Offer' : 'Free Cash Offer'}
+                  </Text>
                   <Text style={styles.modalSubtitle}>Configure rewards & conditions</Text>
                 </View>
                 <TouchableOpacity onPress={resetForm}>
@@ -425,15 +539,55 @@ export const OffersScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Cashback Amount (₹)</Text>
-                <Input 
-                  placeholder="e.g. 50" 
-                  value={amount} 
-                  onChangeText={setAmount} 
-                  keyboardType="numeric"
-                />
-              </View>
+              {selectedType !== 'free_delivery' && selectedType !== 'free_product' && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>
+                    {selectedType === 'discount' || selectedType === 'cheap_product' ? 'Discount Percentage (%)' : 
+                     selectedType === 'combo' ? 'Combo Price (₹)' : 'Cashback Amount (₹)'}
+                  </Text>
+                  <Input 
+                    placeholder={selectedType === 'discount' || selectedType === 'cheap_product' ? "e.g. 10" : 
+                                 selectedType === 'combo' ? "e.g. 299" : "e.g. 50"} 
+                    value={amount} 
+                    onChangeText={setAmount} 
+                    keyboardType="numeric"
+                  />
+                </View>
+              )}
+
+              {(selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo') && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>
+                    {selectedType === 'free_product' ? 'Select Free Products' : 
+                     selectedType === 'combo' ? 'Select Combo Items' : 'Select Discounted Products'}
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.productSelectBtn}
+                    onPress={() => {
+                      setProductModalMode('reward');
+                      setShowProductModal(true);
+                    }}
+                  >
+                    <View style={styles.productSelectLeft}>
+                      <Icon 
+                        name={selectedType === 'free_product' ? "gift-outline" : 
+                              selectedType === 'combo' ? "layers-outline" : "tag-outline"} 
+                        size={20} 
+                        color={selectedType === 'free_product' ? "#DB2777" : 
+                               selectedType === 'combo' ? "#EA580C" : "#7C3AED"} 
+                      />
+                      <Text style={[styles.productSelectText, { color: selectedType === 'free_product' ? "#DB2777" : 
+                                                                    selectedType === 'combo' ? "#EA580C" : "#7C3AED" }]}>
+                        {selectedRewardProducts.length > 0 
+                          ? `${selectedRewardProducts.length} Products Selected` 
+                          : selectedType === 'free_product' ? 'Tap to select free products' : 
+                            selectedType === 'combo' ? 'Tap to select combo items' : 'Tap to select discounted products'}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-right" size={20} color={Colors.border} />
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <Text style={styles.sectionTitle}>Conditions (Optional)</Text>
               
@@ -531,7 +685,10 @@ export const OffersScreen = ({ navigation }: any) => {
                 </View>
                 <TouchableOpacity 
                   style={styles.productSelectBtn}
-                  onPress={() => setShowProductModal(true)}
+                  onPress={() => {
+                    setProductModalMode('condition');
+                    setShowProductModal(true);
+                  }}
                 >
                   <View style={styles.productSelectLeft}>
                     <Icon name="format-list-bulleted" size={20} color={Colors.textSecondary} />
@@ -580,8 +737,12 @@ export const OffersScreen = ({ navigation }: any) => {
           <View style={styles.productModalContent}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Select Products</Text>
-                <Text style={styles.modalSubtitle}>{selectedProducts.length} selected</Text>
+                <Text style={styles.modalTitle}>
+                  {productModalMode === 'reward' ? 'Select Free Products' : 'Select Target Products'}
+                </Text>
+                <Text style={styles.modalSubtitle}>
+                  {productModalMode === 'reward' ? selectedRewardProducts.length : selectedProducts.length} selected
+                </Text>
               </View>
               <TouchableOpacity onPress={() => setShowProductModal(false)}>
                 <Icon name="close" size={24} color={Colors.text} />
@@ -590,14 +751,22 @@ export const OffersScreen = ({ navigation }: any) => {
 
             <ScrollView showsVerticalScrollIndicator={false} style={styles.productList}>
               {storeProducts.map((product) => {
-                const isSelected = selectedProducts.includes(product.id);
+                const isSelected = productModalMode === 'reward' 
+                  ? selectedRewardProducts.includes(product.id)
+                  : selectedProducts.includes(product.id);
+
                 return (
                   <TouchableOpacity 
                     key={product.id} 
                     style={styles.productItem}
                     onPress={() => {
-                      if (isSelected) setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                      else setSelectedProducts([...selectedProducts, product.id]);
+                      if (productModalMode === 'reward') {
+                        if (isSelected) setSelectedRewardProducts(selectedRewardProducts.filter(id => id !== product.id));
+                        else setSelectedRewardProducts([...selectedRewardProducts, product.id]);
+                      } else {
+                        if (isSelected) setSelectedProducts(selectedProducts.filter(id => id !== product.id));
+                        else setSelectedProducts([...selectedProducts, product.id]);
+                      }
                     }}
                   >
                     <Text style={[styles.productName, isSelected && styles.productNameActive]}>
@@ -616,7 +785,10 @@ export const OffersScreen = ({ navigation }: any) => {
             <View style={styles.productModalActions}>
               <TouchableOpacity 
                 style={styles.clearBtn} 
-                onPress={() => setSelectedProducts([])}
+                onPress={() => {
+                  if (productModalMode === 'reward') setSelectedRewardProducts([]);
+                  else setSelectedProducts([]);
+                }}
               >
                 <Text style={styles.clearBtnText}>Clear All</Text>
               </TouchableOpacity>
@@ -641,7 +813,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.md,
-    paddingBottom: 100,
+    paddingBottom: 40,
   },
   headerTitleRow: {
     flexDirection: 'row',
@@ -650,7 +822,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     color: Colors.text,
   },
