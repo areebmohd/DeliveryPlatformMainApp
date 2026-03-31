@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View } from 'react-native';
 import { StoreScreen } from '../screens/business/StoreScreen';
 import { OrdersScreen } from '../screens/business/OrdersScreen';
+import { OffersScreen } from '../screens/business/OffersScreen';
 import { BusinessAccountScreen } from '../screens/business/BusinessAccountScreen';
 import { ManageProductsScreen } from '../screens/business/ManageProductsScreen';
 import { Colors } from '../theme/colors';
@@ -85,6 +86,7 @@ export const BusinessNavigator = () => {
           tabBarIcon: ({ focused, size }) => {
             let iconName = '';
             if (route.name === 'Store') iconName = 'storefront';
+            else if (route.name === 'Offers') iconName = 'tag';
             else if (route.name === 'Orders') iconName = 'clipboard-text-clock';
             else if (route.name === 'Account') iconName = 'account';
 
@@ -100,6 +102,7 @@ export const BusinessNavigator = () => {
       }}
     >
       <Tab.Screen name="Store" component={StoreStack} />
+      <Tab.Screen name="Offers" component={OffersScreen} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
       <Tab.Screen name="Account" component={AccountStack} />
     </Tab.Navigator>

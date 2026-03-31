@@ -1,0 +1,1034 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  Dimensions,
+  TextInput,
+  Switch,
+  Platform,
+  StatusBar,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors, Spacing, borderRadius, Typography } from '../../theme/colors';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../api/supabase';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { TimePicker } from '../../components/ui/TimePicker';
+import { useAlert } from '../../context/AlertContext';
+
+const { width, height } = Dimensions.get('window');
+
+type OfferType = 'free_cash' | 'discount' | 'free_delivery' | 'free_product' | 'cheap_product' | 'combo';
+
+interface OfferCondition {
+  min_price: number | null;
+  product_ids: string[];
+  start_time: string | null;
+  end_time: string | null;
+  max_distance: number | null;
+  applicable_orders: 'all' | 'first' | 'nth';
+}
+
+interface Offer {
+  id: string;
+  store_id: string;
+  type: OfferType;
+  status: 'active' | 'inactive';
+  amount: number;
+  conditions: OfferCondition;
+  created_at: string;
+}
+
+export const OffersScreen = ({ navigation }: any) => {
+  const { user } = useAuth();
+  const { showAlert, showToast } = useAlert();
+  const insets = useSafeAreaInsets();
+  
+  const [loading, setLoading] = useState(true);
+  const [store, setStore] = useState<any>(null);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [selectedType, setSelectedType] = useState<OfferType | null>(null);
+  
+  // Form State
+  const [amount, setAmount] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxDistance, setMaxDistance] = useState('');
+  const [orderCount, setOrderCount] = useState('');
+  const [startTime, setStartTime] = useState('09:00 AM');
+  const [endTime, setEndTime] = useState('10:00 PM');
+  const [startTimeActive, setStartTimeActive] = useState(false);
+  const [endTimeActive, setEndTimeActive] = useState(false);
+  const [activePicker, setActivePicker] = useState<'start' | 'end' | null>(null);
+
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [storeProducts, setStoreProducts] = useState<any[]>([]);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
+
+  useEffect(() => {
+    fetchStoreAndOffers();
+  }, [user?.id]);
+
+  const fetchStoreAndOffers = async () => {
+    try {
+      setLoading(true);
+      // Fetch Store
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .select('id')
+        .eq('owner_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (storeError) throw storeError;
+      setStore(storeData);
+
+      if (storeData) {
+        // Fetch Offers
+        const { data: offersData, error: offersError } = await supabase
+          .from('offers')
+          .select('*')
+          .eq('store_id', storeData.id)
+          .order('created_at', { ascending: false });
+        
+        if (offersError) {
+            console.log('Offers table might not exist yet');
+            setOffers([]);
+        } else {
+            setOffers(offersData || []);
+        }
+
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('id, name')
+          .eq('store_id', storeData.id)
+          .eq('is_deleted', false);
+        
+        setStoreProducts(productsData || []);
+      }
+    } catch (e) {
+      console.error('Error fetching data:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddOffer = () => {
+    setEditingOffer(null);
+    setShowTypeModal(true);
+  };
+
+  const handleEditOffer = (offer: Offer) => {
+    setEditingOffer(offer);
+    setAmount(offer.amount.toString());
+    setMinPrice(offer.conditions.min_price?.toString() || '');
+    setMaxDistance(offer.conditions.max_distance?.toString() || '');
+    setOrderCount(offer.conditions.applicable_orders === 'all' ? '' : offer.conditions.applicable_orders.toString());
+    
+    if (offer.conditions.start_time) {
+      setStartTime(offer.conditions.start_time);
+      setStartTimeActive(true);
+    } else {
+      setStartTimeActive(false);
+    }
+    
+    if (offer.conditions.end_time) {
+      setEndTime(offer.conditions.end_time);
+      setEndTimeActive(true);
+    } else {
+      setEndTimeActive(false);
+    }
+
+    setSelectedProducts(offer.conditions.product_ids || []);
+    setSelectedType(offer.type);
+    setShowFormModal(true);
+  };
+
+  const selectType = (type: OfferType) => {
+    if (type !== 'free_cash') {
+      showAlert({
+        title: 'Coming Soon',
+        message: `${type.replace('_', ' ')} offers will be available in the next update!`,
+        type: 'info'
+      });
+      return;
+    }
+    setSelectedType(type);
+    setShowTypeModal(false);
+    setShowFormModal(true);
+  };
+
+  const resetForm = () => {
+    setAmount('');
+    setMinPrice('');
+    setMaxDistance('');
+    setOrderCount('');
+    setStartTime('09:00 AM');
+    setEndTime('10:00 PM');
+    setStartTimeActive(false);
+    setEndTimeActive(false);
+    setSelectedProducts([]);
+    setSelectedType(null);
+    setEditingOffer(null);
+    setShowFormModal(false);
+    setShowProductModal(false);
+  };
+
+  const saveOffer = async () => {
+    if (!amount || isNaN(Number(amount))) {
+      showToast('Please enter a valid amount', 'error');
+      return;
+    }
+
+    try {
+      setFormLoading(true);
+      const offerData = {
+        store_id: store.id,
+        type: selectedType,
+        amount: Number(amount),
+        conditions: {
+          min_price: minPrice ? Number(minPrice) : null,
+          product_ids: selectedProducts.length > 0 ? selectedProducts : null,
+          max_distance: maxDistance ? Number(maxDistance) : null,
+          applicable_orders: orderCount ? Number(orderCount) : 'all',
+          start_time: startTimeActive ? startTime : null,
+          end_time: endTimeActive ? endTime : null,
+        },
+        status: editingOffer ? editingOffer.status : 'active'
+      };
+
+      if (editingOffer) {
+        const { data, error } = await supabase
+          .from('offers')
+          .update(offerData)
+          .eq('id', editingOffer.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        setOffers(offers.map(o => o.id === data.id ? data : o));
+        showToast('Offer updated successfully!', 'success');
+      } else {
+        const { data, error } = await supabase
+          .from('offers')
+          .insert(offerData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        setOffers([data, ...offers]);
+        showToast('Offer created successfully!', 'success');
+      }
+      
+      resetForm();
+    } catch (e: any) {
+      console.error('Error saving offer:', e);
+      showAlert({
+        title: 'Error',
+        message: e.message || 'Could not save offer. Please check if the table exists.',
+        type: 'error'
+      });
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const toggleOfferStatus = async (id: string, currentStatus: string) => {
+    try {
+      const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      const { error } = await supabase
+        .from('offers')
+        .update({ status: nextStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setOffers(offers.map(o => o.id === id ? { ...o, status: nextStatus as any } : o));
+      showToast(`Offer ${nextStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
+    } catch (e) {
+      console.error('Error toggling status:', e);
+    }
+  };
+
+  const deleteOffer = (id: string) => {
+    showAlert({
+      title: 'Delete Offer',
+      message: 'Are you sure you want to delete this offer?',
+      type: 'warning',
+      showCancel: true,
+      primaryAction: {
+        text: 'Delete',
+        onPress: async () => {
+          try {
+            const { error } = await supabase.from('offers').delete().eq('id', id);
+            if (error) throw error;
+            setOffers(offers.filter(o => o.id !== id));
+            showToast('Offer deleted', 'success');
+          } catch (e) {
+            console.error('Error deleting offer:', e);
+          }
+        },
+        variant: 'destructive'
+      }
+    });
+  };
+
+  const renderOfferCard = (offer: Offer) => (
+    <View key={offer.id} style={styles.offerCard}>
+      <View style={styles.offerHeader}>
+        <View style={styles.offerTypeBadge}>
+          <Icon name="cash" size={16} color={Colors.primary} />
+          <Text style={styles.offerTypeText}>Free Cash</Text>
+        </View>
+        <View style={styles.offerActions}>
+          <TouchableOpacity onPress={() => handleEditOffer(offer)} style={styles.editBtn}>
+            <Icon name="pencil-outline" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+          <Switch 
+            value={offer.status === 'active'} 
+            onValueChange={() => toggleOfferStatus(offer.id, offer.status)}
+            trackColor={{ false: '#767577', true: Colors.primaryLight }}
+            thumbColor={offer.status === 'active' ? Colors.primary : '#f4f3f4'}
+          />
+          <TouchableOpacity onPress={() => deleteOffer(offer.id)} style={styles.deleteBtn}>
+            <Icon name="delete-outline" size={20} color={Colors.error} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      
+      <Text style={styles.offerAmount}>₹{offer.amount} Cashback</Text>
+      
+      <View style={styles.conditionsList}>
+        {offer.conditions.min_price && (
+          <View style={styles.conditionItem}>
+            <Icon name="currency-inr" size={14} color={Colors.textSecondary} />
+            <Text style={styles.conditionText}>Min. Order: ₹{offer.conditions.min_price}</Text>
+          </View>
+        )}
+        {offer.conditions.max_distance && (
+          <View style={styles.conditionItem}>
+            <Icon name="map-marker-distance" size={14} color={Colors.textSecondary} />
+            <Text style={styles.conditionText}>Radius: {offer.conditions.max_distance} km</Text>
+          </View>
+        )}
+        <View style={styles.conditionItem}>
+          <Icon name="account-group-outline" size={14} color={Colors.textSecondary} />
+          <Text style={styles.conditionText}>
+            Up to {offer.conditions.applicable_orders} Orders
+          </Text>
+        </View>
+        {(offer.conditions.start_time || offer.conditions.end_time) && (
+          <View style={styles.conditionItem}>
+            <Icon name="clock-outline" size={14} color={Colors.textSecondary} />
+            <Text style={styles.conditionText}>
+              {offer.conditions.start_time && offer.conditions.end_time 
+                ? `${offer.conditions.start_time} - ${offer.conditions.end_time}`
+                : offer.conditions.start_time ? `From ${offer.conditions.start_time}` : `Until ${offer.conditions.end_time}`
+              }
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+      <View style={{ height: insets.top, backgroundColor: Colors.background }} />
+      
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>Offers</Text>
+          <TouchableOpacity style={styles.addBtn} onPress={handleAddOffer}>
+            <Icon name="plus" size={24} color={Colors.white} />
+            <Text style={styles.addBtnText}>Create</Text>
+          </TouchableOpacity>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 50 }} />
+        ) : offers.length > 0 ? (
+          offers.map(renderOfferCard)
+        ) : (
+          <View style={styles.emptyState}>
+            <Icon name="tag-off-outline" size={80} color={Colors.border} />
+            <Text style={styles.emptyTitle}>No Active Offers</Text>
+            <Text style={styles.emptySubtitle}>
+              Boost your sales by creating exciting offers for your customers.
+            </Text>
+            <Button title="Get Started" onPress={handleAddOffer} style={styles.getStartedBtn} />
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Offer Type Selection Modal */}
+      <Modal visible={showTypeModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.typeModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Offer Type</Text>
+              <TouchableOpacity onPress={() => setShowTypeModal(false)}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.typeGrid}>
+              {[
+                { id: 'free_cash', icon: 'cash', label: 'Free Cash', color: '#10B981' },
+                { id: 'discount', icon: 'percent', label: 'Discounts', color: '#3B82F6' },
+                { id: 'free_delivery', icon: 'truck-delivery', label: 'Free Delivery', color: '#F59E0B' },
+                { id: 'free_product', icon: 'gift', label: 'Free Products', color: '#EC4899' },
+                { id: 'cheap_product', icon: 'tag-outline', label: 'Cheap Product', color: '#8B5CF6' },
+                { id: 'combo', icon: 'layers-outline', label: 'Combo Offer', color: '#F97316' },
+              ].map(type => (
+                <TouchableOpacity 
+                  key={type.id} 
+                  style={[styles.typeItem, type.id !== 'free_cash' && { opacity: 0.6 }]} 
+                  onPress={() => selectType(type.id as OfferType)}
+                >
+                  <View style={[styles.typeIconBg, { backgroundColor: type.color + '20' }]}>
+                    <Icon name={type.icon} size={28} color={type.color} />
+                  </View>
+                  <Text style={styles.typeLabel}>{type.label}</Text>
+                  {type.id !== 'free_cash' && <Text style={styles.soonText}>Soon</Text>}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Free Cash Form Modal */}
+      <Modal visible={showFormModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.formModalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>Free Cash Offer</Text>
+                  <Text style={styles.modalSubtitle}>Configure rewards & conditions</Text>
+                </View>
+                <TouchableOpacity onPress={resetForm}>
+                  <Icon name="close" size={24} color={Colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Cashback Amount (₹)</Text>
+                <Input 
+                  placeholder="e.g. 50" 
+                  value={amount} 
+                  onChangeText={setAmount} 
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <Text style={styles.sectionTitle}>Conditions (Optional)</Text>
+              
+              <View style={styles.conditionCard}>
+                <View style={styles.condHeader}>
+                  <Icon name="clock-outline" size={20} color={Colors.primary} />
+                  <Text style={styles.condLabel}>Time Condition</Text>
+                </View>
+                <View style={styles.inputRow}>
+                  <TouchableOpacity 
+                    style={{ flex: 1, marginRight: 8 }}
+                    onPress={() => setActivePicker('start')}
+                  >
+                    <Text style={styles.inputSubLabel}>Start Time</Text>
+                    <View style={[styles.timePickerTrigger, startTimeActive && styles.activeTimeTrigger]}>
+                      <Text style={[styles.timePickerText, startTimeActive && styles.activeTimePickerText]}>
+                        {startTimeActive ? startTime : 'Set Start'}
+                      </Text>
+                      <TouchableOpacity onPress={() => setStartTimeActive(!startTimeActive)}>
+                        <Icon 
+                          name={startTimeActive ? "close-circle" : "plus-circle-outline"} 
+                          size={20} 
+                          color={startTimeActive ? Colors.error : Colors.primary} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={{ flex: 1 }}
+                    onPress={() => setActivePicker('end')}
+                  >
+                    <Text style={styles.inputSubLabel}>End Time</Text>
+                    <View style={[styles.timePickerTrigger, endTimeActive && styles.activeTimeTrigger]}>
+                      <Text style={[styles.timePickerText, endTimeActive && styles.activeTimePickerText]}>
+                        {endTimeActive ? endTime : 'Set End'}
+                      </Text>
+                      <TouchableOpacity onPress={() => setEndTimeActive(!endTimeActive)}>
+                        <Icon 
+                          name={endTimeActive ? "close-circle" : "plus-circle-outline"} 
+                          size={20} 
+                          color={endTimeActive ? Colors.error : Colors.primary} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.subLabel}>Enable toggles and select time to restrict availability.</Text>
+              </View>
+
+              <View style={styles.conditionCard}>
+                <View style={styles.condHeader}>
+                  <Icon name="account-group-outline" size={20} color={Colors.primary} />
+                  <Text style={styles.condLabel}>Applicable Orders</Text>
+                </View>
+                <Input 
+                  placeholder="Applies to first N orders" 
+                  value={orderCount} 
+                  onChangeText={setOrderCount} 
+                  keyboardType="numeric"
+                />
+                <Text style={styles.subLabel}>Setting "3" means offer applies for the customer's first 3 orders from your store.</Text>
+              </View>
+
+              <View style={styles.conditionCard}>
+                <View style={styles.condHeader}>
+                  <Icon name="currency-inr" size={20} color={Colors.primary} />
+                  <Text style={styles.condLabel}>Minimum Order Price</Text>
+                </View>
+                <Input 
+                  placeholder="Applies if order > ₹" 
+                  value={minPrice} 
+                  onChangeText={setMinPrice} 
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.conditionCard}>
+                <View style={styles.condHeader}>
+                  <Icon name="map-marker-distance" size={20} color={Colors.primary} />
+                  <Text style={styles.condLabel}>Distance Radius (km)</Text>
+                </View>
+                <Input 
+                  placeholder="Applies within radius" 
+                  value={maxDistance} 
+                  onChangeText={setMaxDistance} 
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.conditionCard}>
+                <View style={styles.condHeader}>
+                  <Icon name="package-variant" size={20} color={Colors.primary} />
+                  <Text style={styles.condLabel}>Specific Products</Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.productSelectBtn}
+                  onPress={() => setShowProductModal(true)}
+                >
+                  <View style={styles.productSelectLeft}>
+                    <Icon name="format-list-bulleted" size={20} color={Colors.textSecondary} />
+                    <Text style={styles.productSelectText}>
+                      {selectedProducts.length > 0 
+                        ? `${selectedProducts.length} Products Selected` 
+                        : 'Apply to all products'}
+                    </Text>
+                  </View>
+                  <Icon name="chevron-right" size={20} color={Colors.border} />
+                </TouchableOpacity>
+                <Text style={styles.subLabel}>Tap to select specific products for this offer.</Text>
+              </View>
+
+              <Button 
+                title="Create Offer" 
+                onPress={saveOffer} 
+                loading={formLoading} 
+                style={styles.saveBtn} 
+              />
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <TimePicker 
+        visible={!!activePicker}
+        title={activePicker === 'start' ? 'Select Start Time' : 'Select End Time'}
+        value={activePicker === 'start' ? startTime : endTime}
+        onClose={() => setActivePicker(null)}
+        onSelect={(time) => {
+          if (activePicker === 'start') {
+            setStartTime(time);
+            setStartTimeActive(true);
+          } else {
+            setEndTime(time);
+            setEndTimeActive(true);
+          }
+        }}
+      />
+
+      {/* Product Selection Modal */}
+      <Modal visible={showProductModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.productModalContent}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Select Products</Text>
+                <Text style={styles.modalSubtitle}>{selectedProducts.length} selected</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowProductModal(false)}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.productList}>
+              {storeProducts.map((product) => {
+                const isSelected = selectedProducts.includes(product.id);
+                return (
+                  <TouchableOpacity 
+                    key={product.id} 
+                    style={styles.productItem}
+                    onPress={() => {
+                      if (isSelected) setSelectedProducts(selectedProducts.filter(id => id !== product.id));
+                      else setSelectedProducts([...selectedProducts, product.id]);
+                    }}
+                  >
+                    <Text style={[styles.productName, isSelected && styles.productNameActive]}>
+                      {product.name}
+                    </Text>
+                    <Icon 
+                      name={isSelected ? "checkbox-marked" : "checkbox-blank-outline"} 
+                      size={24} 
+                      color={isSelected ? Colors.primary : Colors.border} 
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.productModalActions}>
+              <TouchableOpacity 
+                style={styles.clearBtn} 
+                onPress={() => setSelectedProducts([])}
+              >
+                <Text style={styles.clearBtnText}>Clear All</Text>
+              </TouchableOpacity>
+              <Button 
+                title="Done" 
+                onPress={() => setShowProductModal(false)} 
+                style={styles.doneBtn}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  scrollContent: {
+    padding: Spacing.md,
+    paddingBottom: 100,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  addBtn: {
+    flexDirection: 'row',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  addBtnText: {
+    color: Colors.white,
+    fontWeight: '700',
+    marginLeft: 4,
+    fontSize: 14,
+  },
+  offerCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  offerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.sm,
+  },
+  offerTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  offerTypeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginLeft: 4,
+  },
+  offerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteBtn: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  editBtn: {
+    padding: 4,
+    marginRight: 4,
+  },
+  offerAmount: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 12,
+  },
+  conditionsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  conditionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  conditionText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 100,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text,
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
+    paddingHorizontal: 40,
+  },
+  getStartedBtn: {
+    marginTop: 24,
+    width: 200,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: Colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  typeModalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: Spacing.xl,
+    maxHeight: height * 0.7,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  typeItem: {
+    width: (width - 64) / 2 - 8,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  typeIconBg: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  typeLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  soonText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  formModalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: Spacing.xl,
+    maxHeight: height * 0.9,
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  conditionCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  condHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  condLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+    marginLeft: 8,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  inputSubLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  subLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  orderTypeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  orderTypeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+  },
+  orderTypeBtnActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  orderTypeTextBtn: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  orderTypeTextBtnActive: {
+    color: Colors.primary,
+  },
+  productScroll: {
+    flexDirection: 'row',
+  },
+  productPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginRight: 8,
+  },
+  productPillActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  productPillText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  productPillTextActive: {
+    color: Colors.white,
+  },
+  saveBtn: {
+    marginTop: 12,
+    height: 56,
+  },
+  timePickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  activeTimeTrigger: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + '05',
+  },
+  timePickerText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  activeTimePickerText: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  productSelectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: 12,
+    height: 48,
+    marginBottom: 8,
+  },
+  productSelectLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  productSelectText: {
+    fontSize: 14,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+  productModalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: Spacing.xl,
+    height: height * 0.8,
+  },
+  productList: {
+    flex: 1,
+  },
+  productItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  productName: {
+    fontSize: 15,
+    color: Colors.text,
+    fontWeight: '500',
+  },
+  productNameActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  productModalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  clearBtn: {
+    paddingHorizontal: 16,
+    height: 56,
+    justifyContent: 'center',
+  },
+  clearBtnText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  doneBtn: {
+    flex: 1,
+    height: 56,
+  },
+});
