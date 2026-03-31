@@ -78,6 +78,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             product_name, 
             quantity, 
             product_price,
+            selected_options,
             products (
               stores (name)
             )
@@ -205,7 +206,9 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
                           {oi.product_name}
                           {oi.selected_options && Object.keys(oi.selected_options).length > 0 && (
                             <Text style={styles.itemOptionsText}>
-                              {` (${Object.values(oi.selected_options).join(', ')})`}
+                              {` (${Object.entries(oi.selected_options)
+                                .map(([k, v]) => `${v}`)
+                                .join(', ')})`}
                             </Text>
                           )}
                         </Text>

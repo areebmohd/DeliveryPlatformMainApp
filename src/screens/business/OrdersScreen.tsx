@@ -287,19 +287,16 @@ export const OrdersScreen = () => {
                 <Text style={styles.itemQuantityText}>{product.quantity}x</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemRowText} numberOfLines={1}>
+                <Text style={styles.itemRowText}>
                   {product.product_name}
+                  {product.selected_options && Object.keys(product.selected_options).length > 0 && (
+                    <Text style={styles.itemOptionsText}>
+                      {` (${Object.entries(product.selected_options)
+                        .map(([k, v]) => `${v}`)
+                        .join(', ')})`}
+                    </Text>
+                  )}
                 </Text>
-                {product.selected_options && Object.keys(product.selected_options).length > 0 && (
-                  <View style={styles.optionsBadgeContainer}>
-                    {Object.entries(product.selected_options).map(([k, v], idx) => (
-                      <View key={idx} style={styles.optionBadge}>
-                        <Text style={styles.optionBadgeLabel}>{k}:</Text>
-                        <Text style={styles.optionBadgeValue}>{v as string}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
               </View>
               <Text style={styles.itemPriceText}>₹{product.product_price * product.quantity}</Text>
               {isModifiable && (
