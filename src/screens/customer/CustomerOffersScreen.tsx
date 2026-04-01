@@ -27,7 +27,7 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
-  const { items, subtotal, setAppliedOffer, appliedOffer } = useCart();
+  const { items, subtotal, setAppliedOffers, appliedOffers } = useCart();
   const { showAlert } = useAlert();
   const insets = useSafeAreaInsets();
 
@@ -125,9 +125,12 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
       errors.push(`Please add items from ${offer.store_name} to your cart.`);
     }
 
-    // 2. Min Price
-    if (conditions.min_price && subtotal < conditions.min_price) {
-      errors.push(`Minimum order value of ₹${conditions.min_price} required. (Current: ₹${subtotal.toFixed(2)})`);
+    // 2. Min Price (Store Specific)
+    const storeItems = items.filter(i => i.store_id === offer.store_id);
+    const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+    
+    if (conditions.min_price && storeSubtotal < conditions.min_price) {
+      errors.push(`Minimum order from ${offer.store_name} ₹${conditions.min_price} required. (Current: ₹${storeSubtotal.toFixed(2)})`);
     }
 
     // 3. Distance
@@ -198,6 +201,15 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
   };
 
   const handleApplyOffer = async (offer: Offer) => {
+    const isApplied = appliedOffers[offer.store_id]?.id === offer.id;
+
+    if (isApplied) {
+      const newOffers = { ...appliedOffers };
+      delete newOffers[offer.store_id];
+      setAppliedOffers(newOffers);
+      return;
+    }
+
     const errors = await checkConditions(offer);
     
     if (errors && errors.length > 0) {
@@ -209,7 +221,10 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
       return;
     }
 
-    setAppliedOffer(offer);
+    setAppliedOffers({
+      ...appliedOffers,
+      [offer.store_id]: offer
+    });
     navigation.navigate('Cart');
   };
 
@@ -227,7 +242,7 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
 
   const renderOfferCard = (offer: Offer) => {
     const theme = getTheme(offer.type);
-    const isApplied = appliedOffer?.id === offer.id;
+    const isApplied = appliedOffers[offer.store_id]?.id === offer.id;
 
     return (
       <View key={offer.id} style={styles.offerCard}>
@@ -244,11 +259,13 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
           </View>
 
           <Text style={styles.offerTitle}>
-            {offer.type === 'combo' ? `Combo at ₹${offer.amount}` : 
-             offer.type === 'discount' ? `${offer.amount}% Discount` : 
-             offer.type === 'free_cash' ? `₹${offer.amount} Cashback` : 
-             offer.type === 'cheap_product' ? `${offer.amount}% Off on Selected` : 
-             offer.type === 'free_delivery' ? 'Free Delivery' : 'Special Offer'}
+            {offer.name || (
+              offer.type === 'combo' ? `Combo at ₹${offer.amount}` : 
+              offer.type === 'discount' ? `${offer.amount}% Discount` : 
+              offer.type === 'free_cash' ? `₹${offer.amount} Cashback` : 
+              offer.type === 'cheap_product' ? `${offer.amount}% Off on Selected` : 
+              offer.type === 'free_delivery' ? 'Free Delivery' : 'Special Offer'
+            )}
           </Text>
 
           <View style={styles.conditionsRow}>
@@ -273,7 +290,7 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
             </TouchableOpacity>
             
             <Button 
-              title={isApplied ? "Applied" : "Apply Offer"} 
+              title={isApplied ? "Remove" : "Apply Offer"} 
               onPress={() => handleApplyOffer(offer)}
               style={[styles.applyBtn, isApplied ? styles.appliedBtn : undefined]}
               textStyle={isApplied ? { color: Colors.primary } : undefined}
@@ -287,15 +304,15 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Store Offers</Text>
-        <Text style={styles.headerSubtitle}>Discover exciting deals near you</Text>
-      </View>
-
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Store Offers</Text>
+          <Text style={styles.disclaimerText}>Only one offer per store is applicable at once in the cart.</Text>
+        </View>
+
         {loading ? (
           <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 100 }} />
         ) : offers.length > 0 ? (
@@ -386,9 +403,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: 0,
     paddingTop: Spacing.md,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.lg,
     backgroundColor: 'transparent',
   },
   headerTitle: {
@@ -401,6 +418,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 4,
+  },
+  disclaimerText: {
+    fontSize: 12,
+    color: Colors.primary,
+    marginTop: 8,
+    fontWeight: '700',
   },
   scrollContent: {
     paddingHorizontal: Spacing.md,

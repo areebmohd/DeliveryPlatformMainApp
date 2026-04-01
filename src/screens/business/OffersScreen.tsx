@@ -38,6 +38,7 @@ interface OfferCondition {
 
 interface Offer {
   id: string;
+  name?: string;
   store_id: string;
   type: OfferType;
   status: 'active' | 'inactive';
@@ -62,6 +63,7 @@ export const OffersScreen = ({ navigation }: any) => {
   const [selectedType, setSelectedType] = useState<OfferType | null>(null);
   
   // Form State
+  const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxDistance, setMaxDistance] = useState('');
@@ -136,6 +138,7 @@ export const OffersScreen = ({ navigation }: any) => {
 
   const handleEditOffer = (offer: Offer) => {
     setEditingOffer(offer);
+    setName(offer.name || '');
     setAmount(offer.amount.toString());
     setMinPrice(offer.conditions.min_price?.toString() || '');
     setMaxDistance(offer.conditions.max_distance?.toString() || '');
@@ -187,6 +190,7 @@ export const OffersScreen = ({ navigation }: any) => {
   };
 
   const resetForm = () => {
+    setName('');
     setAmount('');
     setMinPrice('');
     setMaxDistance('');
@@ -214,10 +218,16 @@ export const OffersScreen = ({ navigation }: any) => {
       return;
     }
 
+    if (!name.trim()) {
+      showToast('Please enter an offer name', 'error');
+      return;
+    }
+
     try {
       setFormLoading(true);
       const offerData = {
         store_id: store.id,
+        name: name.trim(),
         type: selectedType,
         amount: (selectedType === 'free_delivery' || selectedType === 'free_product') ? 0 : Number(amount),
         conditions: {
@@ -400,6 +410,10 @@ export const OffersScreen = ({ navigation }: any) => {
         </View>
       </View>
       
+      {offer.name ? (
+        <Text style={styles.offerNameText}>{offer.name}</Text>
+      ) : null}
+      
       <Text style={styles.offerAmount}>
         {
           offer.type === 'discount' ? `${offer.amount}% Off` : 
@@ -459,7 +473,10 @@ export const OffersScreen = ({ navigation }: any) => {
       
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle}>Offers</Text>
+          <View>
+            <Text style={styles.headerTitle}>Offers</Text>
+            <Text style={styles.disclaimerText}>Only one offer per store is applicable.</Text>
+          </View>
           <TouchableOpacity style={styles.addBtn} onPress={handleAddOffer}>
             <Icon name="plus" size={24} color={Colors.white} />
             <Text style={styles.addBtnText}>Create</Text>
@@ -537,6 +554,15 @@ export const OffersScreen = ({ navigation }: any) => {
                 <TouchableOpacity onPress={resetForm}>
                   <Icon name="close" size={24} color={Colors.text} />
                 </TouchableOpacity>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Offer Name</Text>
+                <Input 
+                  placeholder="e.g. Diwali Offer, Buy 1 Get 1" 
+                  value={name} 
+                  onChangeText={setName} 
+                />
               </View>
 
               {selectedType !== 'free_delivery' && selectedType !== 'free_product' && (
@@ -826,6 +852,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.text,
   },
+  disclaimerText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    fontWeight: '600',
+  },
   addBtn: {
     flexDirection: 'row',
     backgroundColor: Colors.primary,
@@ -858,6 +890,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: Spacing.sm,
+  },
+  offerNameText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 4,
   },
   offerTypeBadge: {
     flexDirection: 'row',

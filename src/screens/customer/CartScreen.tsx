@@ -27,7 +27,7 @@ import Geolocation from '@react-native-community/geolocation';
 const { width, height } = Dimensions.get('window');
 
 export const CartScreen = ({ navigation }: any) => {
-  const { items, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress, appliedOffer, setAppliedOffer } = useCart();
+  const { items, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress, appliedOffers, setAppliedOffers } = useCart();
   const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -55,6 +55,7 @@ export const CartScreen = ({ navigation }: any) => {
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [isAutoApplyInProgress, setIsAutoApplyInProgress] = useState(false);
   const [lastAutoAppliedId, setLastAutoAppliedId] = useState<string | null>(null);
+  const [storeDistances, setStoreDistances] = useState<Record<string, number>>({});
 
   // Distance helper
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -117,8 +118,12 @@ export const CartScreen = ({ navigation }: any) => {
     const { conditions } = offer;
     const errors: string[] = [];
 
-    if (conditions.min_price && subtotal < conditions.min_price) {
-      errors.push(`Minimum order ₹${conditions.min_price} required.`);
+    // Store specific subtotal check
+    const storeItems = items.filter(i => i.store_id === offer.store_id);
+    const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+
+    if (conditions.min_price && storeSubtotal < conditions.min_price) {
+      errors.push(`Minimum order ₹${conditions.min_price} required from ${offer.store_name || 'this store'}.`);
     }
 
     if (conditions.max_distance) {
@@ -163,58 +168,65 @@ export const CartScreen = ({ navigation }: any) => {
   };
 
   const autoApplyBestOffer = async () => {
-    if (appliedOffer || isAutoApplyInProgress || items.length === 0) return;
+    if (isAutoApplyInProgress || items.length === 0) return;
 
     try {
       setIsAutoApplyInProgress(true);
       const storesInCart = [...new Set(items.map(i => i.store_id))];
       if (storesInCart.length === 0) return;
 
-      const storeId = storesInCart[0] as string;
+      const newAppliedOffers = { ...appliedOffers };
+      let appliedCount = 0;
 
-      const { data, error } = await supabase
-        .from('offers')
-        .select(`
-          *,
-          store:stores(name, location)
-        `)
-        .eq('store_id', storeId)
-        .eq('status', 'active');
+      for (const storeId of storesInCart) {
+        if (newAppliedOffers[storeId as string]) continue; // Already has an offer for this store
 
-      if (error || !data) return;
+        const { data, error } = await supabase
+          .from('offers')
+          .select(`
+            *,
+            store:stores(name, location)
+          `)
+          .eq('store_id', storeId)
+          .eq('status', 'active');
 
-      const validOffers = data.filter(o => {
-        const formattedOffer = {
-          ...o,
-          store_location: o.store?.location
-        };
-        return checkOfferConditions(formattedOffer).length === 0;
-      });
+        if (error || !data || data.length === 0) continue;
 
-      if (validOffers.length === 0) return;
+        const validOffers = data.filter(o => {
+          const formattedOffer = {
+            ...o,
+            store_location: o.store?.location,
+            store_name: o.store?.name
+          };
+          return checkOfferConditions(formattedOffer).length === 0;
+        });
 
-      // Ranking: Cash > Discount > Delivery
-      const rankedOffers = validOffers.sort((a, b) => {
-        const typeOrder = { free_cash: 0, discount: 1, free_delivery: 2 };
-        const aOrder = (typeOrder as any)[a.type] ?? 99;
-        const bOrder = (typeOrder as any)[b.type] ?? 99;
-        
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        return (b.amount || 0) - (a.amount || 0); // Higher amount first
-      });
+        if (validOffers.length === 0) continue;
 
-      const bestOffer = rankedOffers[0];
-      const bestOfferFormatted = {
-        ...bestOffer,
-        store_name: bestOffer.store?.name,
-        store_location: bestOffer.store?.location
-      };
+        // Ranking: Cash > Discount > Delivery
+        const rankedOffers = validOffers.sort((a, b) => {
+          const typeOrder = { free_cash: 0, discount: 1, free_delivery: 2 };
+          const aOrder = (typeOrder as any)[a.type] ?? 99;
+          const bOrder = (typeOrder as any)[b.type] ?? 99;
+          
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return (b.amount || 0) - (a.amount || 0);
+        });
 
-      // Don't auto-apply the same one we just removed or already applied
-      if (bestOffer.id !== lastAutoAppliedId) {
-        setAppliedOffer(bestOfferFormatted);
-        setLastAutoAppliedId(bestOffer.id);
-        showToast(`Offer "${bestOffer.type.replace('_', ' ')}" applied automatically!`, 'success');
+        const bestOffer = rankedOffers[0];
+        if (bestOffer.id !== lastAutoAppliedId) {
+          newAppliedOffers[storeId as string] = {
+            ...bestOffer,
+            store_name: bestOffer.store?.name,
+            store_location: bestOffer.store?.location
+          };
+          appliedCount++;
+        }
+      }
+
+      if (appliedCount > 0) {
+        setAppliedOffers(newAppliedOffers);
+        showToast(`${appliedCount} offer(s) applied automatically!`, 'success');
       }
     } catch (e) {
       console.error('Auto-apply error:', e);
@@ -234,7 +246,10 @@ export const CartScreen = ({ navigation }: any) => {
       return;
     }
 
-    setAppliedOffer(offer);
+    setAppliedOffers({
+      ...appliedOffers,
+      [offer.store_id]: offer
+    });
     setIsOffersModalVisible(false);
     showToast('Offer applied successfully!', 'success');
   };
@@ -265,13 +280,13 @@ export const CartScreen = ({ navigation }: any) => {
   }, [user, navigation]);
 
   useEffect(() => {
-    if (items.length > 0 && !appliedOffer) {
+    if (items.length > 0) {
       const timer = setTimeout(() => {
         autoApplyBestOffer();
-      }, 1000); // 1s delay to avoid flickering
+      }, 1000); 
       return () => clearTimeout(timer);
     }
-  }, [items.length, subtotal, appliedOffer]);
+  }, [items.length, subtotal, appliedOffers]);
 
   const fetchPaymentSettings = async () => {
     try {
@@ -374,6 +389,11 @@ export const CartScreen = ({ navigation }: any) => {
         }
       }
 
+      const distancesMap: Record<string, number> = {};
+      storesWithUserDist.forEach(s => {
+        distancesMap[s.id] = s.distToUser;
+      });
+      setStoreDistances(distancesMap);
       setDistance(totalRouteDist);
 
     } catch (e) {
@@ -383,38 +403,47 @@ export const CartScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     calculateFees();
-    validateAppliedOffer();
+    validateAppliedOffers();
   }, [items, selectedAddress, sessionAddress]);
 
-  const validateAppliedOffer = () => {
-    if (!appliedOffer) return;
+  const validateAppliedOffers = () => {
+    if (Object.keys(appliedOffers).length === 0) return;
 
-    if (appliedOffer.conditions.min_price && subtotal < appliedOffer.conditions.min_price) {
-      setAppliedOffer(null);
-      showAlert({
-        title: 'Offer Removed',
-        message: `Your subtotal fell below ₹${appliedOffer.conditions.min_price}. The offer has been removed.`,
-        type: 'info'
-      });
-      return;
-    }
+    const newOffers = { ...appliedOffers };
+    let changed = false;
 
-    const hasStoreItems = items.some(item => item.store_id === appliedOffer.store_id);
-    if (!hasStoreItems) {
-      setAppliedOffer(null);
-      return;
-    }
+    Object.entries(newOffers).forEach(([storeId, offer]) => {
+      // 1. Min Price check (on store specific subtotal)
+      const storeItems = items.filter(i => i.store_id === storeId);
+      const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
-    if (appliedOffer.conditions.product_ids && appliedOffer.conditions.product_ids.length > 0) {
-      const hasProduct = items.some(item => appliedOffer.conditions.product_ids?.includes(item.id));
-      if (!hasProduct) {
-        setAppliedOffer(null);
-        showAlert({
-          title: 'Offer Removed',
-          message: 'The required products for this offer are no longer in your cart.',
-          type: 'info'
-        });
+      if (offer.conditions.min_price && storeSubtotal < offer.conditions.min_price) {
+        delete newOffers[storeId];
+        changed = true;
+        showToast(`Offer for ${offer.store_name} removed: Subtotal too low.`, 'info');
+        return;
       }
+
+      // 2. Existence check
+      if (storeItems.length === 0) {
+        delete newOffers[storeId];
+        changed = true;
+        return;
+      }
+
+      // 3. Product check
+      if (offer.conditions.product_ids && offer.conditions.product_ids.length > 0) {
+        const hasProduct = items.some(item => offer.conditions.product_ids?.includes(item.id));
+        if (!hasProduct) {
+          delete newOffers[storeId];
+          changed = true;
+          showToast(`Offer removed: Required products missing.`, 'info');
+        }
+      }
+    });
+
+    if (changed) {
+      setAppliedOffers(newOffers);
     }
   };
 
@@ -428,32 +457,46 @@ export const CartScreen = ({ navigation }: any) => {
   const baseGrandTotal = subtotal + baseDeliveryFee + platformFee + helperFee;
 
   let deliveryFee = baseDeliveryFee;
-  let offerDiscount = 0;
-  if (appliedOffer) {
-    if (appliedOffer.type === 'free_delivery') {
-      deliveryFee = 0;
-      offerDiscount = baseDeliveryFee;
-    } else if (appliedOffer.type === 'free_cash') {
-      offerDiscount = appliedOffer.amount;
-    } else if (appliedOffer.type === 'discount') {
-      offerDiscount = (subtotal * appliedOffer.amount) / 100;
-    } else if (appliedOffer.type === 'cheap_product') {
-      const eligibleItems = items.filter(item => appliedOffer.conditions.product_ids?.includes(item.id));
+  let totalOfferDiscount = 0;
+  let maxFreeDist = 0;
+
+  Object.values(appliedOffers).forEach(offer => {
+    let offerDiscount = 0;
+    if (offer.type === 'free_delivery') {
+      const dist = storeDistances[offer.store_id] || 0;
+      if (dist > maxFreeDist) maxFreeDist = dist;
+    } else if (offer.type === 'free_cash') {
+      offerDiscount = offer.amount;
+    } else if (offer.type === 'discount') {
+      const storeItems = items.filter(i => i.store_id === offer.store_id);
+      const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      offerDiscount = (storeSubtotal * offer.amount) / 100;
+    } else if (offer.type === 'cheap_product') {
+      const eligibleItems = items.filter(item => offer.conditions.product_ids?.includes(item.id));
       const eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-      offerDiscount = (eligibleSubtotal * appliedOffer.amount) / 100;
-    } else if (appliedOffer.type === 'combo') {
-      const comboItems = items.filter(item => appliedOffer.reward_data?.product_ids?.includes(item.id));
+      offerDiscount = (eligibleSubtotal * offer.amount) / 100;
+    } else if (offer.type === 'combo') {
+      const comboItems = items.filter(item => offer.reward_data?.product_ids?.includes(item.id));
       const comboSubtotal = comboItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-      offerDiscount = Math.max(0, comboSubtotal - appliedOffer.amount);
-    } else if (appliedOffer.type === 'free_product') {
-      const freeItem = items.find(item => appliedOffer.reward_data?.product_ids?.includes(item.id));
+      offerDiscount = Math.max(0, comboSubtotal - offer.amount);
+    } else if (offer.type === 'free_product') {
+      const freeItem = items.find(item => offer.reward_data?.product_ids?.includes(item.id));
       if (freeItem) {
         offerDiscount = freeItem.price * 1;
       }
     }
+    totalOfferDiscount += offerDiscount;
+  });
+
+  if (maxFreeDist > 0) {
+    const freePortion = isLargeVehicle 
+      ? 300 + (maxFreeDist * 30)
+      : 20 + (maxFreeDist * 5);
+    
+    deliveryFee = Math.max(0, baseDeliveryFee - freePortion);
   }
 
-  const grandTotal = Math.max(0, baseGrandTotal - offerDiscount);
+  const grandTotal = Math.max(0, baseGrandTotal - totalOfferDiscount);
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
@@ -820,6 +863,11 @@ export const CartScreen = ({ navigation }: any) => {
             </View>
             <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
           </View>
+          {maxFreeDist > 0 && deliveryFee > 0 && (
+            <Text style={styles.deliveryDisclaimer}>
+              This delivery fee is only from store or stores having larger distance than free delivery store.
+            </Text>
+          )}
 
           {isLargeVehicle && (
             <View style={styles.vehicleAlertContainer}>
@@ -871,29 +919,38 @@ export const CartScreen = ({ navigation }: any) => {
           <View style={[styles.billRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Grand Total</Text>
             <View style={{ alignItems: 'flex-end' }}>
-              {offerDiscount > 0 && (
+              {totalOfferDiscount > 0 && (
                 <Text style={styles.originalTotalText}>₹{baseGrandTotal.toFixed(2)}</Text>
               )}
               <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
             </View>
           </View>
 
-          {appliedOffer && (
-            <View style={styles.appliedOfferRow}>
+          {Object.entries(appliedOffers).map(([storeId, offer]) => (
+            <View key={storeId} style={styles.appliedOfferRow}>
               <View style={styles.offerTag}>
                 <View style={styles.iconContainer}>
                   <Icon name="tag-heart" size={20} color="#059669" />
                 </View>
                 <View style={styles.offerTagContent}>
-                  <Text style={styles.appliedOfferName}>{appliedOffer.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} Applied</Text>
-                  <Text style={styles.savingsText}>You saved ₹{offerDiscount.toFixed(2)}</Text>
+                  <Text style={styles.appliedOfferName}>
+                    {offer.name || `${offer.type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())} Applied`}
+                  </Text>
+                  <Text style={styles.storeNameSmall}>Store: {offer.store_name}</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => setAppliedOffer(null)} style={styles.removeOfferBtn}>
+              <TouchableOpacity 
+                onPress={() => {
+                  const newOffers = { ...appliedOffers };
+                  delete newOffers[storeId];
+                  setAppliedOffers(newOffers);
+                }} 
+                style={styles.removeOfferBtn}
+              >
                 <Text style={styles.removeOfferText}>Remove</Text>
               </TouchableOpacity>
             </View>
-          )}
+          ))}
         </View>
 
         <View style={styles.paymentSection}>
@@ -1081,7 +1138,7 @@ export const CartScreen = ({ navigation }: any) => {
             ) : (
               <ScrollView contentContainerStyle={styles.offerModalList}>
                 {activeStoreOffers.map((offer) => {
-                  const isApplied = appliedOffer?.id === offer.id;
+                  const isApplied = appliedOffers[offer.store_id]?.id === offer.id;
                   const conditionErrors = isApplied ? [] : checkOfferConditions(offer);
                   const canApply = conditionErrors.length === 0;
 
@@ -1100,12 +1157,14 @@ export const CartScreen = ({ navigation }: any) => {
                       </View>
                       
                       <Text style={styles.offerModalOfferTitle}>
-                        {offer.type === 'free_delivery' ? 'Free Delivery on this order!' :
-                         offer.type === 'free_cash' ? `Flat ₹${offer.amount} OFF` :
-                         offer.type === 'discount' ? `${offer.amount}% Discount` :
-                         offer.type === 'cheap_product' ? `${offer.amount}% OFF on select items` :
-                         offer.type === 'combo' ? `Combo reward of ₹${offer.amount}` :
-                         `Free Gift Available!`}
+                        {offer.name || (
+                          offer.type === 'free_delivery' ? 'Free Delivery on this order!' :
+                          offer.type === 'free_cash' ? `Flat ₹${offer.amount} OFF` :
+                          offer.type === 'discount' ? `${offer.amount}% Discount` :
+                          offer.type === 'cheap_product' ? `${offer.amount}% OFF on select items` :
+                          offer.type === 'combo' ? `Combo reward of ₹${offer.amount}` :
+                          `Free Gift Available!`
+                        )}
                       </Text>
 
                       {offer.conditions.min_price && (
@@ -1740,6 +1799,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     color: '#064E3B',
+  },
+  storeNameSmall: {
+    fontSize: 12,
+    color: '#065F46',
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  deliveryDisclaimer: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: -5,
+    marginBottom: 10,
   },
   savingsText: {
     fontSize: 12,

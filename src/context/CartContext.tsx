@@ -31,6 +31,7 @@ export interface OfferCondition {
 
 export interface Offer {
   id: string;
+  name?: string;
   store_id: string;
   type: OfferType;
   status: 'active' | 'inactive';
@@ -53,8 +54,8 @@ interface CartContextType {
   subtotal: number;
   sessionAddress: any | null;
   setSessionAddress: (address: any | null) => void;
-  appliedOffer: Offer | null;
-  setAppliedOffer: (offer: Offer | null) => void;
+  appliedOffers: Record<string, Offer>;
+  setAppliedOffers: (offers: Record<string, Offer>) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -62,7 +63,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [sessionAddress, setSessionAddress] = useState<any | null>(null);
-  const [appliedOffer, setAppliedOffer] = useState<Offer | null>(null);
+  const [appliedOffers, setAppliedOffers] = useState<Record<string, Offer>>({});
   const { showAlert } = useAlert();
 
   const addItem = (product: any, store: any) => {
@@ -171,7 +172,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearCart = () => {
     setItems([]);
-    setAppliedOffer(null);
+    setAppliedOffers({});
   };
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -188,8 +189,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subtotal,
       sessionAddress,
       setSessionAddress,
-      appliedOffer,
-      setAppliedOffer
+      appliedOffers,
+      setAppliedOffers
     }}>
       {children}
     </CartContext.Provider>
