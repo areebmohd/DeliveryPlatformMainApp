@@ -46,7 +46,8 @@ export const SearchScreen = ({ navigation, route }: any) => {
   };
 
   useEffect(() => {
-    if (searchQuery.length >= 2) {
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.length >= 2) {
       handleSearch();
     } else {
       setProducts([]);
@@ -55,27 +56,44 @@ export const SearchScreen = ({ navigation, route }: any) => {
   }, [searchQuery]);
 
   const handleSearch = async () => {
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.length < 2) return;
+
     try {
       setLoading(true);
       
+      const searchTerms = trimmedQuery.split(/\s+/).filter(Boolean);
+      
       // Search Products (Name or Description)
-      const { data: productData, error: productError } = await supabase
+      let productQuery = supabase
         .from('products')
         .select('*, stores:stores_view!inner(*)')
-        .or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
         .eq('stores.is_active', true)
         .eq('is_deleted', false)
         .eq('is_info_complete', true)
         .eq('in_stock', true)
         .limit(30);
 
+      // Add a filter for each term (AND logic between terms)
+      searchTerms.forEach((term: string) => {
+        productQuery = productQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%,tags::text.ilike.%${term}%`);
+      });
+
+      const { data: productData, error: productError } = await productQuery;
+
       // Search Stores (Name, City, Address, Category, or Description)
-      const { data: storeData, error: storeError } = await supabase
+      let storeQuery = supabase
         .from('stores_view')
         .select('*')
-        .or(`name.ilike.%${searchQuery}%,city.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
         .eq('is_active', true)
         .limit(30);
+
+      // Add a filter for each term (AND logic between terms)
+      searchTerms.forEach((term: string) => {
+        storeQuery = storeQuery.or(`name.ilike.%${term}%,city.ilike.%${term}%,address.ilike.%${term}%,category.ilike.%${term}%,description.ilike.%${term}%`);
+      });
+
+      const { data: storeData, error: storeError } = await storeQuery;
 
       if (productError) throw productError;
       if (storeError) throw storeError;

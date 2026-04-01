@@ -62,6 +62,8 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         }))
       : [{ title: '', values: [''], currentInput: '' }]
   );
+  const [tags, setTags] = useState<string[]>(product?.tags || []);
+  const [tagInput, setTagInput] = useState('');
   const [inStock, setInStock] = useState(product?.in_stock !== false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -138,6 +140,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                 values: opt.values?.length ? opt.values : [''],
                 currentInput: ''
               })));
+            }
+            if (data.tags) {
+              setTags(data.tags);
             }
           }
         } catch (err) {
@@ -377,6 +382,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         name: name.trim() || `Product ${barcode}`,
         description: JSON.stringify(sanitizedDescription),
         options: sanitizedOptions,
+        tags: tags,
         price: parseFloat(price) || 0,
         weight_kg: manualWeight,
         category: category.trim(),
@@ -659,7 +665,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                     <View style={styles.pairInputs}>
                       <View style={styles.pairTitleCol}>
                         <TextInput
-                          placeholder="e.g., Material"
+                          placeholder="e.g. Material"
                           placeholderTextColor={Colors.textSecondary}
                           value={pair.title}
                           onChangeText={(val) => {
@@ -673,7 +679,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                       </View>
                       <View style={styles.pairTextCol}>
                         <TextInput
-                          placeholder="e.g., Cotton"
+                          placeholder="e.g. Cotton"
                           placeholderTextColor={Colors.textSecondary}
                           value={pair.text}
                           onChangeText={(val) => {
@@ -682,7 +688,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                             setDescriptionPairs(next);
                           }}
                           multiline
-                          style={[styles.pairInput, { textAlignVertical: 'top' }]}
+                          style={styles.pairInput}
                           editable={canEditDetails}
                         />
                       </View>
@@ -809,7 +815,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                       onPress={() => setProductOptions(prev => [...prev, { title: '', values: [''], currentInput: '' }])}
                     >
                       <Icon name="plus-circle-outline" size={20} color={Colors.primary} />
-                      <Text style={styles.addPairText}>Add More Variant Groups</Text>
+                      <Text style={styles.addPairText}>Add More Options</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -895,6 +901,55 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             textStyle={styles.needChangesText}
             leftIcon={<Icon name="alert-circle-outline" size={18} color={Colors.error} />}
           />
+        )}
+
+        {/* Tags Section */}
+        {(isPersonalMode || isCommonMode) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Tags (Synonyms)</Text>
+            <Text style={styles.helperText}>
+              Add synonyms to help customers find this product. e.g. "kela" for "Banana".
+            </Text>
+            
+            <Input
+              placeholder="Type a tag..."
+              value={tagInput}
+              onChangeText={setTagInput}
+              onSubmitEditing={() => {
+                if (tagInput.trim()) {
+                  setTags(prev => [...new Set([...prev, tagInput.trim().toLowerCase()])]);
+                  setTagInput('');
+                }
+              }}
+              rightIcon={
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (tagInput.trim()) {
+                      setTags(prev => [...new Set([...prev, tagInput.trim().toLowerCase()])]);
+                      setTagInput('');
+                    }
+                  }}
+                  style={styles.inlineAddBtn}
+                >
+                  <Text style={styles.inlineAddBtnText}>Add</Text>
+                </TouchableOpacity>
+              }
+            />
+
+            <View style={styles.tagsContainer}>
+              {tags.map((tag, index) => (
+                <View key={index} style={styles.tagChip}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                  <TouchableOpacity 
+                    onPress={() => setTags(prev => prev.filter((_, i) => i !== index))}
+                    style={styles.removeTagBtn}
+                  >
+                    <Icon name="close-circle" size={18} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
         )}
 
         <Button
@@ -1257,7 +1312,7 @@ const styles = StyleSheet.create({
     width: '35%',
     borderRightWidth: 1,
     borderRightColor: '#D1D1D6',
-    backgroundColor: '#EDEEF0',
+    backgroundColor: Colors.surface,
   },
   pairTextCol: {
     flex: 1,
@@ -1336,7 +1391,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderColor: '#D1D1D6',
     marginBottom: 12,
   },
   optionMainRow: {
@@ -1368,7 +1423,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderColor: '#D1D1D6',
   },
   optionInputWithAction: {
     flexDirection: 'row',
@@ -1382,7 +1437,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderColor: '#D1D1D6',
     fontWeight: '400',
   },
   optionValuesField: {
@@ -1454,5 +1509,52 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 12,
     fontWeight: '700',
+  },
+  inlineAddBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: -4, // Adjust for Input component padding
+  },
+  inlineAddBtnText: {
+    color: Colors.white,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  addTagBtn: {
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  addTagBtnText: {
+    color: Colors.white,
+    fontWeight: '700',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.border + '50',
+    paddingVertical: 6,
+    paddingLeft: 12,
+    paddingRight: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  tagText: {
+    fontSize: 14,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+  removeTagBtn: {
+    marginLeft: 6,
   },
 });
