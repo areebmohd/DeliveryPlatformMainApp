@@ -36,9 +36,11 @@ const formatOpeningHours = (hoursJson: string) => {
 export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const { store } = route.params;
   const [products, setProducts] = useState<any[]>([]);
+  const [storeOffers, setStoreOffers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [offersLoading, setOffersLoading] = useState(false);
   const { addItem, updateQuantity, items, totalItems, subtotal } = useCart();
-  const [activeTab, setActiveTab] = useState<'products' | 'info'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'offers' | 'info'>('products');
   const [isFavourite, setIsFavourite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
@@ -46,6 +48,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
 
   useEffect(() => {
     fetchProducts();
+    fetchStoreOffers();
     checkFavourite();
   }, []);
 
@@ -116,6 +119,24 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
       console.error('Error fetching products:', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStoreOffers = async () => {
+    try {
+      setOffersLoading(true);
+      const { data, error } = await supabase
+        .from('offers')
+        .select('*')
+        .eq('store_id', store.id)
+        .eq('status', 'active');
+
+      if (error) throw error;
+      setStoreOffers(data || []);
+    } catch (e) {
+      console.error('Error fetching store offers:', e);
+    } finally {
+      setOffersLoading(false);
     }
   };
 
@@ -251,6 +272,20 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={[styles.tab, activeTab === 'offers' && styles.activeTab]}
+              onPress={() => setActiveTab('offers')}
+            >
+              <Icon
+                name={activeTab === 'offers' ? 'tag' : 'tag-outline'}
+                size={20}
+                color={activeTab === 'offers' ? Colors.white : Colors.primary}
+              />
+              <Text style={[styles.tabText, activeTab === 'offers' && styles.activeTabText]}>
+                Offers
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.tab, activeTab === 'info' && styles.activeTab]}
               onPress={() => setActiveTab('info')}
             >
@@ -290,6 +325,55 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                 <View style={styles.emptyContainer}>
                   <Icon name="package-variant" size={64} color={Colors.border} />
                   <Text style={styles.emptyText}>No products available right now.</Text>
+                </View>
+              )}
+            </View>
+          ) : activeTab === 'offers' ? (
+            <View style={styles.offersSection}>
+              {offersLoading ? (
+                <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
+              ) : storeOffers.length > 0 ? (
+                storeOffers.map((offer) => (
+                  <View key={offer.id} style={styles.offerTabCard}>
+                    <View style={styles.offerTabHeader}>
+                      <View style={[styles.offerTabBadge, { backgroundColor: offer.type === 'free_delivery' ? '#FEF3C7' : (offer.type === 'free_product' ? '#FCE7F3' : '#D1FAE5') }]}>
+                        <Icon 
+                          name={offer.type === 'free_delivery' ? 'truck-delivery' : (offer.type === 'free_product' ? 'gift' : 'cash')} 
+                          size={14} 
+                          color={offer.type === 'free_delivery' ? '#D97706' : (offer.type === 'free_product' ? '#DB2777' : '#10B981')} 
+                        />
+                        <Text style={[styles.offerTabBadgeText, { color: offer.type === 'free_delivery' ? '#D97706' : (offer.type === 'free_product' ? '#DB2777' : '#10B981') }]}>
+                          {offer.type.replace('_', ' ').toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <Text style={styles.offerTabTitle}>{offer.name || 'Special Offer'}</Text>
+                    <Text style={styles.offerTabDesc}>
+                      {offer.type === 'discount' ? `${offer.amount}% Discount on your order` : 
+                       offer.type === 'free_cash' ? `₹${offer.amount} Cashback reward` : 
+                       offer.type === 'free_product' ? `Free ${offer.reward_data?.product_name || 'Bonus'} with this purchase` : 
+                       offer.type === 'free_delivery' ? 'Enjoy Free Delivery on this store' : 'Special Store Promotion'}
+                    </Text>
+
+                    <View style={styles.offerTabConditions}>
+                      {offer.conditions?.min_price && (
+                        <View style={styles.offerTabCondPill}>
+                          <Text style={styles.offerTabCondText}>Min. ₹{offer.conditions.min_price}</Text>
+                        </View>
+                      )}
+                      {offer.conditions?.max_distance && (
+                        <View style={styles.offerTabCondPill}>
+                          <Text style={styles.offerTabCondText}>Under {offer.conditions.max_distance}km</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Icon name="tag-off-outline" size={64} color={Colors.border} />
+                  <Text style={styles.emptyText}>No active offers at the moment.</Text>
                 </View>
               )}
             </View>
@@ -741,5 +825,66 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontWeight: '700',
     fontSize: 14,
+  },
+  offersSection: {
+    paddingBottom: 100,
+  },
+  offerTabCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  offerTabHeader: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  offerTabBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  offerTabBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  offerTabTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  offerTabDesc: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  offerTabConditions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  offerTabCondPill: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  offerTabCondText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '600',
   },
 });

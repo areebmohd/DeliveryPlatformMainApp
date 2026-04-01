@@ -57,6 +57,53 @@ export const CartScreen = ({ navigation }: any) => {
   const [lastAutoAppliedId, setLastAutoAppliedId] = useState<string | null>(null);
   const [storeDistances, setStoreDistances] = useState<Record<string, number>>({});
 
+  // Background fetch for reward product details (if missing)
+  useEffect(() => {
+    const fetchRewardDetails = async () => {
+      const updatedOffers = { ...appliedOffers };
+      let changed = false;
+
+      for (const [storeId, offer] of Object.entries(appliedOffers)) {
+        if (offer.type === 'free_product') {
+          const rewardData = (offer.reward_data as any) || {};
+          const productId = rewardData.product_ids?.[0];
+
+          if (productId && (!rewardData.product_name || !rewardData.product_price)) {
+            try {
+              const { data: product, error } = await supabase
+                .from('products')
+                .select('name, price')
+                .eq('id', productId)
+                .single();
+
+              if (!error && product) {
+                updatedOffers[storeId] = {
+                  ...offer,
+                  reward_data: {
+                    ...rewardData,
+                    product_name: product.name,
+                    product_price: product.price,
+                  }
+                };
+                changed = true;
+              }
+            } catch (e) {
+              console.error('Error fetching reward product details:', e);
+            }
+          }
+        }
+      }
+
+      if (changed) {
+        setAppliedOffers(updatedOffers);
+      }
+    };
+
+    if (Object.keys(appliedOffers).length > 0) {
+      fetchRewardDetails();
+    }
+  }, [appliedOffers]);
+
   // Distance helper
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371; // km
@@ -479,11 +526,6 @@ export const CartScreen = ({ navigation }: any) => {
       const comboItems = items.filter(item => offer.reward_data?.product_ids?.includes(item.id));
       const comboSubtotal = comboItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
       offerDiscount = Math.max(0, comboSubtotal - offer.amount);
-    } else if (offer.type === 'free_product') {
-      const freeItem = items.find(item => offer.reward_data?.product_ids?.includes(item.id));
-      if (freeItem) {
-        offerDiscount = freeItem.price * 1;
-      }
     }
     totalOfferDiscount += offerDiscount;
   });
@@ -667,6 +709,20 @@ export const CartScreen = ({ navigation }: any) => {
         selected_options: item.selected_options || {}
       }));
 
+      // Add Free Product Rewards to order
+      Object.entries(appliedOffers).forEach(([_, offer]: [string, any]) => {
+        if (offer.type === 'free_product' && checkOfferConditions(offer).length === 0) {
+          orderItems.push({
+            order_id: order.id,
+            product_id: offer.reward_data?.product_ids?.[0] || 'GIFT',
+            product_name: offer.reward_data?.product_name || 'Gift Item',
+            product_price: 0,
+            quantity: 1,
+            selected_options: { gift: 'true' }
+          });
+        }
+      });
+
       const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItems);
@@ -811,6 +867,42 @@ export const CartScreen = ({ navigation }: any) => {
                 </View>
               </View>
               ))}
+
+              {/* Free Product Reward */}
+              {(() => {
+                const offer = appliedOffers[storeId];
+                if (offer?.type === 'free_product' && checkOfferConditions(offer).length === 0) {
+                  return (
+                    <View style={[styles.itemCard, styles.freeItemCard]}>
+                      {(() => {
+                        const rewardId = (offer.reward_data as any)?.product_ids?.[0];
+                        const manualItem = storeData.items.find((i: any) => i.id === rewardId);
+                        const pName = (offer.reward_data as any)?.product_name || manualItem?.name || 'Gift Item';
+                        const pPrice = (offer.reward_data as any)?.product_price || manualItem?.price;
+
+                        return (
+                          <>
+                            <View style={styles.itemInfo}>
+                              <Text style={styles.itemName} numberOfLines={1}>
+                                {pName}
+                                <Text style={styles.freeBadgeTextSub}> (Gift)</Text>
+                              </Text>
+                              {pPrice && (
+                                <Text style={styles.itemPriceStrikethrough}>₹{pPrice}</Text>
+                              )}
+                            </View>
+                            <View style={[styles.freeBadge, { flexDirection: 'row', gap: 6, alignItems: 'center' }]}>
+                              <Icon name="gift" size={14} color={Colors.white} />
+                              <Text style={styles.freeBadgeText}>Free</Text>
+                            </View>
+                          </>
+                        );
+                      })()}
+                    </View>
+                  );
+                }
+                return null;
+              })()}
             </View>
           </View>
         ))}
@@ -1816,8 +1908,43 @@ const styles = StyleSheet.create({
   savingsText: {
     fontSize: 12,
     color: '#10B981',
+    fontWeight: '800',
+  },
+  freeItemCard: {
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 12,
+    marginTop: 4,
+    borderStyle: 'dashed',
+  },
+  freeBadge: {
+    backgroundColor: '#DB2777', // Pink/Gift theme
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  freeBadgeText: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  freeBadgeTextSub: {
+    fontSize: 11,
+    color: '#DB2777',
     fontWeight: '700',
+    marginTop: 1,
+  },
+  itemPriceStrikethrough: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textDecorationLine: 'line-through',
     marginTop: 2,
+    fontWeight: '600',
+  },
+  billingSection: {
   },
   originalTotalText: {
     fontSize: 14,

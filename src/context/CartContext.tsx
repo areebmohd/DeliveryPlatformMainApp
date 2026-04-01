@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAlert } from './AlertContext';
+
+const STORAGE_KEYS = {
+  CART_ITEMS: '@cart_items',
+  CART_OFFERS: '@cart_offers',
+  CART_ADDRESS: '@cart_address',
+};
 
 interface CartItem {
   id: string;
@@ -64,7 +71,48 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [items, setItems] = useState<CartItem[]>([]);
   const [sessionAddress, setSessionAddress] = useState<any | null>(null);
   const [appliedOffers, setAppliedOffers] = useState<Record<string, Offer>>({});
+  const [isLoaded, setIsLoaded] = useState(false);
   const { showAlert } = useAlert();
+
+  // Load cart data from storage on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [savedItems, savedOffers, savedAddress] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEYS.CART_ITEMS),
+          AsyncStorage.getItem(STORAGE_KEYS.CART_OFFERS),
+          AsyncStorage.getItem(STORAGE_KEYS.CART_ADDRESS),
+        ]);
+
+        if (savedItems) setItems(JSON.parse(savedItems));
+        if (savedOffers) setAppliedOffers(JSON.parse(savedOffers));
+        if (savedAddress) setSessionAddress(JSON.parse(savedAddress));
+      } catch (e) {
+        console.error('Error loading cart data:', e);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Save cart data to storage on change
+  useEffect(() => {
+    if (!isLoaded) return; // Prevent overwriting with empty defaults before load
+
+    const saveData = async () => {
+      try {
+        await Promise.all([
+          AsyncStorage.setItem(STORAGE_KEYS.CART_ITEMS, JSON.stringify(items)),
+          AsyncStorage.setItem(STORAGE_KEYS.CART_OFFERS, JSON.stringify(appliedOffers)),
+          AsyncStorage.setItem(STORAGE_KEYS.CART_ADDRESS, JSON.stringify(sessionAddress)),
+        ]);
+      } catch (e) {
+        console.error('Error saving cart data:', e);
+      }
+    };
+    saveData();
+  }, [items, appliedOffers, sessionAddress, isLoaded]);
 
   const addItem = (product: any, store: any) => {
     // 1. Parse store location from WKT
@@ -170,9 +218,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
     setItems([]);
     setAppliedOffers({});
+    // We don't necessarily clear the session address here 
+    // but the cart items are the most critical.
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEYS.CART_ITEMS);
+      await AsyncStorage.removeItem(STORAGE_KEYS.CART_OFFERS);
+    } catch (e) {
+      console.error('Error clearing cart storage:', e);
+    }
   };
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);

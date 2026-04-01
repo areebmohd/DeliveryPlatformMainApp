@@ -238,7 +238,11 @@ export const OffersScreen = ({ navigation }: any) => {
           start_time: startTimeActive ? startTime : null,
           end_time: endTimeActive ? endTime : null,
         },
-        reward_data: (selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo') ? { product_ids: selectedRewardProducts } : {},
+        reward_data: (selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo') ? { 
+          product_ids: selectedRewardProducts,
+          product_name: storeProducts.find(p => p.id === selectedRewardProducts[0])?.name || 'Gift Item',
+          product_price: storeProducts.find(p => p.id === selectedRewardProducts[0])?.price || 0
+        } : {},
         status: editingOffer ? editingOffer.status : 'active'
       };
 
