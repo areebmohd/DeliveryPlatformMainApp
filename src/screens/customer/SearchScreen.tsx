@@ -58,24 +58,24 @@ export const SearchScreen = ({ navigation, route }: any) => {
     try {
       setLoading(true);
       
-      // Search Products
+      // Search Products (Name or Description)
       const { data: productData, error: productError } = await supabase
         .from('products')
         .select('*, stores:stores_view!inner(*)')
-        .ilike('name', `%${searchQuery}%`)
+        .or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
         .eq('stores.is_active', true)
         .eq('is_deleted', false)
         .eq('is_info_complete', true)
         .eq('in_stock', true)
-        .limit(20);
+        .limit(30);
 
-      // Search Stores
+      // Search Stores (Name, City, Address, Category, or Description)
       const { data: storeData, error: storeError } = await supabase
         .from('stores_view')
         .select('*')
-        .ilike('name', `%${searchQuery}%`)
+        .or(`name.ilike.%${searchQuery}%,city.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
         .eq('is_active', true)
-        .limit(20);
+        .limit(30);
 
       if (productError) throw productError;
       if (storeError) throw storeError;
