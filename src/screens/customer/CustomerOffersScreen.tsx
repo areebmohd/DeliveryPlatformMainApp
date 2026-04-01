@@ -201,11 +201,12 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
   };
 
   const handleApplyOffer = async (offer: Offer) => {
-    const isApplied = appliedOffers[offer.store_id]?.id === offer.id;
+    const offerKey = offer.type === 'free_delivery' ? `${offer.store_id}_delivery` : offer.store_id;
+    const isApplied = appliedOffers[offerKey]?.id === offer.id;
 
     if (isApplied) {
       const newOffers = { ...appliedOffers };
-      delete newOffers[offer.store_id];
+      delete newOffers[offerKey];
       setAppliedOffers(newOffers);
       return;
     }
@@ -223,7 +224,7 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
 
     setAppliedOffers({
       ...appliedOffers,
-      [offer.store_id]: offer
+      [offerKey]: offer
     });
     navigation.navigate('Cart');
   };
@@ -242,7 +243,8 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
 
   const renderOfferCard = (offer: Offer) => {
     const theme = getTheme(offer.type);
-    const isApplied = appliedOffers[offer.store_id]?.id === offer.id;
+    const offerKey = offer.type === 'free_delivery' ? `${offer.store_id}_delivery` : offer.store_id;
+    const isApplied = appliedOffers[offerKey]?.id === offer.id;
 
     return (
       <View key={offer.id} style={styles.offerCard}>
@@ -310,7 +312,7 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Store Offers</Text>
-          <Text style={styles.disclaimerText}>Only one offer per store is applicable at once in the cart.</Text>
+          <Text style={styles.disclaimerText}>Only one offer per store is applicable at once. Free Delivery can be added with any other offer from the same store.</Text>
         </View>
 
         {loading ? (

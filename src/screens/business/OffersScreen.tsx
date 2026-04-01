@@ -479,7 +479,7 @@ export const OffersScreen = ({ navigation }: any) => {
         <View style={styles.headerTitleRow}>
           <View>
             <Text style={styles.headerTitle}>Offers</Text>
-            <Text style={styles.disclaimerText}>Only one offer per store is applicable.</Text>
+            <Text style={styles.disclaimerText}>Customers can apply one standard offer along with a Free Delivery offer from your store.</Text>
           </View>
           <TouchableOpacity style={styles.addBtn} onPress={handleAddOffer}>
             <Icon name="plus" size={24} color={Colors.white} />

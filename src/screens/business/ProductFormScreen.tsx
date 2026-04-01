@@ -322,9 +322,6 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       const manualWeight = parseFloat(weight) || 0;
       const needsLarge = manualWeight > 20 || isOversized;
       
-      // We set nominal dimensions to satisfy existing cart logic if needed
-      // (though Cart now primarily uses needs_large_vehicle flag)
-      const dimValue = isOversized ? 41 : 20; 
 
       // 2. Check for duplicate name in the same store
       if (!isEditing) {
@@ -391,9 +388,6 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         product_type: productType,
         stock_quantity: parseInt(stockQuantity),
         in_stock: inStock,
-        length_cm: dimValue,
-        width_cm: dimValue,
-        height_cm: dimValue,
         needs_large_vehicle: needsLarge,
         is_info_complete: isComplete, // Mark as complete once saved with details
         raw_image_url: rawImageUrl,

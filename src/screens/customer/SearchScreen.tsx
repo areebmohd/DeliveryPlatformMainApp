@@ -76,7 +76,7 @@ export const SearchScreen = ({ navigation, route }: any) => {
 
       // Add a filter for each term (AND logic between terms)
       searchTerms.forEach((term: string) => {
-        productQuery = productQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%,tags::text.ilike.%${term}%`);
+        productQuery = productQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%,tags_search_text.ilike.%${term}%`);
       });
 
       const { data: productData, error: productError } = await productQuery;

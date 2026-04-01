@@ -226,7 +226,13 @@ export const CartScreen = ({ navigation }: any) => {
       let appliedCount = 0;
 
       for (const storeId of storesInCart) {
-        if (newAppliedOffers[storeId as string]) continue; // Already has an offer for this store
+        const standardKey = storeId as string;
+        const deliveryKey = `${storeId}_delivery`;
+        
+        const hasStandard = !!newAppliedOffers[standardKey];
+        const hasDelivery = !!newAppliedOffers[deliveryKey];
+
+        if (hasStandard && hasDelivery) continue; // Already has both
 
         const { data, error } = await supabase
           .from('offers')
@@ -261,8 +267,10 @@ export const CartScreen = ({ navigation }: any) => {
         });
 
         const bestOffer = rankedOffers[0];
-        if (bestOffer.id !== lastAutoAppliedId) {
-          newAppliedOffers[storeId as string] = {
+        const offerKey = bestOffer.type === 'free_delivery' ? deliveryKey : standardKey;
+
+        if (bestOffer.id !== lastAutoAppliedId && !newAppliedOffers[offerKey]) {
+          newAppliedOffers[offerKey] = {
             ...bestOffer,
             store_name: bestOffer.store?.name,
             store_location: bestOffer.store?.location
@@ -293,9 +301,10 @@ export const CartScreen = ({ navigation }: any) => {
       return;
     }
 
+    const offerKey = offer.type === 'free_delivery' ? `${offer.store_id}_delivery` : offer.store_id;
     setAppliedOffers({
       ...appliedOffers,
-      [offer.store_id]: offer
+      [offerKey]: offer
     });
     setIsOffersModalVisible(false);
     showToast('Offer applied successfully!', 'success');
@@ -459,13 +468,14 @@ export const CartScreen = ({ navigation }: any) => {
     const newOffers = { ...appliedOffers };
     let changed = false;
 
-    Object.entries(newOffers).forEach(([storeId, offer]) => {
+    Object.entries(newOffers).forEach(([offerKey, offer]) => {
+      const storeId = offer.store_id;
       // 1. Min Price check (on store specific subtotal)
       const storeItems = items.filter(i => i.store_id === storeId);
       const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
       if (offer.conditions.min_price && storeSubtotal < offer.conditions.min_price) {
-        delete newOffers[storeId];
+        delete newOffers[offerKey];
         changed = true;
         showToast(`Offer for ${offer.store_name} removed: Subtotal too low.`, 'info');
         return;
@@ -473,7 +483,7 @@ export const CartScreen = ({ navigation }: any) => {
 
       // 2. Existence check
       if (storeItems.length === 0) {
-        delete newOffers[storeId];
+        delete newOffers[offerKey];
         changed = true;
         return;
       }
@@ -482,7 +492,7 @@ export const CartScreen = ({ navigation }: any) => {
       if (offer.conditions.product_ids && offer.conditions.product_ids.length > 0) {
         const hasProduct = items.some(item => offer.conditions.product_ids?.includes(item.id));
         if (!hasProduct) {
-          delete newOffers[storeId];
+          delete newOffers[offerKey];
           changed = true;
           showToast(`Offer removed: Required products missing.`, 'info');
         }
@@ -1230,7 +1240,8 @@ export const CartScreen = ({ navigation }: any) => {
             ) : (
               <ScrollView contentContainerStyle={styles.offerModalList}>
                 {activeStoreOffers.map((offer) => {
-                  const isApplied = appliedOffers[offer.store_id]?.id === offer.id;
+                  const offerKey = offer.type === 'free_delivery' ? `${offer.store_id}_delivery` : offer.store_id;
+                  const isApplied = appliedOffers[offerKey]?.id === offer.id;
                   const conditionErrors = isApplied ? [] : checkOfferConditions(offer);
                   const canApply = conditionErrors.length === 0;
 
