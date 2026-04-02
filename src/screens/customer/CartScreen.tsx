@@ -853,30 +853,68 @@ export const CartScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
             <View style={styles.storeItemsList}>
-              {storeData.items.map((item: any) => (
-              <View key={item.id} style={styles.itemCard}>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemName}>
-                    {item.name}
-                    {item.selected_options && Object.keys(item.selected_options).length > 0 && (
-                      <Text style={styles.itemOptionsText}>
-                        {` (${Object.values(item.selected_options).join(', ')})`}
+              {storeData.items.map((item: any) => {
+                const standardOffer = appliedOffers[storeId];
+                let discountedPrice = item.price;
+                let hasDiscount = false;
+
+                if (standardOffer && checkOfferConditions(standardOffer).length === 0) {
+                  const storeItems = items.filter(i => i.store_id === storeId);
+                  const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+
+                  if (standardOffer.type === 'free_cash') {
+                    const discountPercent = standardOffer.amount / storeSubtotal;
+                    discountedPrice = item.price * (1 - discountPercent);
+                    hasDiscount = true;
+                  } else if (standardOffer.type === 'discount') {
+                    discountedPrice = item.price * (1 - standardOffer.amount / 100);
+                    hasDiscount = true;
+                  } else if (standardOffer.type === 'cheap_product') {
+                    if (standardOffer.conditions.product_ids?.includes(item.id)) {
+                      discountedPrice = item.price * (1 - standardOffer.amount / 100);
+                      hasDiscount = true;
+                    }
+                  } else if (standardOffer.type === 'combo') {
+                    if (standardOffer.reward_data?.product_ids?.includes(item.id)) {
+                      hasDiscount = true;
+                    }
+                  }
+                }
+
+                return (
+                  <View key={item.id} style={styles.itemCard}>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemName}>
+                        {item.name}
+                        {item.selected_options && Object.keys(item.selected_options).length > 0 && (
+                          <Text style={styles.itemOptionsText}>
+                            {` (${Object.values(item.selected_options).join(', ')})`}
+                          </Text>
+                        )}
                       </Text>
-                    )}
-                  </Text>
-                  <Text style={styles.itemPrice}>₹{item.price}</Text>
-                </View>
-                <View style={styles.quantityControls}>
-                  <TouchableOpacity onPress={() => updateQuantity(item.id, -1)} style={styles.qtyBtn}>
-                    <Icon name="minus" size={18} color={Colors.primary} />
-                  </TouchableOpacity>
-                  <Text style={styles.quantity}>{item.quantity}</Text>
-                  <TouchableOpacity onPress={() => updateQuantity(item.id, 1)} style={styles.qtyBtn}>
-                    <Icon name="plus" size={18} color={Colors.primary} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              ))}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {hasDiscount && discountedPrice < item.price ? (
+                          <>
+                            <Text style={styles.itemPrice}>₹{discountedPrice.toFixed(2)}</Text>
+                            <Text style={styles.itemPriceStrikethrough}>₹{item.price}</Text>
+                          </>
+                        ) : (
+                          <Text style={styles.itemPrice}>₹{item.price}</Text>
+                        )}
+                      </View>
+                    </View>
+                    <View style={styles.quantityControls}>
+                      <TouchableOpacity onPress={() => updateQuantity(item.id, -1)} style={styles.qtyBtn}>
+                        <Icon name="minus" size={18} color={Colors.primary} />
+                      </TouchableOpacity>
+                      <Text style={styles.quantity}>{item.quantity}</Text>
+                      <TouchableOpacity onPress={() => updateQuantity(item.id, 1)} style={styles.qtyBtn}>
+                        <Icon name="plus" size={18} color={Colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
 
               {/* Free Product Reward */}
               {(() => {
@@ -897,14 +935,14 @@ export const CartScreen = ({ navigation }: any) => {
                                 {pName}
                                 <Text style={styles.freeBadgeTextSub}> (Gift)</Text>
                               </Text>
-                              {pPrice && (
-                                <Text style={styles.itemPriceStrikethrough}>₹{pPrice}</Text>
-                              )}
                             </View>
                             <View style={[styles.freeBadge, { flexDirection: 'row', gap: 6, alignItems: 'center' }]}>
                               <Icon name="gift" size={14} color={Colors.white} />
                               <Text style={styles.freeBadgeText}>Free</Text>
                             </View>
+                            {pPrice && (
+                              <Text style={[styles.itemPriceStrikethrough, { marginLeft: 8 }]}>₹{pPrice}</Text>
+                            )}
                           </>
                         );
                       })()}
@@ -914,6 +952,43 @@ export const CartScreen = ({ navigation }: any) => {
                 return null;
               })()}
             </View>
+
+            {/* Applied Offers for this store */}
+            {(() => {
+              const standardKey = storeId;
+              const deliveryKey = `${storeId}_delivery`;
+              const offers = [appliedOffers[standardKey], appliedOffers[deliveryKey]].filter(Boolean);
+
+              if (offers.length === 0) return null;
+
+              return (
+                <View style={styles.storeAppliedOffers}>
+                  {offers.map((offer: any) => (
+                    <View key={offer.id} style={styles.storeOfferTag}>
+                      <View style={styles.storeOfferIcon}>
+                        <Icon name={offer.type === 'free_delivery' ? "truck-fast" : "tag-heart"} size={16} color={offer.type === 'free_delivery' ? Colors.primary : "#059669"} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.storeOfferName}>
+                          {offer.name || `${offer.type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())} Applied`}
+                        </Text>
+                      </View>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          const newOffers = { ...appliedOffers };
+                          const key = offer.type === 'free_delivery' ? deliveryKey : standardKey;
+                          delete newOffers[key];
+                          setAppliedOffers(newOffers);
+                        }} 
+                        style={styles.storeOfferRemove}
+                      >
+                        <Icon name="close-circle" size={18} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
           </View>
         ))}
 
@@ -947,7 +1022,27 @@ export const CartScreen = ({ navigation }: any) => {
           
           <View style={styles.billRow}>
             <Text style={styles.billLabel}>Item Total</Text>
-            <Text style={styles.billValue}>₹{subtotal.toFixed(2)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.billValue}>₹{(subtotal - (Object.values(appliedOffers).reduce((sum, o: any) => {
+                if (o.type === 'free_delivery') return sum;
+                let d = 0;
+                if (o.type === 'free_cash') d = o.amount;
+                else if (o.type === 'discount') {
+                  const sItems = items.filter(i => i.store_id === o.store_id);
+                  d = (sItems.reduce((s, i) => s + (i.price * i.quantity), 0) * o.amount) / 100;
+                } else if (o.type === 'cheap_product') {
+                  const eItems = items.filter(i => o.conditions.product_ids?.includes(i.id));
+                  d = (eItems.reduce((s, i) => s + (i.price * i.quantity), 0) * o.amount) / 100;
+                } else if (o.type === 'combo') {
+                  const cItems = items.filter(i => o.reward_data?.product_ids?.includes(i.id));
+                  d = Math.max(0, cItems.reduce((s, i) => s + (i.price * i.quantity), 0) - o.amount);
+                }
+                return sum + d;
+              }, 0))).toFixed(2)}</Text>
+              {totalOfferDiscount > 0 && (
+                <Text style={styles.originalTotalText}>₹{subtotal.toFixed(2)}</Text>
+              )}
+            </View>
           </View>
 
           <View style={styles.billRow}>
@@ -963,7 +1058,12 @@ export const CartScreen = ({ navigation }: any) => {
                 <Icon name="information-outline" size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
+              {maxFreeDist > 0 && deliveryFee < baseDeliveryFee && (
+                <Text style={styles.originalTotalText}>₹{baseDeliveryFee.toFixed(2)}</Text>
+              )}
+            </View>
           </View>
           {maxFreeDist > 0 && deliveryFee > 0 && (
             <Text style={styles.deliveryDisclaimer}>
@@ -1020,39 +1120,13 @@ export const CartScreen = ({ navigation }: any) => {
 
           <View style={[styles.billRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Grand Total</Text>
-            <View style={{ alignItems: 'flex-end' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
               {totalOfferDiscount > 0 && (
                 <Text style={styles.originalTotalText}>₹{baseGrandTotal.toFixed(2)}</Text>
               )}
-              <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
             </View>
           </View>
-
-          {Object.entries(appliedOffers).map(([storeId, offer]) => (
-            <View key={storeId} style={styles.appliedOfferRow}>
-              <View style={styles.offerTag}>
-                <View style={styles.iconContainer}>
-                  <Icon name="tag-heart" size={20} color="#059669" />
-                </View>
-                <View style={styles.offerTagContent}>
-                  <Text style={styles.appliedOfferName}>
-                    {offer.name || `${offer.type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())} Applied`}
-                  </Text>
-                  <Text style={styles.storeNameSmall}>Store: {offer.store_name}</Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                onPress={() => {
-                  const newOffers = { ...appliedOffers };
-                  delete newOffers[storeId];
-                  setAppliedOffers(newOffers);
-                }} 
-                style={styles.removeOfferBtn}
-              >
-                <Text style={styles.removeOfferText}>Remove</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
         </View>
 
         <View style={styles.paymentSection}>
@@ -1123,7 +1197,12 @@ export const CartScreen = ({ navigation }: any) => {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.lg }]}>
         <View style={styles.checkoutInfo}>
-          <Text style={styles.checkoutTotal}>₹{grandTotal.toFixed(2)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.checkoutTotal}>₹{grandTotal.toFixed(2)}</Text>
+            {totalOfferDiscount > 0 && (
+              <Text style={[styles.originalTotalText, { marginBottom: 0 }]}>₹{baseGrandTotal.toFixed(2)}</Text>
+            )}
+          </View>
           <Text style={styles.checkoutLabel}>Total Payable</Text>
           {paymentMethod === 'pay_online' && (
             <Text style={{ fontSize: 10, color: Colors.primary, fontWeight: '700', marginTop: 2 }}>
@@ -1870,6 +1949,39 @@ const styles = StyleSheet.create({
     borderColor: '#10B981',
     width: '100%',
     overflow: 'hidden',
+  },
+  storeAppliedOffers: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    gap: 8,
+  },
+  storeOfferTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    gap: 10,
+  },
+  storeOfferIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#DCFCE7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  storeOfferName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#166534',
+  },
+  storeOfferRemove: {
+    padding: 2,
   },
   offerTag: {
     flexDirection: 'row',
