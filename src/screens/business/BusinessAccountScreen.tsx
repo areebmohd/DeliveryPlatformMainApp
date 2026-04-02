@@ -6,6 +6,7 @@ import {
   StatusBar,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -151,7 +152,10 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
           <OptionItem 
             icon="chat-question-outline" 
             label="Business Support" 
-            onPress={() => navigation.navigate('Support')} 
+            onPress={() => {
+              // Explicit navigation
+              navigation.navigate('Support');
+            }} 
             isLast={true}
           />
         </View>

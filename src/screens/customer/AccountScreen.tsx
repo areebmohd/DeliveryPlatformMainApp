@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -181,7 +182,15 @@ export const AccountScreen = ({ navigation }: any) => {
           />
           <OptionItem icon="crown-outline" label="Premium" onPress={() => {}} />
           <OptionItem icon="cash-refund" label="Refunds" onPress={() => navigation.navigate('Refunds')} />
-          <OptionItem icon="headset" label="Customer Support" onPress={() => {}} isLast={true} />
+          <OptionItem 
+            icon="headset" 
+            label="Customer Support" 
+            onPress={() => {
+              // Explicit navigation to ensure correct stack resolution
+              navigation.navigate('Account', { screen: 'CustomerSupport' });
+            }} 
+            isLast={true} 
+          />
         </View>
 
         {/* Sign Out Box */}

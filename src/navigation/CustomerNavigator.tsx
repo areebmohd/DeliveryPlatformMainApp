@@ -23,6 +23,7 @@ import { NotificationsScreen } from '../screens/customer/NotificationsScreen';
 import { MapSelectionScreen } from '../screens/customer/MapSelectionScreen';
 import { RefundsScreen } from '../screens/customer/RefundsScreen';
 import { CustomerOffersScreen } from '../screens/customer/CustomerOffersScreen';
+import { SupportScreen as CustomerSupportScreen } from '../screens/customer/SupportScreen';
 
 const Tab = createBottomTabNavigator();
 const HomeStackNav = createNativeStackNavigator();
@@ -59,6 +60,7 @@ const AccountStack = () => {
       <AccountStackNav.Screen name="Notifications" component={NotificationsScreen} />
       <AccountStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
       <AccountStackNav.Screen name="Refunds" component={RefundsScreen} />
+      <AccountStackNav.Screen name="CustomerSupport" component={CustomerSupportScreen} />
     </AccountStackNav.Navigator>
   );
 };
@@ -84,7 +86,7 @@ export const CustomerNavigator = () => {
         const hideOnScreens = [
           'StoreDetails', 'ProductDetail', 'AddAddress', 'AddLiveLocation', 
           'Search', 'Category', 'MapSelection', 'Notifications', 
-          'Favourites', 'CustomerOrders', 'Addresses', 'Refunds'
+          'Favourites', 'CustomerOrders', 'Addresses', 'Refunds', 'CustomerSupport'
         ];
         const isTabVisible = !hideOnScreens.includes(routeName as string);
 

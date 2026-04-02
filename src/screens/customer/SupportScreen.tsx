@@ -11,7 +11,7 @@ export const SupportScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
 
   const handleEmailSupport = () => {
-    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Business%20Support%20Request`);
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Customer%20Support%20Request`);
   };
 
   const handleCallSupport = () => {
@@ -26,16 +26,16 @@ export const SupportScreen = ({ navigation }: any) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Business Support</Text>
+        <Text style={styles.headerTitle}>Support Center</Text>
       </View>
 
       <View style={styles.content}>
         <View style={styles.iconCircle}>
           <Icon name="chat-question-outline" size={80} color={Colors.primary} />
         </View>
-        <Text style={styles.title}>How can we help your business?</Text>
+        <Text style={styles.title}>How can we help?</Text>
         <Text style={styles.subtitle}>
-          Our team is ready to assist you with orders, payouts, and store management.
+          Our support team is ready to assist you with orders, payments, and account details.
         </Text>
         
         <View style={styles.btnRow}>
