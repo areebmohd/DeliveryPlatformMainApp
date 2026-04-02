@@ -55,8 +55,6 @@ export const CustomerProductCard = ({
             <Icon name="package-variant" size={30} color={Colors.border} />
           </View>
         )}
-        
-        {/* Integrated Controls on Image */}
         {onAdd && (
           <View style={styles.controlsLayer}>
             {quantity > 0 ? (
@@ -83,9 +81,6 @@ export const CustomerProductCard = ({
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.name} numberOfLines={1}>
-          {product.name || `Barcode: ${product.barcode}`}
-        </Text>
         <View style={styles.priceRow}>
           <Text style={styles.price}>₹{formatPriceShort(product.price)}</Text>
           {product.weight_kg ? (
@@ -94,6 +89,10 @@ export const CustomerProductCard = ({
             </Text>
           ) : null}
         </View>
+
+        <Text style={styles.name} numberOfLines={2}>
+          {product.name || `Barcode: ${product.barcode}`}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -166,18 +165,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   content: {
-    marginTop: 10,
+    marginTop: 8,
     paddingHorizontal: 4,
-  },
-  name: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.black,
-    marginBottom: 2,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 4,
   },
   price: {
     fontSize: 14,
@@ -189,5 +183,10 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     opacity: 0.8,
     marginLeft: 2,
+  },
+  name: {
+    fontSize: 12.5,
+    fontWeight: '400',
+    color: Colors.text,
   },
 });
