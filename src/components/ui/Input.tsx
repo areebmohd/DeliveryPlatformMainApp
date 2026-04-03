@@ -8,11 +8,13 @@ import {
   TextInputProps,
 } from 'react-native';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   containerStyle?: ViewStyle;
+  leftIcon?: string | React.ReactNode;
   rightIcon?: React.ReactNode;
 }
 
@@ -22,6 +24,7 @@ export const Input = ({
   containerStyle,
   onFocus,
   onBlur,
+  leftIcon,
   rightIcon,
   ...props
 }: InputProps) => {
@@ -46,6 +49,15 @@ export const Input = ({
         error ? styles.errorBorder : null
       ]}>
         <View style={styles.inputWrapper}>
+          {leftIcon && (
+            <View style={styles.leftIconContainer}>
+              {typeof leftIcon === 'string' ? (
+                <Icon name={leftIcon} size={22} color={isFocused ? Colors.primary : Colors.textSecondary} />
+              ) : (
+                leftIcon
+              )}
+            </View>
+          )}
           <TextInput
             style={styles.input}
             placeholderTextColor={Colors.textSecondary}
@@ -106,6 +118,11 @@ const styles = StyleSheet.create({
   },
   rightIconContainer: {
     paddingLeft: Spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leftIconContainer: {
+    paddingRight: Spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
   },

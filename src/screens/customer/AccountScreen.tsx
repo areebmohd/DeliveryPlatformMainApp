@@ -90,24 +90,39 @@ export const AccountScreen = ({ navigation }: any) => {
       >
         <Text style={styles.headerTitle}>Customer Account</Text>
 
-        {/* User Info Box */}
-        <View style={styles.box}>
-          <View style={styles.boxHeader}>
-            <Text style={styles.boxTitle}>User Info</Text>
-            {isEditing && (
-              <TouchableOpacity onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-            )}
+        {/* Premium User Profile Box */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarCircle}>
+                <Icon name="account" size={36} color={Colors.primary} />
+              </View>
+            </View>
+            <View style={styles.profileMainInfo}>
+              <Text style={styles.profileUserName} numberOfLines={1}>
+                {profile?.full_name || 'Guest User'}
+              </Text>
+              <View style={styles.membershipBadge}>
+                <Icon name="shield-check" size={12} color={Colors.success} />
+                <Text style={styles.membershipText}>Verified Customer</Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              onPress={() => setIsEditing(!isEditing)} 
+              style={[styles.miniEditBtn, isEditing && styles.miniCancelBtn]}
+            >
+              <Icon name={isEditing ? "close" : "pencil-outline"} size={18} color={isEditing ? Colors.error : Colors.primary} />
+            </TouchableOpacity>
           </View>
 
           {isEditing ? (
-            <View style={styles.editForm}>
+            <View style={styles.enhancedEditForm}>
               <Input
                 label="Full Name"
                 value={editName}
                 onChangeText={setEditName}
                 placeholder="Enter your name"
+                leftIcon="account-outline"
               />
               <Input
                 label="Phone Number"
@@ -115,6 +130,7 @@ export const AccountScreen = ({ navigation }: any) => {
                 onChangeText={setEditPhone}
                 placeholder="Enter phone number"
                 keyboardType="phone-pad"
+                leftIcon="phone-outline"
               />
               <Input
                 label="UPI ID"
@@ -122,38 +138,47 @@ export const AccountScreen = ({ navigation }: any) => {
                 onChangeText={setEditUpiId}
                 placeholder="example@upi"
                 autoCapitalize="none"
+                leftIcon="wallet-outline"
               />
-              <Text style={styles.inputNote}>* This UPI ID will be used for refunds only.</Text>
+              <Text style={styles.formNote}>* UPI ID is used for secure refunds.</Text>
               <Button 
-                title="Save Changes" 
+                title="Save Profile" 
                 onPress={handleUpdateProfile} 
                 loading={loading}
-                style={styles.saveBtn}
+                style={styles.saveProfileBtn}
               />
             </View>
           ) : (
-            <View style={styles.infoList}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Name</Text>
-                <Text style={styles.infoValue}>{profile?.full_name || 'Not set'}</Text>
+            <View style={styles.profileDetailsGrid}>
+              <View style={styles.detailItem}>
+                <View style={styles.detailIconBox}>
+                  <Icon name="phone-outline" size={20} color={Colors.primary} />
+                </View>
+                <View>
+                  <Text style={styles.detailLabel}>Mobile</Text>
+                  <Text style={styles.detailValue}>{profile?.phone || 'Not set'}</Text>
+                </View>
               </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Phone</Text>
-                <Text style={styles.infoValue}>{profile?.phone || 'Not set'}</Text>
+
+              <View style={styles.detailItem}>
+                <View style={styles.detailIconBox}>
+                  <Icon name="email-outline" size={20} color={Colors.primary} />
+                </View>
+                <View>
+                  <Text style={styles.detailLabel}>Email</Text>
+                  <Text style={styles.detailValue} numberOfLines={1}>{profile?.email}</Text>
+                </View>
               </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>UPI ID</Text>
-                <Text style={styles.infoValue}>{profile?.upi_id || 'Not set'}</Text>
+
+              <View style={styles.detailItem}>
+                <View style={styles.detailIconBox}>
+                  <Icon name="wallet-giftcard" size={20} color={Colors.primary} />
+                </View>
+                <View>
+                  <Text style={styles.detailLabel}>UPI ID</Text>
+                  <Text style={styles.detailValue}>{profile?.upi_id || 'Not set'}</Text>
+                </View>
               </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Email</Text>
-                <Text style={styles.infoValue}>{profile?.email}</Text>
-              </View>
-              
-              <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.editBtnBottom}>
-                <Icon name="pencil-outline" size={18} color={Colors.primary} />
-                <Text style={styles.editBtnTextBottom}>Edit Profile Details</Text>
-              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -250,85 +275,146 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
   },
-  boxHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
+  profileCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 28,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 4,
   },
-  boxTitle: {
-    fontSize: 18,
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatarCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: Colors.white,
+    elevation: 5,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  onlineBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Colors.success,
+    borderWidth: 2,
+    borderColor: Colors.white,
+  },
+  profileMainInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  profileUserName: {
+    fontSize: 20,
     fontWeight: '800',
     color: Colors.text,
+    letterSpacing: -0.5,
   },
-  cancelBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: Colors.surface,
+  membershipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.success + '15',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    gap: 4,
+  },
+  membershipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.success,
+    textTransform: 'uppercase',
+  },
+  miniEditBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.primary + '20',
+  },
+  miniCancelBtn: {
+    backgroundColor: '#FFF1F2',
+    borderColor: Colors.error + '20',
+  },
+  profileDetailsGrid: {
+    gap: Spacing.md,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    padding: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  cancelBtnText: {
-    color: Colors.textSecondary,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  editBtnBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  detailIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.white,
     justifyContent: 'center',
-    backgroundColor: Colors.primaryLight,
-    padding: 14,
-    borderRadius: 16,
-    marginTop: Spacing.md,
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.primary + '20',
-  },
-  editBtnTextBottom: {
-    color: Colors.primary,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  infoList: {
-    gap: Spacing.md,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 2,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  infoLabel: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  infoValue: {
-    fontSize: 15,
-    color: Colors.text,
+  detailLabel: {
+    fontSize: 11,
     fontWeight: '700',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  infoValueDisabled: {
+  detailValue: {
     fontSize: 15,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-    marginTop: 4,
+    fontWeight: '600',
+    color: Colors.text,
+    marginTop: 1,
   },
-  editForm: {
-    gap: Spacing.xs,
+  enhancedEditForm: {
+    gap: Spacing.sm,
   },
-  inputNote: {
-    fontSize: 12,
+  formNote: {
+    fontSize: 11,
     color: Colors.textSecondary,
-    marginTop: -4,
-    marginBottom: 8,
-    marginLeft: 4,
     fontStyle: 'italic',
+    marginLeft: 4,
+    marginBottom: 10,
+    marginTop: -10, // Reduced from original gap
   },
-  saveBtn: {
-    marginTop: Spacing.md,
+  saveProfileBtn: {
+    marginTop: Spacing.sm,
   },
   optionItem: {
     flexDirection: 'row',
