@@ -15,10 +15,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { supabase } from '../../api/supabase';
+import { Button } from '../../components/ui/Button';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
+import { getOfferDescription } from '../../utils/offerUtils';
 import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
 import { useCart } from '../../context/CartContext';
+import { supabase } from '../../api/supabase';
 
 const formatOpeningHours = (hoursJson: string) => {
   try {
@@ -295,7 +297,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                 color={activeTab === 'info' ? Colors.white : Colors.primary}
               />
               <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>
-                Store Info
+                Info
               </Text>
             </TouchableOpacity>
           </View>
@@ -350,10 +352,16 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                     
                     <Text style={styles.offerTabTitle}>{offer.name || 'Special Offer'}</Text>
                     <Text style={styles.offerTabDesc}>
-                      {offer.type === 'discount' ? `${offer.amount}% Discount on your order` : 
-                       offer.type === 'free_cash' ? `₹${offer.amount} Cashback reward` : 
-                       offer.type === 'free_product' ? `Free ${offer.reward_data?.product_name || 'Bonus'} with this purchase` : 
-                       offer.type === 'free_delivery' ? 'Enjoy Free Delivery on this store' : 'Special Store Promotion'}
+                      {(() => {
+                        const getNames = (ids?: string[]) => {
+                          if (!ids || ids.length === 0) return '';
+                          const names = ids.map(id => products.find(p => String(p.id) === String(id))?.name).filter(Boolean);
+                          if (names.length === 0) return '';
+                          return names.join(', ');
+                        };
+                        const resolvedName = getNames(offer.reward_data?.product_ids);
+                        return getOfferDescription(offer, resolvedName);
+                      })()}
                     </Text>
 
                     <View style={styles.offerTabConditions}>

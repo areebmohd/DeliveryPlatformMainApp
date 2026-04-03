@@ -463,7 +463,7 @@ export const StoreScreen = ({ navigation }: any) => {
               activeTab === 'info' && styles.activeTabText,
             ]}
           >
-            Store Info
+            Info
           </Text>
         </TouchableOpacity>
       </View>

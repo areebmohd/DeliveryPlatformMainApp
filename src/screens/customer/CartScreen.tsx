@@ -17,6 +17,7 @@ import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { useCart } from '../../context/CartContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
+import { getOfferDescription } from '../../utils/offerUtils';
 import { Input } from '../../components/ui/Input';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -1339,16 +1340,8 @@ export const CartScreen = ({ navigation }: any) => {
                         )}
                       </View>
                       
-                      <Text style={styles.offerModalOfferTitle}>
-                        {offer.name || (
-                          offer.type === 'free_delivery' ? 'Free Delivery on this order!' :
-                          offer.type === 'free_cash' ? `Flat ₹${offer.amount} OFF` :
-                          offer.type === 'discount' ? `${offer.amount}% Discount` :
-                          offer.type === 'cheap_product' ? `${offer.amount}% OFF on select items` :
-                          offer.type === 'combo' ? `Combo reward of ₹${offer.amount}` :
-                          `Free Gift Available!`
-                        )}
-                      </Text>
+                      <Text style={styles.offerModalOfferTitle}>{offer.name || 'Special Offer'}</Text>
+                      <Text style={styles.offerModalOfferDesc}>{getOfferDescription(offer)}</Text>
 
                       {offer.conditions.min_price && (
                         <Text style={styles.offerModalConditionText}>• Min. Order: ₹{offer.conditions.min_price}</Text>
@@ -2177,7 +2170,13 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: Colors.text,
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  offerModalOfferDesc: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 20,
   },
   offerModalConditionText: {
     fontSize: 13,

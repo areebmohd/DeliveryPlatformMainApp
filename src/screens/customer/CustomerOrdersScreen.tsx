@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
+import { getOfferDescription } from '../../utils/offerUtils';
 
 export const CustomerOrdersScreen = ({ navigation }: any) => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -264,18 +265,8 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
                           <Icon name="ticket-percent" size={14} color={Colors.success} />
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.promoTitle}>
-                            {offer.name || (offer.type === 'free_delivery' ? 'Free Delivery' : 'Special Offer')}
-                          </Text>
-                          {offer.type === 'discount' && (
-                            <Text style={styles.promoAmount}>{offer.amount}% OFF Applied</Text>
-                          )}
-                          {offer.type === 'free_cash' && (
-                            <Text style={styles.promoAmount}>₹{offer.amount} Free Cash Discount</Text>
-                          )}
-                          {offer.type === 'free_delivery' && (
-                            <Text style={styles.promoAmount}>Delivery Fee Waived</Text>
-                          )}
+                          <Text style={styles.promoTitle}>{offer.name || 'Special Offer'}</Text>
+                          <Text style={styles.promoAmount}>{getOfferDescription(offer)}</Text>
                         </View>
                       </View>
                     ))}

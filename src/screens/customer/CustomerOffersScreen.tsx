@@ -19,11 +19,12 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart, Offer, OfferType } from '../../context/CartContext';
 import { useAlert } from '../../context/AlertContext';
 import { Button } from '../../components/ui/Button';
+import { getOfferDescription } from '../../utils/offerUtils';
 
 const { width } = Dimensions.get('window');
 
 export const CustomerOffersScreen = ({ navigation }: any) => {
-  const [offers, setOffers] = useState<Offer[]>([]);
+  const [groupedOffers, setGroupedOffers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { user, profile } = useAuth();
@@ -60,7 +61,20 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
         store_location: o.store?.location
       }));
 
-      setOffers(formattedOffers);
+      // Group by store
+      const groups: any = {};
+      formattedOffers.forEach((offer: any) => {
+        if (!groups[offer.store_id]) {
+          groups[offer.store_id] = {
+            id: offer.store_id,
+            name: offer.store_name,
+            offers: []
+          };
+        }
+        groups[offer.store_id].offers.push(offer);
+      });
+
+      setGroupedOffers(Object.values(groups));
     } catch (e: any) {
       console.error('Error fetching offers:', e);
       showAlert({
@@ -248,60 +262,69 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
 
     return (
       <View key={offer.id} style={styles.offerCard}>
-        <View style={[styles.cardAccent, { backgroundColor: theme.color }]} />
-        <View style={styles.cardContent}>
-          <View style={styles.offerHeader}>
-            <View style={[styles.typeBadge, { backgroundColor: theme.bg }]}>
-              <Icon name={theme.icon} size={16} color={theme.color} />
-              <Text style={[styles.typeText, { color: theme.color }]}>
-                {offer.type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-              </Text>
-            </View>
-            <Text style={styles.storeTag}>{offer.store_name}</Text>
+        <View style={styles.offerTabHeader}>
+          <View style={[styles.offerTabBadge, { backgroundColor: theme.bg }]}>
+            <Icon 
+              name={theme.icon} 
+              size={12} 
+              color={theme.color} 
+            />
+            <Text style={[styles.offerTabBadgeText, { color: theme.color }]}>
+              {offer.type.replace('_', ' ').toUpperCase()}
+            </Text>
           </View>
+        </View>
 
-          <Text style={styles.offerTitle}>
-            {offer.name || (
-              offer.type === 'combo' ? `Combo at ₹${offer.amount}` : 
-              offer.type === 'discount' ? `${offer.amount}% Discount` : 
-              offer.type === 'free_cash' ? `₹${offer.amount} Cashback` : 
-              offer.type === 'cheap_product' ? `${offer.amount}% Off on Selected` : 
-              offer.type === 'free_delivery' ? 'Free Delivery' : 'Special Offer'
-            )}
-          </Text>
+        <Text style={styles.offerTabTitle} numberOfLines={1}>{offer.name || 'Special Offer'}</Text>
+        <Text style={styles.offerTabDesc} numberOfLines={2}>
+          {getOfferDescription(offer)}
+        </Text>
 
-          <View style={styles.conditionsRow}>
+        <View style={styles.footerRow}>
+          <View style={styles.offerTabConditions}>
             {offer.conditions.min_price && (
-              <View style={styles.condPill}>
-                <Text style={styles.condPillText}>Min. ₹{offer.conditions.min_price}</Text>
+              <View style={styles.offerTabCondPill}>
+                <Text style={styles.offerTabCondText}>Min. ₹{offer.conditions.min_price}</Text>
               </View>
             )}
             {offer.conditions.max_distance && (
-              <View style={styles.condPill}>
-                <Text style={styles.condPillText}>Under {offer.conditions.max_distance}km</Text>
+              <View style={styles.offerTabCondPill}>
+                <Text style={styles.offerTabCondText}>{offer.conditions.max_distance}km</Text>
               </View>
             )}
           </View>
 
-          <View style={styles.offerActions}>
-            <TouchableOpacity 
-              style={styles.viewCondBtn}
-              onPress={() => setConditionModal({ visible: true, offer })}
-            >
-              <Text style={styles.viewCondText}>View Conditions</Text>
-            </TouchableOpacity>
-            
-            <Button 
-              title={isApplied ? "Remove" : "Apply Offer"} 
-              onPress={() => handleApplyOffer(offer)}
-              style={[styles.applyBtn, isApplied ? styles.appliedBtn : undefined]}
-              textStyle={isApplied ? { color: Colors.primary } : undefined}
-            />
-          </View>
+          <TouchableOpacity 
+            style={[styles.miniApplyBtn, isApplied && styles.miniAppliedBtn]}
+            onPress={() => handleApplyOffer(offer)}
+          >
+            <Text style={[styles.miniApplyBtnText, isApplied && styles.miniAppliedBtnText]}>
+              {isApplied ? "Remove" : "Apply"}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
   };
+
+  const renderStoreSection = (store: any) => (
+    <View key={store.id} style={styles.storeSection}>
+      <View style={styles.storeHeader}>
+        <Icon name="storefront" size={20} color={Colors.text} />
+        <Text style={styles.storeName}>{store.name}</Text>
+        <Text style={styles.storeOfferCount}>{store.offers.length} Deals</Text>
+      </View>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.horizontalScrollContent}
+        snapToInterval={width}
+        decelerationRate="fast"
+      >
+        {store.offers.map(renderOfferCard)}
+      </ScrollView>
+    </View>
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -312,14 +335,14 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Store Offers</Text>
-          <Text style={styles.disclaimerText}>Only one offer per store is applicable at once. Free Delivery can be added with any other offer from the same store.</Text>
+          <Text style={styles.disclaimerText}>Only one standard offer with free delivery offer is applicable in every order for each store.</Text>
         </View>
 
         {loading ? (
           <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 100 }} />
-        ) : offers.length > 0 ? (
+        ) : groupedOffers.length > 0 ? (
           <View style={styles.offersList}>
-            {offers.map(renderOfferCard)}
+            {groupedOffers.map(renderStoreSection)}
           </View>
         ) : (
           <View style={styles.emptyState}>
@@ -435,97 +458,119 @@ const styles = StyleSheet.create({
   offersList: {
     paddingBottom: 20,
   },
-  offerCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 24,
-    marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    elevation: 4,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+  storeSection: {
+    marginBottom: 24,
+  },
+  storeHeader: {
     flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  cardAccent: {
-    width: 6,
-    height: '100%',
-  },
-  cardContent: {
-    flex: 1,
-    padding: Spacing.lg,
-  },
-  offerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    paddingHorizontal: 4,
   },
-  typeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  typeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginLeft: 6,
-  },
-  storeTag: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  offerTitle: {
-    fontSize: 20,
+  storeName: {
+    fontSize: 18,
     fontWeight: '800',
     color: Colors.text,
-    marginBottom: 12,
+    marginLeft: 8,
+    flex: 1,
   },
-  conditionsRow: {
+  storeOfferCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  horizontalScrollContent: {
+    paddingRight: 0,
+    paddingLeft: 0,
+  },
+  offerCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    width: width,
+    marginRight: 0,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    padding: 20,
+  },
+  offerTabHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+    marginBottom: 8,
   },
-  condPill: {
-    backgroundColor: '#F3F4F6',
+  offerTabBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    gap: 4,
   },
-  condPillText: {
+  offerTabBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  offerTabTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  offerTabDesc: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 20,
+    height: 40, // Two lines roughly
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  offerTabConditions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    flex: 1,
+  },
+  offerTabCondPill: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  offerTabCondText: {
     fontSize: 11,
     color: Colors.textSecondary,
     fontWeight: '600',
   },
-  offerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+  miniApplyBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
-  viewCondBtn: {
-    paddingVertical: 10,
+  miniApplyBtnText: {
+    color: Colors.white,
+    fontSize: 13,
+    fontWeight: '800',
   },
-  viewCondText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
-    textDecorationLine: 'underline',
-  },
-  applyBtn: {
-    flex: 1,
-    height: 48,
-  },
-  appliedBtn: {
+  miniAppliedBtn: {
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.primary,
+  },
+  miniAppliedBtnText: {
+    color: Colors.primary,
   },
   modalOverlay: {
     flex: 1,

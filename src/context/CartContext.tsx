@@ -46,6 +46,7 @@ export interface Offer {
   conditions: OfferCondition;
   reward_data?: {
     product_ids?: string[];
+    product_name?: string;
   };
   created_at: string;
   store_name?: string; // Opt-in for display

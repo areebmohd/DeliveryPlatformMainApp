@@ -14,7 +14,6 @@ import {
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, borderRadius, Typography } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -22,6 +21,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { TimePicker } from '../../components/ui/TimePicker';
 import { useAlert } from '../../context/AlertContext';
+import { getOfferDescription } from '../../utils/offerUtils';
+import { Colors, Spacing, borderRadius, Typography } from '../../theme/colors';
 
 const { width, height } = Dimensions.get('window');
 
@@ -240,7 +241,9 @@ export const OffersScreen = ({ navigation }: any) => {
         },
         reward_data: (selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo') ? { 
           product_ids: selectedRewardProducts,
-          product_name: storeProducts.find(p => p.id === selectedRewardProducts[0])?.name || 'Gift Item',
+          product_name: selectedRewardProducts.length === 1 
+            ? (storeProducts.find(p => String(p.id) === String(selectedRewardProducts[0]))?.name || 'Item')
+            : (selectedRewardProducts.length > 1 ? `${selectedRewardProducts.length} Items` : 'Items'),
           product_price: storeProducts.find(p => p.id === selectedRewardProducts[0])?.price || 0
         } : {},
         status: editingOffer ? editingOffer.status : 'active'
@@ -379,27 +382,14 @@ export const OffersScreen = ({ navigation }: any) => {
         
         <Text style={styles.offerAmount}>
           {(() => {
-            const getProductNames = (ids?: string[]) => {
-              if (!ids || ids.length === 0) return 'Items';
-              return ids.map(id => storeProducts.find(p => p.id === id)?.name || 'Item').join(', ');
+            const getNames = (ids?: string[]) => {
+              if (!ids || ids.length === 0) return '';
+              const names = ids.map(id => storeProducts.find(p => String(p.id) === String(id))?.name).filter(Boolean);
+              if (names.length === 0) return '';
+              return names.join(', ');
             };
-
-            switch (offer.type) {
-              case 'discount':
-                return `${offer.amount}% Instant Discount on Total Items Price`;
-              case 'free_delivery':
-                return '₹0 Delivery fee';
-              case 'free_product':
-                return `Get Free ${getProductNames(offer.reward_data?.product_ids)}`;
-              case 'cheap_product':
-                return `${offer.amount}% Instant Discount on ${getProductNames(offer.reward_data?.product_ids)}`;
-              case 'combo':
-                return `${getProductNames(offer.reward_data?.product_ids)} at Only ₹${offer.amount}`;
-              case 'free_cash':
-                return `₹${offer.amount} Free Cash Amount`;
-              default:
-                return '';
-            }
+            const resolvedName = getNames(offer.reward_data?.product_ids);
+            return getOfferDescription(offer, resolvedName);
           })()}
         </Text>
       </View>
