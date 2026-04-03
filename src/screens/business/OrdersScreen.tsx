@@ -78,7 +78,8 @@ export const OrdersScreen = () => {
         *,
         customer:profiles!orders_customer_id_fkey (full_name, phone),
         rider:profiles!orders_rider_id_fkey (full_name, phone),
-        order_items!inner (*, products!inner(store_id))
+        order_items!inner (*, products!inner(store_id)),
+        applied_offers
       `)
       .eq('order_items.products.store_id', id)
       .order('created_at', { ascending: false });
@@ -306,6 +307,48 @@ export const OrdersScreen = () => {
             </View>
           ))}
         </View>
+
+        {/* Applied Offers for THIS store */}
+        {(() => {
+          const storeId = store?.id;
+          if (!item.applied_offers || !storeId) return null;
+
+          const storeOffers = [];
+          const stdOffer = item.applied_offers[storeId];
+          const delOffer = item.applied_offers[`${storeId}_delivery`];
+
+          if (stdOffer) storeOffers.push(stdOffer);
+          if (delOffer) storeOffers.push(delOffer);
+
+          if (storeOffers.length === 0) return null;
+
+          return (
+            <View style={styles.promoContainer}>
+              <Text style={styles.promoLabel}>PROMOTIONS APPLIED</Text>
+              {storeOffers.map((offer, oIdx) => (
+                <View key={oIdx} style={styles.promoBadge}>
+                  <View style={styles.promoIconCircle}>
+                    <Icon name="ticket-percent" size={14} color={Colors.success} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.promoTitle}>
+                      {offer.name || (offer.type === 'free_delivery' ? 'Free Delivery' : 'Discount Offer')}
+                    </Text>
+                    {offer.type === 'discount' && (
+                      <Text style={styles.promoDescription}>{offer.amount}% Store Discount</Text>
+                    )}
+                    {offer.type === 'free_cash' && (
+                      <Text style={styles.promoDescription}>₹{offer.amount} Flat Discount</Text>
+                    )}
+                    {offer.type === 'free_delivery' && (
+                      <Text style={styles.promoDescription}>Delivery sponsored by you</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          );
+        })()}
 
         <View style={styles.orderFooter}>
           <Text style={styles.amountLabel}>Grand Total</Text>
@@ -684,6 +727,46 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  promoContainer: {
+    marginBottom: Spacing.md,
+    paddingHorizontal: 4,
+  },
+  promoLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.success,
+    letterSpacing: 1.5,
+    marginBottom: Spacing.sm,
+  },
+  promoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    gap: 12,
+  },
+  promoIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#DCFCE7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#166534',
+  },
+  promoDescription: {
+    fontSize: 11,
+    color: '#15803d',
+    fontWeight: '600',
+    marginTop: 1,
   },
 });
 

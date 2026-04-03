@@ -703,7 +703,8 @@ export const CartScreen = ({ navigation }: any) => {
           transport_type: isLargeVehicle ? 'heavy' : 'standard',
           total_weight_kg: items.reduce((sum, i) => sum + (i.weight_kg * i.quantity), 0),
           has_helper: hasHelper,
-          helper_fee: helperFee
+          helper_fee: helperFee,
+          applied_offers: appliedOffers
         })
         .select()
         .single();
@@ -1067,7 +1068,7 @@ export const CartScreen = ({ navigation }: any) => {
           </View>
           {maxFreeDist > 0 && deliveryFee > 0 && (
             <Text style={styles.deliveryDisclaimer}>
-              This delivery fee is only from store or stores having larger distance than free delivery store.
+              This delivery fee is only from store not having Free Delivery offer.
             </Text>
           )}
 

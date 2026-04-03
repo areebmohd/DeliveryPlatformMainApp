@@ -80,9 +80,10 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             product_price,
             selected_options,
             products (
-              stores (name)
+              stores (id, name)
             )
-          )
+          ),
+          applied_offers
         `)
         .eq('customer_id', user.id)
         .order('created_at', { ascending: false });
@@ -95,6 +96,27 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
       setLoading(false);
     }
   };
+
+  const groupedOrders = React.useMemo(() => {
+    return orders.reduce((groups: any, order: any) => {
+      const dateObj = new Date(order.created_at);
+      const day = dateObj.getDate().toString().padStart(2, '0');
+      const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
+      const year = dateObj.getFullYear();
+      const formattedDate = `${day} ${month} ${year}`;
+      
+      if (!groups[formattedDate]) groups[formattedDate] = [];
+      groups[formattedDate].push(order);
+      return groups;
+    }, {});
+  }, [orders]);
+
+  const orderList = React.useMemo(() => {
+    return Object.keys(groupedOrders).map(date => ({
+      title: date,
+      data: groupedOrders[date],
+    }));
+  }, [groupedOrders]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -163,7 +185,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
         <View style={styles.cardHeader}>
           <View style={styles.headerLeft}>
             <Text style={styles.orderNumber}>#{item.order_number}</Text>
-            <Text style={styles.dateTime}>{formattedDate}, {formattedTime}</Text>
+            <Text style={styles.dateTime}>{formattedTime}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '15' }]}>
             <Text style={[styles.statusLabel, { color: statusInfo.color }]}>
@@ -194,30 +216,72 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
           });
 
           return Object.keys(groups).map((sName, gIdx) => (
-            <View key={gIdx} style={{ marginTop: Spacing.sm }}>
-              <Text style={styles.storeName}>{sName}</Text>
+            <View key={gIdx} style={styles.storeSection}>
+              <View style={styles.storeHeaderRow}>
+                <Icon name="storefront-outline" size={16} color={Colors.text} />
+                <Text style={styles.storeName}>{sName}</Text>
+              </View>
               <View style={styles.itemsList}>
                 {groups[sName].map((oi: any, idx: number) => (
                   <View key={idx} style={styles.orderItemWrapper}>
                     <View style={styles.orderItemRow}>
-                      <View style={styles.itemLeft}>
-                        <Text style={styles.itemQty}>{oi.quantity} x</Text>
-                        <Text style={styles.itemName} numberOfLines={1}>
-                          {oi.product_name}
-                          {oi.selected_options && Object.keys(oi.selected_options).length > 0 && (
-                            <Text style={styles.itemOptionsText}>
-                              {` (${Object.entries(oi.selected_options)
-                                .map(([k, v]) => `${v}`)
-                                .join(', ')})`}
-                            </Text>
-                          )}
-                        </Text>
-                      </View>
+                      <Text style={styles.itemQty}>{oi.quantity} x</Text>
+                      <Text style={styles.itemName} numberOfLines={1}>
+                        {oi.product_name}
+                        {oi.selected_options && Object.keys(oi.selected_options).length > 0 && (
+                          <Text style={styles.itemOptionsText}>
+                            {` (${Object.entries(oi.selected_options)
+                              .map(([k, v]) => `${v}`)
+                              .join(', ')})`}
+                          </Text>
+                        )}
+                      </Text>
                       <Text style={styles.itemPrice}>₹{oi.product_price * oi.quantity}</Text>
                     </View>
                   </View>
                 ))}
               </View>
+
+              {/* Applied Offers for this store */}
+              {(() => {
+                const storeId = groups[sName][0]?.products?.stores?.id || item.stores?.id;
+                if (!item.applied_offers || !storeId) return null;
+
+                const storeOffers = [];
+                const stdOffer = item.applied_offers[storeId];
+                const delOffer = item.applied_offers[`${storeId}_delivery`];
+
+                if (stdOffer) storeOffers.push(stdOffer);
+                if (delOffer) storeOffers.push(delOffer);
+
+                if (storeOffers.length === 0) return null;
+
+                return (
+                  <View style={styles.offersContainer}>
+                    {storeOffers.map((offer, oIdx) => (
+                      <View key={oIdx} style={styles.promoBadge}>
+                        <View style={styles.promoIconContainer}>
+                          <Icon name="ticket-percent" size={14} color={Colors.success} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.promoTitle}>
+                            {offer.name || (offer.type === 'free_delivery' ? 'Free Delivery' : 'Special Offer')}
+                          </Text>
+                          {offer.type === 'discount' && (
+                            <Text style={styles.promoAmount}>{offer.amount}% OFF Applied</Text>
+                          )}
+                          {offer.type === 'free_cash' && (
+                            <Text style={styles.promoAmount}>₹{offer.amount} Free Cash Discount</Text>
+                          )}
+                          {offer.type === 'free_delivery' && (
+                            <Text style={styles.promoAmount}>Delivery Fee Waived</Text>
+                          )}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
             </View>
           ));
         })()}
@@ -230,7 +294,20 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             </View>
           )}
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Grand Total</Text>
+            <View>
+              <Text style={styles.totalLabel}>Grand Total</Text>
+              <View style={[
+                styles.paymentStatusBadge,
+                { backgroundColor: item.payment_method === 'pay_online' ? Colors.success + '15' : Colors.warning + '15' }
+              ]}>
+                <Text style={[
+                  styles.paymentStatusText,
+                  { color: item.payment_method === 'pay_online' ? Colors.success : Colors.warning }
+                ]}>
+                  {item.payment_method === 'pay_online' ? 'Paid' : 'POD'}
+                </Text>
+              </View>
+            </View>
             <Text style={styles.totalAmount}>₹{item.total_amount}</Text>
           </View>
 
@@ -296,10 +373,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : (
-        <FlatList
-          data={orders}
-          renderItem={renderOrderItem}
-          keyExtractor={(item) => item.id}
+        <ScrollView 
           contentContainerStyle={[
             styles.listContent, 
             { paddingBottom: insets.bottom + 40 }
@@ -308,7 +382,22 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
           }
-          ListEmptyComponent={
+        >
+          {orderList.length > 0 ? (
+            orderList.map((group, index) => (
+              <View key={group.title} style={index > 0 ? { marginTop: Spacing.xl } : null}>
+                <View style={styles.dateHeader}>
+                  <Text style={styles.dateHeaderText}>{group.title}</Text>
+                  <View style={styles.dateHeaderLine} />
+                </View>
+                {group.data.map((order: any) => (
+                  <React.Fragment key={order.id}>
+                    {renderOrderItem({ item: order })}
+                  </React.Fragment>
+                ))}
+              </View>
+            ))
+          ) : (
             <View style={styles.emptyContainer}>
               <Icon name="shopping-outline" size={80} color={Colors.border} />
               <Text style={styles.emptyTitle}>No orders yet</Text>
@@ -319,8 +408,8 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
                 style={{ marginTop: 24, width: '100%' }}
               />
             </View>
-          }
-        />
+          )}
+        </ScrollView>
       )}
     </View>
   );
@@ -335,7 +424,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   backButton: {
     width: 40,
@@ -357,13 +447,14 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   listContent: {
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
   },
   orderCard: {
     backgroundColor: Colors.white,
     borderRadius: 24,
     padding: Spacing.lg,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,
     elevation: 2,
@@ -393,12 +484,22 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: '600',
   },
+  storeSection: {
+    marginTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.sm,
+  },
+  storeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: Spacing.sm,
+  },
   storeName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: Colors.text,
-    marginTop: Spacing.sm,
-    marginBottom: 4,
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -411,18 +512,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   itemsList: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: Spacing.md,
-    marginBottom: Spacing.md,
+    marginBottom: 0,
+    gap: 8,
   },
   orderItemWrapper: {
-    marginBottom: 10,
+    marginBottom: 0,
   },
   orderItemRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
   },
   itemLeft: {
     flexDirection: 'row',
@@ -431,16 +530,15 @@ const styles = StyleSheet.create({
   },
   itemQty: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Colors.text,
-    marginRight: 8,
     width: 25,
   },
   itemName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.text,
-    marginBottom: 4,
+    flex: 1,
   },
   itemOptionsText: {
     fontSize: 12,
@@ -449,41 +547,33 @@ const styles = StyleSheet.create({
   },
   itemPrice: {
     fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  optionsBadgeContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
-  },
-  optionBadge: {
-    flexDirection: 'row',
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    alignItems: 'center',
-  },
-  optionBadgeLabel: {
-    fontSize: 9,
-    color: Colors.textSecondary,
-    fontWeight: '700',
-    marginRight: 2,
-  },
-  optionBadgeValue: {
-    fontSize: 9,
-    color: Colors.text,
     fontWeight: '800',
+    color: Colors.text,
+  },
+  dateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 10,
+  },
+  dateHeaderText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  dateHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
   },
   cardFooter: {
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     paddingTop: Spacing.md,
     gap: 16,
+    marginTop: Spacing.md,
   },
   totalRow: {
     flexDirection: 'row',
@@ -496,9 +586,22 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   totalAmount: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     color: Colors.primary,
+  },
+  paymentStatusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  paymentStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   cancelBtn: {
     flexDirection: 'row',
@@ -524,7 +627,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.primary + '20',
-    borderStyle: 'dashed',
+    borderStyle: 'dotted',
   },
   otpInfo: {
     marginLeft: 12,
@@ -567,7 +670,8 @@ const styles = StyleSheet.create({
   transportRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: 0,
+    marginTop: -8,
     gap: 6,
   },
   transportLabel: {
@@ -613,5 +717,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.text,
     fontWeight: '700',
+  },
+  offersContainer: {
+    marginTop: Spacing.sm,
+    gap: 8,
+  },
+  promoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    gap: 10,
+  },
+  promoIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#DCFCE7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.success,
+  },
+  promoAmount: {
+    fontSize: 11,
+    color: Colors.success,
+    fontWeight: '600',
+    marginTop: 1,
   },
 });
