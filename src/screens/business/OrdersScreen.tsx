@@ -248,7 +248,6 @@ export const OrdersScreen = () => {
             </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             <Text style={[styles.statusText, { color: statusColor }]}>
               {getStatusLabel(item.status)}
             </Text>
@@ -268,11 +267,11 @@ export const OrdersScreen = () => {
 
           {item.rider && (
             <View style={[styles.personRow, { marginTop: Spacing.sm }]}>
-              <View style={[styles.iconCircle, { backgroundColor: Colors.secondary + '15' }]}>
-                <Icon name="bike" size={16} color={Colors.secondary} />
+              <View style={styles.iconCircle}>
+                <Icon name="bike" size={16} color={Colors.primary} />
               </View>
               <View>
-                <Text style={[styles.personName, { color: Colors.secondary }]}>{item.rider.full_name}</Text>
+                <Text style={styles.personName}>{item.rider.full_name}</Text>
                 <Text style={styles.personRole}>Delivery Partner • {item.rider.phone || 'No phone'}</Text>
               </View>
             </View>
@@ -309,14 +308,8 @@ export const OrdersScreen = () => {
         </View>
 
         <View style={styles.orderFooter}>
-          <View>
-            <Text style={styles.amountLabel}>Grand Total</Text>
-            <Text style={styles.amountValue}>₹{item.total_amount}</Text>
-          </View>
-          
-          <View style={styles.actionButtons}>
-            {/* Action buttons removed from store account as per user request */}
-          </View>
+          <Text style={styles.amountLabel}>Grand Total</Text>
+          <Text style={styles.amountValue}>₹{item.total_amount}</Text>
         </View>
       </View>
     );
