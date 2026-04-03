@@ -213,13 +213,13 @@ export const OffersScreen = ({ navigation }: any) => {
       return;
     }
 
-    if (selectedType !== 'free_delivery' && selectedType !== 'free_product' && (!amount || isNaN(Number(amount)))) {
-      showToast('Please enter a valid value', 'error');
+    if (!name.trim()) {
+      showToast('Offer Name is required', 'error');
       return;
     }
 
-    if (!name.trim()) {
-      showToast('Please enter an offer name', 'error');
+    if (selectedType !== 'free_delivery' && selectedType !== 'free_product' && (!amount || isNaN(Number(amount)))) {
+      showToast('Please enter a valid amount/percentage', 'error');
       return;
     }
 
@@ -324,59 +324,27 @@ export const OffersScreen = ({ navigation }: any) => {
 
   const renderOfferCard = (offer: Offer) => (
     <View key={offer.id} style={styles.offerCard}>
-      <View style={styles.offerHeader}>
-        <View style={[
-          styles.offerTypeBadge, 
-          offer.type === 'free_cash' && { backgroundColor: '#D1FAE5' },
-          offer.type === 'discount' && { backgroundColor: '#DBEAFE' },
-          offer.type === 'free_delivery' && { backgroundColor: '#FEF3C7' },
-          offer.type === 'free_product' && { backgroundColor: '#FCE7F3' },
-          offer.type === 'cheap_product' && { backgroundColor: '#EDE9FE' },
-          offer.type === 'combo' && { backgroundColor: '#FFEDD5' }
-        ]}>
-          <Icon 
-            name={
-              offer.type === 'free_cash' ? 'cash' : 
-              offer.type === 'discount' ? 'percent' : 
-              offer.type === 'free_delivery' ? 'truck-delivery' : 
-              offer.type === 'free_product' ? 'gift' : 
-              offer.type === 'cheap_product' ? 'tag-outline' : 
-              offer.type === 'combo' ? 'layers-outline' : 'cash'
-            } 
-            size={16} 
-            color={
-              offer.type === 'free_cash' ? '#10B981' : 
-              offer.type === 'discount' ? '#2563EB' : 
-              offer.type === 'free_delivery' ? '#D97706' : 
-              offer.type === 'free_product' ? '#DB2777' : 
-              offer.type === 'cheap_product' ? '#7C3AED' : 
-              offer.type === 'combo' ? '#EA580C' : Colors.primary
-            } 
-          />
-          <Text style={[
-            styles.offerTypeText, 
-            offer.type === 'free_cash' && { color: '#10B981' },
-            offer.type === 'discount' && { color: '#2563EB' },
-            offer.type === 'free_delivery' && { color: '#D97706' },
-            offer.type === 'free_product' && { color: '#DB2777' },
-            offer.type === 'cheap_product' && { color: '#7C3AED' },
-            offer.type === 'combo' && { color: '#EA580C' }
+      <View style={styles.cardMainInfo}>
+        <View style={styles.categoryRow}>
+          <View style={[
+            styles.offerTypeBadge, 
+            offer.type === 'free_cash' && { backgroundColor: '#D1FAE5' },
+            offer.type === 'discount' && { backgroundColor: '#DBEAFE' },
+            offer.type === 'free_delivery' && { backgroundColor: '#FEF3C7' },
+            offer.type === 'free_product' && { backgroundColor: '#FCE7F3' },
+            offer.type === 'cheap_product' && { backgroundColor: '#EDE9FE' },
+            offer.type === 'combo' && { backgroundColor: '#FFEDD5' }
           ]}>
-            {
-              offer.type === 'free_cash' ? 'Free Cash' : 
-              offer.type === 'discount' ? 'Instant Discount' : 
-              offer.type === 'free_delivery' ? 'Free Delivery' : 
-              offer.type === 'free_product' ? 'Free Product' : 
-              offer.type === 'cheap_product' ? 'Cheap Products' : 
-              offer.type === 'combo' ? 'Combo Offer' : 'Free Cash'
-            }
-          </Text>
-        </View>
-        <View style={styles.offerActions}>
-          <TouchableOpacity onPress={() => handleEditOffer(offer)} style={styles.editBtn}>
             <Icon 
-              name="pencil-outline" 
-              size={20} 
+              name={
+                offer.type === 'free_cash' ? 'cash' : 
+                offer.type === 'discount' ? 'percent' : 
+                offer.type === 'free_delivery' ? 'truck-delivery' : 
+                offer.type === 'free_product' ? 'gift' : 
+                offer.type === 'cheap_product' ? 'tag-outline' : 
+                offer.type === 'combo' ? 'layers-outline' : 'cash'
+              } 
+              size={14} 
               color={
                 offer.type === 'free_cash' ? '#10B981' : 
                 offer.type === 'discount' ? '#2563EB' : 
@@ -386,86 +354,122 @@ export const OffersScreen = ({ navigation }: any) => {
                 offer.type === 'combo' ? '#EA580C' : Colors.primary
               } 
             />
-          </TouchableOpacity>
-          <Switch 
-            value={offer.status === 'active'} 
-            onValueChange={() => toggleOfferStatus(offer.id, offer.status)}
-            trackColor={{ 
-              false: '#767577', 
-              true: offer.type === 'free_cash' ? '#A7F3D0' : 
-                    offer.type === 'discount' ? '#93C5FD' : 
-                    offer.type === 'free_delivery' ? '#FCD34D' : 
-                    offer.type === 'free_product' ? '#F9A8D4' : 
-                    offer.type === 'cheap_product' ? '#C4B5FD' : 
-                    offer.type === 'combo' ? '#FDBA74' : Colors.primaryLight 
-            }}
-            thumbColor={offer.status === 'active' 
-              ? (offer.type === 'free_cash' ? '#10B981' : 
-                 offer.type === 'discount' ? '#2563EB' : 
-                 offer.type === 'free_delivery' ? '#D97706' : 
-                 offer.type === 'free_product' ? '#DB2777' : 
-                 offer.type === 'cheap_product' ? '#7C3AED' : 
-                 offer.type === 'combo' ? '#EA580C' : Colors.primary) 
-              : '#f4f3f4'}
-          />
-          <TouchableOpacity onPress={() => deleteOffer(offer.id)} style={styles.deleteBtn}>
-            <Icon name="delete-outline" size={20} color={Colors.error} />
-          </TouchableOpacity>
+            <Text style={[
+              styles.offerTypeText, 
+              offer.type === 'free_cash' && { color: '#10B981' },
+              offer.type === 'discount' && { color: '#2563EB' },
+              offer.type === 'free_delivery' && { color: '#D97706' },
+              offer.type === 'free_product' && { color: '#DB2777' },
+              offer.type === 'cheap_product' && { color: '#7C3AED' },
+              offer.type === 'combo' && { color: '#EA580C' }
+            ]}>
+              {
+                offer.type === 'free_cash' ? 'Free Cash' : 
+                offer.type === 'discount' ? 'Instant Discount' : 
+                offer.type === 'free_delivery' ? 'Free Delivery' : 
+                offer.type === 'free_product' ? 'Free Gift' : 
+                offer.type === 'cheap_product' ? 'Cheap Products' : 
+                offer.type === 'combo' ? 'Combo Offer' : 'Cash'
+              }
+            </Text>
+          </View>
         </View>
+
+        <Text style={styles.offerNameText}>{offer.name || 'Unnamed Offer'}</Text>
+        
+        <Text style={styles.offerAmount}>
+          {(() => {
+            const getProductNames = (ids?: string[]) => {
+              if (!ids || ids.length === 0) return 'Items';
+              return ids.map(id => storeProducts.find(p => p.id === id)?.name || 'Item').join(', ');
+            };
+
+            switch (offer.type) {
+              case 'discount':
+                return `${offer.amount}% Instant Discount on Total Items Price`;
+              case 'free_delivery':
+                return '₹0 Delivery fee';
+              case 'free_product':
+                return `Get Free ${getProductNames(offer.reward_data?.product_ids)}`;
+              case 'cheap_product':
+                return `${offer.amount}% Instant Discount on ${getProductNames(offer.reward_data?.product_ids)}`;
+              case 'combo':
+                return `${getProductNames(offer.reward_data?.product_ids)} at Only ₹${offer.amount}`;
+              case 'free_cash':
+                return `₹${offer.amount} Free Cash Amount`;
+              default:
+                return '';
+            }
+          })()}
+        </Text>
+      </View>
+
+      <View style={styles.conditionsHeaderRow}>
+        <Text style={styles.conditionsSubTitle}>Conditions</Text>
+        <View style={styles.conditionsLine} />
       </View>
       
-      {offer.name ? (
-        <Text style={styles.offerNameText}>{offer.name}</Text>
-      ) : null}
-      
-      <Text style={styles.offerAmount}>
-        {
-          offer.type === 'discount' ? `${offer.amount}% Off` : 
-          offer.type === 'free_delivery' ? 'Free Delivery' : 
-          offer.type === 'free_product' ? (
-            offer.reward_data?.product_ids?.length === 1 
-              ? `Free ${storeProducts.find(p => p.id === offer.reward_data?.product_ids?.[0])?.name || 'Item'}`
-              : `${offer.reward_data?.product_ids?.length || 0} Free Items`
-          ) : offer.type === 'cheap_product' ? (
-            offer.reward_data?.product_ids?.length === 1 
-              ? `${offer.amount}% Off on ${storeProducts.find(p => p.id === offer.reward_data?.product_ids?.[0])?.name || 'Item'}`
-              : `${offer.amount}% Off on ${offer.reward_data?.product_ids?.length || 0} Items`
-          ) : offer.type === 'combo' ? (
-            `Combo at ₹${offer.amount}`
-          ) : `₹${offer.amount} Cashback`
-        }
-      </Text>
-      
       <View style={styles.conditionsList}>
-        {offer.conditions.min_price && (
+        {offer.conditions.min_price ? (
           <View style={styles.conditionItem}>
-            <Icon name="currency-inr" size={14} color={Colors.textSecondary} />
-            <Text style={styles.conditionText}>Min. Order: ₹{offer.conditions.min_price}</Text>
+            <Icon name="currency-inr" size={13} color={Colors.textSecondary} />
+            <Text style={styles.conditionText}>Order {'>'} ₹{offer.conditions.min_price}</Text>
+          </View>
+        ) : (
+          <View style={styles.conditionItem}>
+            <Icon name="tag-outline" size={13} color={Colors.success} />
+            <Text style={[styles.conditionText, { color: Colors.success }]}>No Minimum Order</Text>
           </View>
         )}
         {offer.conditions.max_distance && (
           <View style={styles.conditionItem}>
-            <Icon name="map-marker-distance" size={14} color={Colors.textSecondary} />
-            <Text style={styles.conditionText}>Radius: {offer.conditions.max_distance} km</Text>
+            <Icon name="map-marker-distance" size={13} color={Colors.textSecondary} />
+            <Text style={styles.conditionText}>Within {offer.conditions.max_distance} km</Text>
           </View>
         )}
         <View style={styles.conditionItem}>
-          <Icon name="account-group-outline" size={14} color={Colors.textSecondary} />
+          <Icon name="account-group-outline" size={13} color={Colors.textSecondary} />
           <Text style={styles.conditionText}>
-            Up to {offer.conditions.applicable_orders} Orders
+            {offer.conditions.applicable_orders === 'all' ? 'All Customers' : `First ${offer.conditions.applicable_orders} Orders`}
           </Text>
         </View>
         {(offer.conditions.start_time || offer.conditions.end_time) && (
           <View style={styles.conditionItem}>
-            <Icon name="clock-outline" size={14} color={Colors.textSecondary} />
+            <Icon name="clock-outline" size={13} color={Colors.textSecondary} />
             <Text style={styles.conditionText}>
-              {offer.conditions.start_time && offer.conditions.end_time 
-                ? `${offer.conditions.start_time} - ${offer.conditions.end_time}`
-                : offer.conditions.start_time ? `From ${offer.conditions.start_time}` : `Until ${offer.conditions.end_time}`
-              }
+              {offer.conditions.start_time || '00:00'} - {offer.conditions.end_time || '23:59'}
             </Text>
           </View>
         )}
+      </View>
+
+      <View style={styles.cardSeparator} />
+
+      <View style={styles.offerActionBar}>
+        <View style={styles.availabilityGroup}>
+          <Text style={[styles.statusToggleLabel, offer.status === 'active' ? { color: Colors.success } : { color: Colors.textSecondary }]}>
+            {offer.status === 'active' ? 'Available' : 'Paused'}
+          </Text>
+          <Switch 
+            value={offer.status === 'active'} 
+            onValueChange={() => toggleOfferStatus(offer.id, offer.status)}
+            trackColor={{ false: '#D1D5DB', true: Colors.success + '40' }}
+            thumbColor={offer.status === 'active' ? Colors.success : '#9CA3AF'}
+            ios_backgroundColor="#D1D5DB"
+            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+          />
+        </View>
+        
+        <View style={styles.mainActionBtns}>
+          <TouchableOpacity onPress={() => handleEditOffer(offer)} style={[styles.actionIconBtn, styles.editActionBtn]}>
+            <Icon name="pencil-outline" size={18} color={Colors.primary} />
+            <Text style={[styles.actionBtnText, { color: Colors.primary }]}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => deleteOffer(offer.id)} style={[styles.actionIconBtn, styles.deleteActionBtn]}>
+            <Icon name="trash-can-outline" size={18} color={Colors.error} />
+            <Text style={[styles.actionBtnText, { color: Colors.error }]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -485,7 +489,7 @@ export const OffersScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
           <Text style={styles.disclaimerText}>
-            Customers can apply one standard offer along with a Free Delivery offer from your store.
+            Customers can apply only one standard offer along with a Free Delivery offer from your store in one order.
           </Text>
         </View>
 
@@ -519,7 +523,7 @@ export const OffersScreen = ({ navigation }: any) => {
             <View style={styles.typeGrid}>
               {[
                 { id: 'free_cash', icon: 'cash', label: 'Free Cash', color: '#10B981' },
-                { id: 'discount', icon: 'percent', label: 'Discounts', color: '#3B82F6' },
+                { id: 'discount', icon: 'percent', label: 'Instant Discount', color: '#3B82F6' },
                 { id: 'free_delivery', icon: 'truck-delivery', label: 'Free Delivery', color: '#F59E0B' },
                 { id: 'free_product', icon: 'gift', label: 'Free Products', color: '#EC4899' },
                 { id: 'cheap_product', icon: 'tag-outline', label: 'Cheap Products', color: '#8B5CF6' },
@@ -563,9 +567,9 @@ export const OffersScreen = ({ navigation }: any) => {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Offer Name</Text>
+                <Text style={styles.label}>Offer Name <Text style={{ color: Colors.error }}>*</Text></Text>
                 <Input 
-                  placeholder="e.g. Diwali Offer, Buy 1 Get 1" 
+                  placeholder="e.g. Holi Special, Buy 1 Get 1" 
                   value={name} 
                   onChangeText={setName} 
                 />
@@ -575,7 +579,7 @@ export const OffersScreen = ({ navigation }: any) => {
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>
                     {selectedType === 'discount' || selectedType === 'cheap_product' ? 'Discount Percentage (%)' : 
-                     selectedType === 'combo' ? 'Combo Price (₹)' : 'Cashback Amount (₹)'}
+                     selectedType === 'combo' ? 'Combo Price (₹)' : 'Free Cash Amount (₹)'}
                   </Text>
                   <Input 
                     placeholder={selectedType === 'discount' || selectedType === 'cheap_product' ? "e.g. 10" : 
@@ -866,6 +870,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
     fontWeight: '600',
+    fontStyle: 'italic',
   },
   addBtn: {
     flexDirection: 'row',
@@ -893,74 +898,141 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.border,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    elevation: 3,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
   },
-  offerHeader: {
+  cardMainInfo: {
+    marginBottom: Spacing.md,
+  },
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.sm,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   offerNameText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: Colors.text,
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
   },
   offerTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    gap: 4,
   },
   offerTypeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-    marginLeft: 4,
-  },
-  offerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  deleteBtn: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  editBtn: {
-    padding: 4,
-    marginRight: 4,
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   offerAmount: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
+  conditionsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
     marginBottom: 12,
+  },
+  conditionsSubTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  conditionsLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#F3F4F6',
   },
   conditionsList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 20,
   },
   conditionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    gap: 6,
   },
   conditionText: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.textSecondary,
-    marginLeft: 4,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  cardSeparator: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginHorizontal: -Spacing.lg,
+    marginBottom: 16,
+  },
+  offerActionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  availabilityGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusToggleLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  mainActionBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionIconBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  editActionBtn: {
+    backgroundColor: Colors.primary + '15',
+  },
+  deleteActionBtn: {
+    backgroundColor: Colors.error + '15',
+  },
+  actionBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  actionVr: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#F3F4F6',
   },
   emptyState: {
     flex: 1,

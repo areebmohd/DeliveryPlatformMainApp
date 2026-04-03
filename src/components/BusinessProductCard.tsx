@@ -152,7 +152,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: Colors.text,
-    height: 44,
     lineHeight: 22,
   },
   category: {
