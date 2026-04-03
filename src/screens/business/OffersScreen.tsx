@@ -476,15 +476,17 @@ export const OffersScreen = ({ navigation }: any) => {
       <View style={{ height: insets.top, backgroundColor: Colors.background }} />
       
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerTitleRow}>
-          <View>
+        <View style={styles.headerTitleContainer}>
+          <View style={styles.headerTitleRow}>
             <Text style={styles.headerTitle}>Offers</Text>
-            <Text style={styles.disclaimerText}>Customers can apply one standard offer along with a Free Delivery offer from your store.</Text>
+            <TouchableOpacity style={styles.addBtn} onPress={handleAddOffer}>
+              <Icon name="plus" size={20} color={Colors.white} />
+              <Text style={styles.addBtnText}>Create Offer</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={handleAddOffer}>
-            <Icon name="plus" size={24} color={Colors.white} />
-            <Text style={styles.addBtnText}>Create</Text>
-          </TouchableOpacity>
+          <Text style={styles.disclaimerText}>
+            Customers can apply one standard offer along with a Free Delivery offer from your store.
+          </Text>
         </View>
 
         {loading ? (
@@ -845,11 +847,14 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     paddingBottom: 40,
   },
+  headerTitleContainer: {
+    marginBottom: Spacing.lg,
+  },
   headerTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: 8,
   },
   headerTitle: {
     fontSize: 24,
@@ -865,16 +870,21 @@ const styles = StyleSheet.create({
   addBtn: {
     flexDirection: 'row',
     backgroundColor: Colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: borderRadius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
     alignItems: 'center',
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   addBtnText: {
     color: Colors.white,
-    fontWeight: '700',
-    marginLeft: 4,
-    fontSize: 14,
+    fontWeight: '800',
+    marginLeft: 6,
+    fontSize: 15,
   },
   offerCard: {
     backgroundColor: Colors.white,

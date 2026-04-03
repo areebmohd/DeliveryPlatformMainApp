@@ -87,7 +87,7 @@ export const SupportScreen = ({ navigation }: any) => {
           <Text style={styles.sectionLabel}>CONTACT US</Text>
           <SupportActionCard 
             icon="phone-outline"
-            title="Business Hotline"
+            title="Call Now"
             subtitle="Immediate assistance for store operations"
             onPress={handleCallSupport}
             color={Colors.primary}
