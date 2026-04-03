@@ -1,11 +1,52 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Linking } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  StatusBar, 
+  Linking, 
+  Dimensions,
+  ScrollView
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing } from '../../theme/colors';
+import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+const { width } = Dimensions.get('window');
 const SUPPORT_EMAIL = 'support@deliveryplatform.com';
 const SUPPORT_PHONE = '+919876543210';
+
+const SupportActionCard = ({ 
+  icon, 
+  title, 
+  subtitle, 
+  onPress, 
+  color = Colors.primary,
+  secondaryColor = Colors.primaryLight
+}: { 
+  icon: string; 
+  title: string; 
+  subtitle: string; 
+  onPress: () => void;
+  color?: string;
+  secondaryColor?: string;
+}) => (
+  <TouchableOpacity 
+    style={styles.actionCard} 
+    onPress={onPress}
+    activeOpacity={0.8}
+  >
+    <View style={[styles.iconBox, { backgroundColor: secondaryColor }]}>
+      <Icon name={icon} size={32} color={color} />
+    </View>
+    <View style={styles.cardInfo}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <Text style={styles.cardSubtitle}>{subtitle}</Text>
+    </View>
+    <Icon name="chevron-right" size={24} color={Colors.border} />
+  </TouchableOpacity>
+);
 
 export const SupportScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
@@ -20,35 +61,48 @@ export const SupportScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
-      <View style={{ height: insets.top, backgroundColor: Colors.background }} />
-      <View style={[styles.header, { paddingTop: Spacing.sm }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Icon name="arrow-left" size={24} color={Colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Support Center</Text>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
+      
+      {/* Premium Header */}
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Icon name="arrow-left" size={24} color={Colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Support Center</Text>
+          <View style={{ width: 44 }} />
+        </View>
+        <View style={styles.headerContent}>
+          <Text style={styles.heroText}>How can we help you today?</Text>
+          <Text style={styles.heroSubText}>Our support team is ready to assist you with orders, payments, and account details.</Text>
+        </View>
       </View>
 
-      <View style={styles.content}>
-        <View style={styles.iconCircle}>
-          <Icon name="chat-question-outline" size={80} color={Colors.primary} />
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>CONTACT US</Text>
+          <SupportActionCard 
+            icon="phone-outline"
+            title="Call Support"
+            subtitle="Immediate assistance for your active orders"
+            onPress={handleCallSupport}
+            color={Colors.primary}
+            secondaryColor={Colors.primaryLight}
+          />
+          <SupportActionCard 
+            icon="email-outline"
+            title="Email Support"
+            subtitle="Best for account or refund inquiries"
+            onPress={handleEmailSupport}
+            color={Colors.success}
+            secondaryColor={Colors.successLight}
+          />
         </View>
-        <Text style={styles.title}>How can we help?</Text>
-        <Text style={styles.subtitle}>
-          Our support team is ready to assist you with orders, payments, and account details.
-        </Text>
-        
-        <View style={styles.btnRow}>
-          <TouchableOpacity style={[styles.btn, styles.callBtn]} onPress={handleCallSupport}>
-            <Icon name="phone" size={24} color={Colors.white} />
-            <Text style={styles.btnText}>Call Us</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.btn, styles.emailBtn]} onPress={handleEmailSupport}>
-            <Icon name="email" size={24} color={Colors.white} />
-            <Text style={styles.btnText}>Email Us</Text>
-          </TouchableOpacity>
-        </View>
         <View style={styles.contactDetails}>
           <View style={styles.contactItem}>
             <Icon name="phone-outline" size={20} color={Colors.textSecondary} />
@@ -59,7 +113,22 @@ export const SupportScreen = ({ navigation }: any) => {
             <Text style={styles.contactText}>{SUPPORT_EMAIL}</Text>
           </View>
         </View>
-      </View>
+
+        <View style={styles.infoBox}>
+          <View style={styles.infoRow}>
+            <Icon name="clock-outline" size={20} color={Colors.primary} />
+            <Text style={styles.infoText}>Available for all your requests</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Icon name="shield-check-outline" size={20} color={Colors.primary} />
+            <Text style={styles.infoText}>Your satisfaction is our priority</Text>
+          </View>
+        </View>
+
+        <Text style={styles.footerNote}>
+          We typically respond to emails within 24 hours. For urgent order issues, please use the call option.
+        </Text>
+      </ScrollView>
     </View>
   );
 };
@@ -70,99 +139,131 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
+    backgroundColor: Colors.primary,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.sm,
   },
   backBtn: {
-    backgroundColor: Colors.white,
-    padding: 8,
-    borderRadius: 25,
-    marginRight: Spacing.md,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
+    color: Colors.white,
+    fontSize: 18,
     fontWeight: '800',
-    color: Colors.text,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
+  headerContent: {
+    paddingHorizontal: Spacing.lg,
+    marginTop: 20,
   },
-  iconCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: Colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    elevation: 8,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-  },
-  title: {
+  heroText: {
+    color: Colors.white,
     fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 32,
+  },
+  heroSubText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: Spacing.lg,
+    paddingTop: Spacing.lg,
+  },
+  section: {
+    gap: Spacing.md,
+  },
+  sectionLabel: {
+    fontSize: 12,
     fontWeight: '800',
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
     color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 24,
-    marginBottom: 40,
+    letterSpacing: 1,
+    marginBottom: 4,
   },
-  btnRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  btn: {
+  actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 16,
-    elevation: 4,
+    backgroundColor: Colors.white,
+    padding: 16,
+    borderRadius: borderRadius.lg,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
   },
-  callBtn: {
-    backgroundColor: Colors.primary,
+  iconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
-  emailBtn: {
-    backgroundColor: Colors.success,
+  cardInfo: {
+    flex: 1,
   },
-  btnText: {
-    color: Colors.white,
-    fontWeight: '800',
+  cardTitle: {
     fontSize: 16,
-    marginLeft: 8,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  infoBox: {
+    marginTop: 30,
+    backgroundColor: Colors.border + '40',
+    padding: 20,
+    borderRadius: 20,
+    gap: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  infoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  footerNote: {
+    textAlign: 'center',
+    marginTop: 40,
+    fontSize: 12,
+    color: Colors.textSecondary + '80',
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
   contactDetails: {
-    marginTop: 40,
+    marginTop: 24,
     gap: 12,
     alignItems: 'center',
     backgroundColor: Colors.white,
     padding: 20,
     borderRadius: 20,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: Colors.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
   },
   contactItem: {
     flexDirection: 'row',

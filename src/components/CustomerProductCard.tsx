@@ -188,5 +188,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '400',
     color: Colors.text,
+    height: 34,
+    lineHeight: 17,
   },
 });

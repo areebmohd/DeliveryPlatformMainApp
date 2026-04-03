@@ -54,7 +54,7 @@ export const BusinessProductCard = ({
         
         <View style={styles.info}>
           <View>
-            <Text style={styles.name} numberOfLines={1}>
+            <Text style={styles.name} numberOfLines={2}>
               {product.name || `Barcode: ${product.barcode}`}
             </Text>
             <Text style={styles.category}>
@@ -152,6 +152,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: Colors.text,
+    height: 44,
+    lineHeight: 22,
   },
   category: {
     fontSize: 12,
