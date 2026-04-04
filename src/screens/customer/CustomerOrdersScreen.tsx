@@ -183,25 +183,16 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
         <View style={styles.cardHeader}>
           <View style={styles.headerLeft}>
             <Text style={styles.orderNumber}>#{item.order_number}</Text>
-            <Text style={styles.dateTime}>{formattedTime}</Text>
+            <Text style={styles.dateTime}>
+              {formattedTime}
+              {item.transport_type && ` • ${item.transport_type === 'heavy' ? 'Truck' : 'Bike'}`}
+            </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '15' }]}>
             <Text style={[styles.statusLabel, { color: statusInfo.color }]}>
               {statusInfo.label}
             </Text>
           </View>
-        </View>
-
-        {/* Transport Type Row */}
-        <View style={styles.transportRow}>
-          <Icon 
-            name={item.transport_type === 'heavy' ? 'truck-delivery' : 'motorbike'} 
-            size={18} 
-            color={Colors.textSecondary} 
-          />
-          <Text style={styles.transportLabel}>
-            {item.transport_type === 'heavy' ? 'Large Vehicle Delivery' : 'Standard Bike Delivery'}
-          </Text>
         </View>
 
         {/* Items Grouped by Store */}
@@ -455,7 +446,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: Spacing.md,
   },
   headerLeft: {
     flex: 1,
@@ -654,18 +644,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 22,
-  },
-  transportRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 0,
-    marginTop: -8,
-    gap: 6,
-  },
-  transportLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '600',
   },
   helperRow: {
     flexDirection: 'row',

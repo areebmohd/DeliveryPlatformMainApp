@@ -241,6 +241,7 @@ export const OrdersScreen = () => {
             <Text style={styles.orderNumber}>#{item.order_number}</Text>
             <Text style={styles.orderTime}>
               {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {item.transport_type && ` • ${item.transport_type === 'heavy' ? 'Truck' : 'Bike'}`}
             </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
@@ -319,14 +320,14 @@ export const OrdersScreen = () => {
                     )}
                   </Text>
                 </View>
-                <View style={{ alignItems: 'flex-end', marginHorizontal: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginHorizontal: 8 }}>
                   {hasStoreWideDiscount ? (
                     <>
-                      <Text style={[styles.itemPriceText, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 11 }]}>
-                        ₹{product.product_price * product.quantity}
-                      </Text>
                       <Text style={[styles.itemPriceText, { color: Colors.success, fontWeight: '800' }]}>
                         ₹{Math.round(discountedUnitPrice * product.quantity)}
+                      </Text>
+                      <Text style={[styles.itemPriceText, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 11 }]}>
+                        ₹{product.product_price * product.quantity}
                       </Text>
                     </>
                   ) : (
@@ -392,7 +393,7 @@ export const OrdersScreen = () => {
 
         <View style={styles.orderFooter}>
           <Text style={styles.amountLabel}>Grand Total</Text>
-          <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
             {(() => {
               const storeId = store?.id;
               const storeOffer = item.applied_offers?.[storeId];
@@ -419,10 +420,10 @@ export const OrdersScreen = () => {
 
               return (
                 <>
-                  <Text style={[styles.amountValue, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 16, marginBottom: -2 }]}>
+                  <Text style={styles.amountValue}>₹{item.total_amount}</Text>
+                  <Text style={[styles.amountValue, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 16 }]}>
                     ₹{Math.round(originalTotal)}
                   </Text>
-                  <Text style={styles.amountValue}>₹{item.total_amount}</Text>
                 </>
               );
             })()}
@@ -592,7 +593,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   orderNumber: {
     fontSize: 13,
@@ -722,7 +723,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Colors.text,
-    marginHorizontal: 8,
   },
   removeBtn: {
     padding: 2,
@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: Spacing.sm,
   },
-  promoBadge: {
+   promoBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F0FDF4',
@@ -822,6 +822,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#DCFCE7',
     gap: 12,
+    marginBottom: 8,
   },
   promoIconCircle: {
     width: 28,
