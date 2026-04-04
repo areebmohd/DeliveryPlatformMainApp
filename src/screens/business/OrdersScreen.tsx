@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ScrollView,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -262,7 +263,13 @@ export const OrdersScreen = () => {
             </View>
             <View>
               <Text style={styles.personName}>{item.customer?.full_name || 'Guest Customer'}</Text>
-              <Text style={styles.personRole}>Customer • {item.customer?.phone || 'No phone'}</Text>
+              {item.customer?.phone ? (
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
+                  <Text style={[styles.personRole, { color: Colors.primary }]}>Customer • {item.customer.phone}</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.personRole}>Customer • No phone</Text>
+              )}
             </View>
           </View>
 
@@ -273,7 +280,13 @@ export const OrdersScreen = () => {
               </View>
               <View>
                 <Text style={styles.personName}>{item.rider.full_name}</Text>
-                <Text style={styles.personRole}>Delivery Partner • {item.rider.phone || 'No phone'}</Text>
+                {item.rider.phone ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.rider.phone}`)}>
+                    <Text style={[styles.personRole, { color: Colors.primary }]}>Delivery Partner • {item.rider.phone}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.personRole}>Delivery Partner • No phone</Text>
+                )}
               </View>
             </View>
           )}
@@ -281,31 +294,59 @@ export const OrdersScreen = () => {
 
         <View style={styles.itemsList}>
           <Text style={styles.itemsTitle}>ORDER ITEMS</Text>
-          {activeItems.map((product: any, idx: number) => (
-            <View key={idx} style={styles.itemRowContainer}>
-              <View style={styles.itemQuantityBox}>
-                <Text style={styles.itemQuantityText}>{product.quantity}x</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemRowText}>
-                  {product.product_name}
-                  {product.selected_options && Object.keys(product.selected_options).length > 0 && (
-                    <Text style={styles.itemOptionsText}>
-                      {` (${Object.entries(product.selected_options)
-                        .map(([k, v]) => `${v}`)
-                        .join(', ')})`}
-                    </Text>
+          {activeItems.map((product: any, idx: number) => {
+            const storeId = store?.id;
+            const storeOffer = item.applied_offers?.[storeId];
+            const hasStoreWideDiscount = storeOffer && (storeOffer.type === 'discount' || storeOffer.type === 'free_cash');
+            
+            let discountedUnitPrice = product.product_price;
+            if (storeOffer?.type === 'discount') {
+              discountedUnitPrice = product.product_price * (1 - storeOffer.amount / 100);
+            } else if (storeOffer?.type === 'free_cash') {
+              const totalStoreAmount = activeItems.reduce((acc: number, curr: any) => acc + curr.product_price * curr.quantity, 0);
+              const proportion = (product.product_price * product.quantity) / totalStoreAmount;
+              discountedUnitPrice = (product.product_price * product.quantity - storeOffer.amount * proportion) / product.quantity;
+            }
+
+            return (
+              <View key={idx} style={styles.itemRowContainer}>
+                <View style={styles.itemQuantityBox}>
+                  <Text style={styles.itemQuantityText}>{product.quantity}x</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.itemRowText}>
+                    {product.product_name}
+                    {product.selected_options && Object.keys(product.selected_options).length > 0 && (
+                      <Text style={styles.itemOptionsText}>
+                        {` (${Object.entries(product.selected_options)
+                          .map(([k, v]) => `${v}`)
+                          .join(', ')})`}
+                      </Text>
+                    )}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', marginHorizontal: 8 }}>
+                  {hasStoreWideDiscount ? (
+                    <>
+                      <Text style={[styles.itemPriceText, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 11 }]}>
+                        ₹{product.product_price * product.quantity}
+                      </Text>
+                      <Text style={[styles.itemPriceText, { color: Colors.success, fontWeight: '800' }]}>
+                        ₹{Math.round(discountedUnitPrice * product.quantity)}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.itemPriceText}>₹{product.product_price * product.quantity}</Text>
                   )}
-                </Text>
+                </View>
+                {isModifiable && (
+                  <TouchableOpacity onPress={() => handleRemoveItem(item, product)} style={styles.removeBtn}>
+                    <Icon name="close-circle-outline" size={20} color={Colors.error} />
+                  </TouchableOpacity>
+                )}
               </View>
-              <Text style={styles.itemPriceText}>₹{product.product_price * product.quantity}</Text>
-              {isModifiable && (
-                <TouchableOpacity onPress={() => handleRemoveItem(item, product)} style={styles.removeBtn}>
-                  <Icon name="close-circle-outline" size={20} color={Colors.error} />
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Applied Offers for THIS store */}
@@ -334,15 +375,20 @@ export const OrdersScreen = () => {
                     <Text style={styles.promoTitle}>
                       {offer.name || (offer.type === 'free_delivery' ? 'Free Delivery' : 'Discount Offer')}
                     </Text>
-                    {offer.type === 'discount' && (
-                      <Text style={styles.promoDescription}>{offer.amount}% Store Discount</Text>
-                    )}
-                    {offer.type === 'free_cash' && (
-                      <Text style={styles.promoDescription}>₹{offer.amount} Flat Discount</Text>
-                    )}
-                    {offer.type === 'free_delivery' && (
-                      <Text style={styles.promoDescription}>Delivery sponsored by you</Text>
-                    )}
+                    <Text style={styles.promoDescription}>
+                      {(() => {
+                        const { type, amount, name } = offer;
+                        switch (type) {
+                          case 'discount': return `${amount}% Instant Discount on Total Items Price`;
+                          case 'free_delivery': return '₹0 Delivery fee';
+                          case 'free_product': return `Get Free ${name || 'Gift Item'}`;
+                          case 'cheap_product': return `${amount}% Instant Discount on ${name || 'Some Items'}`;
+                          case 'combo': return `${name || 'Items'} at Only ₹${amount}`;
+                          case 'free_cash': return `₹${amount} Free Cash amount`;
+                          default: return 'Special store offer';
+                        }
+                      })()}
+                    </Text>
                   </View>
                 </View>
               ))}
@@ -352,7 +398,41 @@ export const OrdersScreen = () => {
 
         <View style={styles.orderFooter}>
           <Text style={styles.amountLabel}>Grand Total</Text>
-          <Text style={styles.amountValue}>₹{item.total_amount}</Text>
+          <View style={{ alignItems: 'flex-end' }}>
+            {(() => {
+              const storeId = store?.id;
+              const storeOffer = item.applied_offers?.[storeId];
+              const deliveryOffer = item.applied_offers?.[`${storeId}_delivery`];
+              const hasDiscount = storeOffer || deliveryOffer;
+              
+              if (!hasDiscount) {
+                return <Text style={styles.amountValue}>₹{item.total_amount}</Text>;
+              }
+
+              // Calculate original total before this store's discounts
+              let originalTotal = item.total_amount;
+              if (storeOffer?.type === 'discount') {
+                const storeSubtotal = activeItems.reduce((acc: number, curr: any) => acc + curr.product_price * curr.quantity, 0);
+                const discountAmount = storeSubtotal * (storeOffer.amount / 100);
+                originalTotal += discountAmount;
+              } else if (storeOffer?.type === 'free_cash') {
+                originalTotal += storeOffer.amount;
+              }
+              
+              if (deliveryOffer) {
+                originalTotal += 25; // Standard delivery fee to add back for strike-through
+              }
+
+              return (
+                <>
+                  <Text style={[styles.amountValue, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 16, marginBottom: -2 }]}>
+                    ₹{Math.round(originalTotal)}
+                  </Text>
+                  <Text style={styles.amountValue}>₹{item.total_amount}</Text>
+                </>
+              );
+            })()}
+          </View>
         </View>
       </View>
     );

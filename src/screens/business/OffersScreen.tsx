@@ -21,7 +21,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { TimePicker } from '../../components/ui/TimePicker';
 import { useAlert } from '../../context/AlertContext';
-import { getOfferDescription } from '../../utils/offerUtils';
+import { getOfferDescription, getOfferConditionList, getTheme } from '../../utils/offerUtils';
 import { Colors, Spacing, borderRadius, Typography } from '../../theme/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -325,144 +325,93 @@ export const OffersScreen = ({ navigation }: any) => {
     });
   };
 
-  const renderOfferCard = (offer: Offer) => (
-    <View key={offer.id} style={styles.offerCard}>
-      <View style={styles.cardMainInfo}>
-        <View style={styles.categoryRow}>
-          <View style={[
-            styles.offerTypeBadge, 
-            offer.type === 'free_cash' && { backgroundColor: '#D1FAE5' },
-            offer.type === 'discount' && { backgroundColor: '#DBEAFE' },
-            offer.type === 'free_delivery' && { backgroundColor: '#FEF3C7' },
-            offer.type === 'free_product' && { backgroundColor: '#FCE7F3' },
-            offer.type === 'cheap_product' && { backgroundColor: '#EDE9FE' },
-            offer.type === 'combo' && { backgroundColor: '#FFEDD5' }
-          ]}>
-            <Icon 
-              name={
-                offer.type === 'free_cash' ? 'cash' : 
-                offer.type === 'discount' ? 'percent' : 
-                offer.type === 'free_delivery' ? 'truck-delivery' : 
-                offer.type === 'free_product' ? 'gift' : 
-                offer.type === 'cheap_product' ? 'tag-outline' : 
-                offer.type === 'combo' ? 'layers-outline' : 'cash'
-              } 
-              size={14} 
-              color={
-                offer.type === 'free_cash' ? '#10B981' : 
-                offer.type === 'discount' ? '#2563EB' : 
-                offer.type === 'free_delivery' ? '#D97706' : 
-                offer.type === 'free_product' ? '#DB2777' : 
-                offer.type === 'cheap_product' ? '#7C3AED' : 
-                offer.type === 'combo' ? '#EA580C' : Colors.primary
-              } 
+  const renderConditionLine = (offer: any) => {
+    const list = getOfferConditionList(offer);
+    const maxVisible = 3;
+    const hasMore = list.length > maxVisible;
+    const visibleList = hasMore ? list.slice(0, maxVisible - 1) : list;
+
+    return (
+      <View style={styles.conditionsLine}>
+        <View style={{ flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center' }}>
+          {visibleList.map((c, i) => (
+            <View key={i} style={styles.offerTabCondPill}>
+              <Text style={styles.offerTabCondText} numberOfLines={1}>{c}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  const renderOfferCard = (offer: Offer) => {
+    const theme = getTheme(offer.type);
+    
+    return (
+      <View key={offer.id} style={styles.offerCard}>
+        <View style={styles.cardMainInfo}>
+          <View style={styles.categoryRow}>
+            <View style={[styles.offerTabBadge, { backgroundColor: theme.bg }]}>
+              <Icon 
+                name={theme.icon} 
+                size={14} 
+                color={theme.color} 
+              />
+              <Text style={[styles.offerTabBadgeText, { color: theme.color }]}>
+                {offer.type.replace('_', ' ').toUpperCase()}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.offerNameText}>{offer.name || 'Unnamed Offer'}</Text>
+          
+          <Text style={styles.offerAmount}>
+            {(() => {
+              const getNames = (ids?: string[]) => {
+                if (!ids || ids.length === 0) return '';
+                const names = ids.map(id => storeProducts.find(p => String(p.id) === String(id))?.name).filter(Boolean);
+                if (names.length === 0) return '';
+                return names.join(', ');
+              };
+              const resolvedName = getNames(offer.reward_data?.product_ids);
+              return getOfferDescription(offer, resolvedName);
+            })()}
+          </Text>
+        </View>
+
+        {renderConditionLine(offer)}
+
+        <View style={styles.cardSeparator} />
+
+        <View style={styles.offerActionBar}>
+          <View style={styles.availabilityGroup}>
+            <Text style={[styles.statusToggleLabel, offer.status === 'active' ? { color: Colors.success } : { color: Colors.textSecondary }]}>
+              {offer.status === 'active' ? 'Available' : 'Paused'}
+            </Text>
+            <Switch 
+              value={offer.status === 'active'} 
+              onValueChange={() => toggleOfferStatus(offer.id, offer.status)}
+              trackColor={{ false: '#D1D5DB', true: Colors.success + '40' }}
+              thumbColor={offer.status === 'active' ? Colors.success : '#9CA3AF'}
+              ios_backgroundColor="#D1D5DB"
+              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
-            <Text style={[
-              styles.offerTypeText, 
-              offer.type === 'free_cash' && { color: '#10B981' },
-              offer.type === 'discount' && { color: '#2563EB' },
-              offer.type === 'free_delivery' && { color: '#D97706' },
-              offer.type === 'free_product' && { color: '#DB2777' },
-              offer.type === 'cheap_product' && { color: '#7C3AED' },
-              offer.type === 'combo' && { color: '#EA580C' }
-            ]}>
-              {
-                offer.type === 'free_cash' ? 'Free Cash' : 
-                offer.type === 'discount' ? 'Instant Discount' : 
-                offer.type === 'free_delivery' ? 'Free Delivery' : 
-                offer.type === 'free_product' ? 'Free Gift' : 
-                offer.type === 'cheap_product' ? 'Cheap Products' : 
-                offer.type === 'combo' ? 'Combo Offer' : 'Cash'
-              }
-            </Text>
+          </View>
+
+          <View style={styles.mainActionBtns}>
+            <TouchableOpacity onPress={() => handleEditOffer(offer)} style={[styles.actionIconBtn, styles.editActionBtn]}>
+              <Icon name="pencil-outline" size={18} color={Colors.primary} />
+              <Text style={[styles.actionBtnText, { color: Colors.primary }]}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => deleteOffer(offer.id)} style={[styles.actionIconBtn, styles.deleteActionBtn]}>
+              <Icon name="trash-can-outline" size={18} color={Colors.error} />
+              <Text style={[styles.actionBtnText, { color: Colors.error }]}>Delete</Text>
+            </TouchableOpacity>
           </View>
         </View>
-
-        <Text style={styles.offerNameText}>{offer.name || 'Unnamed Offer'}</Text>
-        
-        <Text style={styles.offerAmount}>
-          {(() => {
-            const getNames = (ids?: string[]) => {
-              if (!ids || ids.length === 0) return '';
-              const names = ids.map(id => storeProducts.find(p => String(p.id) === String(id))?.name).filter(Boolean);
-              if (names.length === 0) return '';
-              return names.join(', ');
-            };
-            const resolvedName = getNames(offer.reward_data?.product_ids);
-            return getOfferDescription(offer, resolvedName);
-          })()}
-        </Text>
       </View>
-
-      <View style={styles.conditionsHeaderRow}>
-        <Text style={styles.conditionsSubTitle}>Conditions</Text>
-        <View style={styles.conditionsLine} />
-      </View>
-      
-      <View style={styles.conditionsList}>
-        {offer.conditions.min_price ? (
-          <View style={styles.conditionItem}>
-            <Icon name="currency-inr" size={13} color={Colors.textSecondary} />
-            <Text style={styles.conditionText}>Order {'>'} ₹{offer.conditions.min_price}</Text>
-          </View>
-        ) : (
-          <View style={styles.conditionItem}>
-            <Icon name="tag-outline" size={13} color={Colors.success} />
-            <Text style={[styles.conditionText, { color: Colors.success }]}>No Minimum Order</Text>
-          </View>
-        )}
-        {offer.conditions.max_distance && (
-          <View style={styles.conditionItem}>
-            <Icon name="map-marker-distance" size={13} color={Colors.textSecondary} />
-            <Text style={styles.conditionText}>Within {offer.conditions.max_distance} km</Text>
-          </View>
-        )}
-        <View style={styles.conditionItem}>
-          <Icon name="account-group-outline" size={13} color={Colors.textSecondary} />
-          <Text style={styles.conditionText}>
-            {offer.conditions.applicable_orders === 'all' ? 'All Customers' : `First ${offer.conditions.applicable_orders} Orders`}
-          </Text>
-        </View>
-        {(offer.conditions.start_time || offer.conditions.end_time) && (
-          <View style={styles.conditionItem}>
-            <Icon name="clock-outline" size={13} color={Colors.textSecondary} />
-            <Text style={styles.conditionText}>
-              {offer.conditions.start_time || '00:00'} - {offer.conditions.end_time || '23:59'}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.cardSeparator} />
-
-      <View style={styles.offerActionBar}>
-        <View style={styles.availabilityGroup}>
-          <Text style={[styles.statusToggleLabel, offer.status === 'active' ? { color: Colors.success } : { color: Colors.textSecondary }]}>
-            {offer.status === 'active' ? 'Available' : 'Paused'}
-          </Text>
-          <Switch 
-            value={offer.status === 'active'} 
-            onValueChange={() => toggleOfferStatus(offer.id, offer.status)}
-            trackColor={{ false: '#D1D5DB', true: Colors.success + '40' }}
-            thumbColor={offer.status === 'active' ? Colors.success : '#9CA3AF'}
-            ios_backgroundColor="#D1D5DB"
-            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-          />
-        </View>
-        
-        <View style={styles.mainActionBtns}>
-          <TouchableOpacity onPress={() => handleEditOffer(offer)} style={[styles.actionIconBtn, styles.editActionBtn]}>
-            <Icon name="pencil-outline" size={18} color={Colors.primary} />
-            <Text style={[styles.actionBtnText, { color: Colors.primary }]}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => deleteOffer(offer.id)} style={[styles.actionIconBtn, styles.deleteActionBtn]}>
-            <Icon name="trash-can-outline" size={18} color={Colors.error} />
-            <Text style={[styles.actionBtnText, { color: Colors.error }]}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -931,48 +880,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: Colors.textSecondary,
-    marginTop: 4,
-  },
-  conditionsHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  conditionsSubTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    marginBottom: 4,
   },
   conditionsLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#F3F4F6',
+    marginBottom: 16,
+    height: 28,
   },
-  conditionsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+  offerTabCondPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 6,
   },
-  conditionItem: {
+  offerTabCondText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '800',
+  },
+  offerTabBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    gap: 6,
+    paddingVertical: 5,
+    borderRadius: 8,
+    gap: 4,
   },
-  conditionText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '600',
+  offerTabBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  viewBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewBtnText: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '800',
   },
   cardSeparator: {
     height: 1,
@@ -1004,10 +959,11 @@ const styles = StyleSheet.create({
   actionIconBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   editActionBtn: {
     backgroundColor: Colors.primary + '15',
@@ -1018,11 +974,6 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 13,
     fontWeight: '800',
-  },
-  actionVr: {
-    width: 1,
-    height: 20,
-    backgroundColor: '#F3F4F6',
   },
   emptyState: {
     flex: 1,
@@ -1316,5 +1267,60 @@ const styles = StyleSheet.create({
   doneBtn: {
     flex: 1,
     height: 56,
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    maxHeight: '90%',
+  },
+  modalDesc: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  modalSection: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+  },
+  modalSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  fullCondItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 12,
+  },
+  condBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+    marginTop: 8,
+  },
+  fullCondText: {
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+    flex: 1,
+  },
+  productNamesList: {
+    marginTop: 8,
+    gap: 4,
+  },
+  productNameItem: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    paddingLeft: 8,
   },
 });
