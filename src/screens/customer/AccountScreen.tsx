@@ -253,14 +253,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
     color: Colors.text,
-    marginBottom: Spacing.lg,
-    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   box: {
     backgroundColor: Colors.white,

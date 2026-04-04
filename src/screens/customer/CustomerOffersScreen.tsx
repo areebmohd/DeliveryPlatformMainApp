@@ -747,14 +747,13 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '800',
     color: Colors.text,
-    letterSpacing: -0.5,
   },
   disclaimerText: {
     fontSize: 12,

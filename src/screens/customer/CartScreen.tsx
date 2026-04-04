@@ -1137,7 +1137,7 @@ export const CartScreen = ({ navigation }: any) => {
 
           <View style={styles.billRow}>
             <View style={styles.labelWithInfo}>
-              <Text style={styles.billLabel}>Delivery Fee ({isLargeVehicle ? 'Large Vehicle' : 'Bike'})</Text>
+              <Text style={styles.billLabel}>Delivery Fee ({isLargeVehicle ? 'Truck' : 'Bike'})</Text>
               <TouchableOpacity onPress={() => setInfoModal({
                 visible: true,
                 title: 'Delivery Fee',
@@ -1163,13 +1163,6 @@ export const CartScreen = ({ navigation }: any) => {
 
           {isLargeVehicle && (
             <View style={styles.vehicleAlertContainer}>
-              <View style={styles.vehicleAlert}>
-                <Icon name="truck-delivery" size={20} color={Colors.error} />
-                <Text style={styles.vehicleAlertText}>
-                  Large vehicle is needed due to item weight or oversized dimensions.
-                </Text>
-              </View>
-              
               <TouchableOpacity 
                 style={[styles.helperToggle, hasHelper && styles.helperToggleActive]}
                 onPress={() => setHasHelper(!hasHelper)}
@@ -1521,11 +1514,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: 0,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '800',
     color: Colors.text,
   },
