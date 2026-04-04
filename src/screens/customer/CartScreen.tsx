@@ -17,7 +17,7 @@ import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { useCart } from '../../context/CartContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
-import { getOfferDescription } from '../../utils/offerUtils';
+import { getOfferDescription, getOfferConditionList, getTheme } from '../../utils/offerUtils';
 import { Input } from '../../components/ui/Input';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -57,6 +57,7 @@ export const CartScreen = ({ navigation }: any) => {
   const [isAutoApplyInProgress, setIsAutoApplyInProgress] = useState(false);
   const [lastAutoAppliedId, setLastAutoAppliedId] = useState<string | null>(null);
   const [storeDistances, setStoreDistances] = useState<Record<string, number>>({});
+  const [manuallyRemovedStores, setManuallyRemovedStores] = useState<string[]>([]);
 
   // Background fetch for reward product details (if missing)
   useEffect(() => {
@@ -229,6 +230,7 @@ export const CartScreen = ({ navigation }: any) => {
       let appliedCount = 0;
 
       for (const storeId of storesInCart) {
+        if (manuallyRemovedStores.includes(storeId)) continue;
         const standardKey = storeId as string;
         const deliveryKey = `${storeId}_delivery`;
         
@@ -311,6 +313,39 @@ export const CartScreen = ({ navigation }: any) => {
     });
     setIsOffersModalVisible(false);
     showToast('Offer applied successfully!', 'success');
+  };
+
+  const renderConditionLine = (offer: any) => {
+    const list = getOfferConditionList(offer);
+    const maxVisible = 3;
+    const hasMore = list.length > maxVisible;
+    const visibleList = hasMore ? list.slice(0, maxVisible - 1) : list;
+
+    return (
+      <View style={styles.conditionsLine}>
+        <View style={{ flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center' }}>
+          {visibleList.map((c, i) => (
+            <View key={i} style={styles.offerTabCondPill}>
+              <Text style={styles.offerTabCondText} numberOfLines={1}>{c}</Text>
+            </View>
+          ))}
+          {hasMore && (
+            <TouchableOpacity 
+              style={styles.offerTabCondPill} 
+              onPress={() => {
+                showAlert({
+                  title: 'Offer Conditions',
+                  message: list.map(c => `• ${c}`).join('\n\n'),
+                  type: 'info'
+                });
+              }}
+            >
+              <Text style={styles.offerTabCondText}>+ More</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
   };
 
   const getOfferColor = (type: string) => {
@@ -989,7 +1024,7 @@ export const CartScreen = ({ navigation }: any) => {
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.storeOfferName}>
-                          {offer.name || `${offer.type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())} Applied`}
+                          {offer.name || 'Special Offer'}
                         </Text>
                       </View>
                       <TouchableOpacity 
@@ -998,6 +1033,10 @@ export const CartScreen = ({ navigation }: any) => {
                           const key = offer.type === 'free_delivery' ? deliveryKey : standardKey;
                           delete newOffers[key];
                           setAppliedOffers(newOffers);
+                          // Stop auto-apply for this store in this session
+                          if (!manuallyRemovedStores.includes(storeId)) {
+                            setManuallyRemovedStores(prev => [...prev, storeId]);
+                          }
                         }} 
                         style={styles.storeOfferRemove}
                       >
@@ -1338,6 +1377,7 @@ export const CartScreen = ({ navigation }: any) => {
             ) : (
               <ScrollView contentContainerStyle={styles.offerModalList}>
                 {activeStoreOffers.map((offer) => {
+                  const theme = getTheme(offer.type);
                   const offerKey = offer.type === 'free_delivery' ? `${offer.store_id}_delivery` : offer.store_id;
                   const isApplied = appliedOffers[offerKey]?.id === offer.id;
                   const conditionErrors = isApplied ? [] : checkOfferConditions(offer);
@@ -1346,8 +1386,10 @@ export const CartScreen = ({ navigation }: any) => {
                   return (
                     <View key={offer.id} style={[styles.modalOfferCard, isApplied && styles.activeModalOfferCard]}>
                       <View style={styles.modalOfferHeader}>
-                        <View style={[styles.offerBadge, { backgroundColor: getOfferColor(offer.type) }]}>
-                          <Text style={styles.offerBadgeText}>{offer.type.replace('_', ' ').toUpperCase()}</Text>
+                        <View style={[styles.offerTabBadge, { backgroundColor: theme.bg }]}>
+                          <Text style={[styles.offerTabBadgeText, { color: theme.color }]}>
+                            {offer.type.replace('_', ' ').toUpperCase()}
+                          </Text>
                         </View>
                         {isApplied && (
                           <View style={styles.appliedBadge}>
@@ -1357,34 +1399,38 @@ export const CartScreen = ({ navigation }: any) => {
                         )}
                       </View>
                       
-                      <Text style={styles.offerModalOfferTitle}>{offer.name || 'Special Offer'}</Text>
-                      <Text style={styles.offerModalOfferDesc}>{getOfferDescription(offer)}</Text>
+                      <Text style={styles.offerTabTitle} numberOfLines={1}>{offer.name || 'Special Offer'}</Text>
+                      <Text style={styles.offerTabDesc} numberOfLines={2}>
+                        {getOfferDescription(offer)}
+                      </Text>
 
-                      {(() => {
-                        const hasCond = offer.conditions.min_price || offer.conditions.start_time || (offer.conditions.product_ids && offer.conditions.product_ids.length > 0);
-                        return !hasCond && (
-                          <Text style={styles.offerModalConditionText}>• No Condition</Text>
-                        );
-                      })()}
-
-                      {offer.conditions.min_price && (
-                        <Text style={styles.offerModalConditionText}>• Min. Order: ₹{offer.conditions.min_price}</Text>
-                      )}
+                      {renderConditionLine(offer)}
 
                       <TouchableOpacity 
                         style={[
-                          styles.offerModalApplyBtn, 
+                          styles.offerModalSingleBtn, 
                           isApplied && styles.offerModalAppliedBtn,
                           !canApply && !isApplied && styles.offerModalDisabledBtn
                         ]}
-                        onPress={() => !isApplied && handleApplyOffer(offer)}
+                        onPress={() => {
+                          if (isApplied) return;
+                          if (!canApply) {
+                            showAlert({
+                              title: 'Conditions Not Met',
+                              message: conditionErrors.map(err => `• ${err}`).join('\n\n'),
+                              type: 'warning'
+                            });
+                            return;
+                          }
+                          handleApplyOffer(offer);
+                        }}
                       >
                         <Text style={[
-                          styles.offerModalApplyText, 
+                          styles.offerModalSingleBtnText, 
                           isApplied && styles.offerModalAppliedText,
                           !canApply && !isApplied && styles.offerModalDisabledText
                         ]}>
-                          {isApplied ? 'Applied' : canApply ? 'Apply Deal' : 'Conditions Not Met'}
+                          {isApplied ? 'Applied' : canApply ? 'Apply Offer' : 'Conditions Not Met'}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -2124,13 +2170,13 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 32,
     minHeight: height * 0.5,
     maxHeight: height * 0.8,
-    padding: 24,
+    padding: 20,
   },
   offerModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: 10,
   },
   offerModalTitle: {
     fontSize: 22,
@@ -2150,7 +2196,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   offerModalList: {
-    paddingBottom: 20,
+    paddingVertical: 10,
   },
   modalOfferCard: {
     backgroundColor: '#F8FAFC',
@@ -2170,15 +2216,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  offerBadge: {
+  offerTabCondPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  offerTabCondText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '800',
+  },
+  offerTabBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
-  offerBadgeText: {
+  offerTabBadgeText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  offerTabTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: Colors.text,
+    marginBottom: 4,
+    letterSpacing: -0.3,
+  },
+  offerTabDesc: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: 5,
+    fontWeight: '500',
+  },
+  offerModalSingleBtn: {
+    backgroundColor: '#059669', // Modern green
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offerModalDisabledBtn: {
+    backgroundColor: '#F1F5F9',
+  },
+  offerModalDisabledText: {
+    color: Colors.textSecondary,
+    fontWeight: '700',
+  },
+  offerModalSingleBtnText: {
     color: Colors.white,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  offerModalAppliedBtn: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#059669',
+  },
+  offerModalAppliedText: {
+    color: '#059669',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  conditionsLine: {
+    marginBottom: 8,
+    height: 28,
   },
   appliedBadge: {
     flexDirection: 'row',
@@ -2189,47 +2294,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     color: '#059669',
-  },
-  offerModalOfferTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  offerModalOfferDesc: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  offerModalConditionText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  offerModalApplyBtn: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  offerModalAppliedBtn: {
-    backgroundColor: '#10B981',
-  },
-  offerModalDisabledBtn: {
-    backgroundColor: '#E2E8F0',
-  },
-  offerModalApplyText: {
-    color: Colors.white,
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  offerModalAppliedText: {
-    color: Colors.white,
-  },
-  offerModalDisabledText: {
-    color: Colors.textSecondary,
   },
 });
