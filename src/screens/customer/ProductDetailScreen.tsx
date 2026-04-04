@@ -28,11 +28,44 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   const [isFavourite, setIsFavourite] = React.useState(false);
   const [favLoading, setFavLoading] = React.useState(false);
   const [selectedOptions, setSelectedOptions] = React.useState<Record<string, string>>({});
+  const [storeCount, setStoreCount] = React.useState(0);
+  const [currentStore, setCurrentStore] = React.useState(store);
   const { showAlert } = useAlert();
 
   React.useEffect(() => {
     checkFavourite();
+    fetchStoreAvailability();
   }, [product.id]);
+
+  const fetchStoreAvailability = async () => {
+    try {
+      let query = supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .neq('is_deleted', true);
+
+      if (product.barcode) {
+        query = query.eq('barcode', product.barcode);
+      } else {
+        query = query.eq('name', product.name);
+      }
+
+      const { count, error } = await query;
+      if (error) throw error;
+      setStoreCount(count || 1);
+
+      if (!currentStore && product.store_id) {
+        const { data: st, error: stErr } = await supabase
+          .from('stores')
+          .select('*')
+          .eq('id', product.store_id)
+          .single();
+        if (!stErr) setCurrentStore(st);
+      }
+    } catch (e) {
+      console.error('Error fetching store count:', e);
+    }
+  };
 
   const checkFavourite = async () => {
     try {
@@ -229,6 +262,22 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
               return <Text style={styles.description}>{product.description}</Text>;
             }
           })()}
+
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionTitle}>Store</Text>
+          {storeCount > 1 ? (
+            <Text style={styles.storeNameText}>Available in {storeCount} Stores</Text>
+          ) : (
+            <TouchableOpacity 
+              activeOpacity={0.7}
+              onPress={() => currentStore && navigation.navigate('StoreDetails', { store: currentStore })}
+            >
+              <Text style={styles.storeLinkText}>
+                {currentStore?.name || 'Loading store...'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
@@ -408,6 +457,18 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 22,
     fontWeight: '500',
+    marginBottom: Spacing.md,
+  },
+  storeNameText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: Spacing.lg,
+  },
+  storeLinkText: {
+    fontSize: 15,
+    color: Colors.primary,
+    fontWeight: '700',
     marginBottom: Spacing.lg,
   },
   specList: {

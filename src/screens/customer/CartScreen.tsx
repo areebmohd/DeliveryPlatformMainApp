@@ -106,6 +106,15 @@ export const CartScreen = ({ navigation }: any) => {
     }
   }, [appliedOffers]);
 
+  // Sync manuallyRemovedStores with cart items
+  useEffect(() => {
+    const storesInCart = [...new Set(items.map(i => i.store_id))];
+    const stillInCart = manuallyRemovedStores.filter(id => storesInCart.includes(id));
+    if (stillInCart.length !== manuallyRemovedStores.length) {
+      setManuallyRemovedStores(stillInCart);
+    }
+  }, [items.length]);
+
   // Distance helper
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371; // km
@@ -228,17 +237,14 @@ export const CartScreen = ({ navigation }: any) => {
 
       const newAppliedOffers = { ...appliedOffers };
       let appliedCount = 0;
+      let upgradedCount = 0;
 
       for (const storeId of storesInCart) {
         if (manuallyRemovedStores.includes(storeId)) continue;
+        
         const standardKey = storeId as string;
         const deliveryKey = `${storeId}_delivery`;
         
-        const hasStandard = !!newAppliedOffers[standardKey];
-        const hasDelivery = !!newAppliedOffers[deliveryKey];
-
-        if (hasStandard && hasDelivery) continue; // Already has both
-
         const { data, error } = await supabase
           .from('offers')
           .select(`
@@ -259,34 +265,60 @@ export const CartScreen = ({ navigation }: any) => {
           return checkOfferConditions(formattedOffer).length === 0;
         });
 
-        if (validOffers.length === 0) continue;
+        if (validOffers.length === 0) {
+          // If a previously auto-applied offer became invalid, we should remove it? 
+          // Actually, let's keep it for now unless it causes bugs. 
+          // But to be clean, if it was auto-applied, we should clear it if no longer valid.
+          continue;
+        }
 
-        // Ranking: Cash > Discount > Delivery
-        const rankedOffers = validOffers.sort((a, b) => {
-          const typeOrder = { free_cash: 0, discount: 1, free_delivery: 2 };
+        // Separate and Rank
+        const standardOffers = validOffers.filter(o => o.type !== 'free_delivery').sort((a, b) => {
+          const typeOrder = { free_cash: 0, discount: 1 };
           const aOrder = (typeOrder as any)[a.type] ?? 99;
           const bOrder = (typeOrder as any)[b.type] ?? 99;
-          
           if (aOrder !== bOrder) return aOrder - bOrder;
           return (b.amount || 0) - (a.amount || 0);
         });
 
-        const bestOffer = rankedOffers[0];
-        const offerKey = bestOffer.type === 'free_delivery' ? deliveryKey : standardKey;
+        const deliveryOffers = validOffers.filter(o => o.type === 'free_delivery');
 
-        if (bestOffer.id !== lastAutoAppliedId && !newAppliedOffers[offerKey]) {
-          newAppliedOffers[offerKey] = {
-            ...bestOffer,
-            store_name: bestOffer.store?.name,
-            store_location: bestOffer.store?.location
-          };
-          appliedCount++;
+        // Apply best standard if changed
+        if (standardOffers.length > 0) {
+          const best = standardOffers[0];
+          const current = newAppliedOffers[standardKey];
+          if (!current || current.id !== best.id) {
+            newAppliedOffers[standardKey] = {
+              ...best,
+              store_name: best.store?.name,
+              store_location: best.store?.location
+            };
+            if (current) upgradedCount++; else appliedCount++;
+          }
+        }
+
+        // Apply best delivery if changed
+        if (deliveryOffers.length > 0) {
+          const best = deliveryOffers[0];
+          const current = newAppliedOffers[deliveryKey];
+          if (!current || current.id !== best.id) {
+            newAppliedOffers[deliveryKey] = {
+              ...best,
+              store_name: best.store?.name,
+              store_location: best.store?.location
+            };
+            if (current) upgradedCount++; else appliedCount++;
+          }
         }
       }
 
-      if (appliedCount > 0) {
+      if (appliedCount > 0 || upgradedCount > 0) {
         setAppliedOffers(newAppliedOffers);
-        showToast(`${appliedCount} offer(s) applied automatically!`, 'success');
+        if (upgradedCount > 0 && appliedCount === 0) {
+          showToast(`Upgraded to better offers!`, 'success');
+        } else if (appliedCount > 0) {
+          showToast(`${appliedCount} offer(s) applied automatically!`, 'success');
+        }
       }
     } catch (e) {
       console.error('Auto-apply error:', e);
