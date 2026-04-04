@@ -58,6 +58,8 @@ export const CartScreen = ({ navigation }: any) => {
   const [lastAutoAppliedId, setLastAutoAppliedId] = useState<string | null>(null);
   const [storeDistances, setStoreDistances] = useState<Record<string, number>>({});
   const [manuallyRemovedStores, setManuallyRemovedStores] = useState<string[]>([]);
+  const [storeDeliveryFees, setStoreDeliveryFees] = useState<Record<string, number>>({});
+  const [totalStoreFees, setTotalStoreFees] = useState(0);
 
   // Background fetch for reward product details (if missing)
   useEffect(() => {
@@ -587,13 +589,19 @@ export const CartScreen = ({ navigation }: any) => {
 
   let deliveryFee = baseDeliveryFee;
   let totalOfferDiscount = 0;
-  let maxFreeDist = 0;
+  let storeContributions: Record<string, number> = {};
+  let totalStoreContribution = 0;
 
   Object.values(appliedOffers).forEach(offer => {
     let offerDiscount = 0;
     if (offer.type === 'free_delivery') {
       const dist = storeDistances[offer.store_id] || 0;
-      if (dist > maxFreeDist) maxFreeDist = dist;
+      const storeFee = isLargeVehicle 
+        ? 300 + (dist * 30)
+        : 20 + (dist * 5);
+      
+      storeContributions[offer.store_id] = storeFee;
+      totalStoreContribution += storeFee;
     } else if (offer.type === 'free_cash') {
       offerDiscount = offer.amount;
     } else if (offer.type === 'discount') {
@@ -612,13 +620,13 @@ export const CartScreen = ({ navigation }: any) => {
     totalOfferDiscount += offerDiscount;
   });
 
-  if (maxFreeDist > 0) {
-    const freePortion = isLargeVehicle 
-      ? 300 + (maxFreeDist * 30)
-      : 20 + (maxFreeDist * 5);
-    
-    deliveryFee = Math.max(0, baseDeliveryFee - freePortion);
-  }
+  deliveryFee = Math.max(0, baseDeliveryFee - totalStoreContribution);
+
+  // Sync state for use in checkout
+  useEffect(() => {
+    setStoreDeliveryFees(storeContributions);
+    setTotalStoreFees(totalStoreContribution);
+  }, [JSON.stringify(storeContributions), totalStoreContribution]);
 
   const grandTotal = Math.max(0, baseGrandTotal - totalOfferDiscount);
 
@@ -777,7 +785,9 @@ export const CartScreen = ({ navigation }: any) => {
           total_weight_kg: items.reduce((sum, i) => sum + (i.weight_kg * i.quantity), 0),
           has_helper: hasHelper,
           helper_fee: helperFee,
-          applied_offers: appliedOffers
+          applied_offers: appliedOffers,
+          total_store_delivery_fees: totalStoreFees,
+          store_delivery_fees: storeDeliveryFees
         })
         .select()
         .single();
@@ -1151,12 +1161,12 @@ export const CartScreen = ({ navigation }: any) => {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
-              {maxFreeDist > 0 && deliveryFee < baseDeliveryFee && (
+              {totalStoreFees > 0 && deliveryFee < baseDeliveryFee && (
                 <Text style={styles.originalTotalText}>₹{baseDeliveryFee.toFixed(2)}</Text>
               )}
             </View>
           </View>
-          {maxFreeDist > 0 && deliveryFee > 0 && (
+          {totalStoreFees > 0 && deliveryFee > 0 && (
             <Text style={styles.deliveryDisclaimer}>
               This delivery fee is only from store not having Free Delivery offer.
             </Text>
