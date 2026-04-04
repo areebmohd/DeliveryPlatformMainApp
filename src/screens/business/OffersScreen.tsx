@@ -479,7 +479,7 @@ export const OffersScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
           <Text style={styles.disclaimerText}>
-            Customers can apply only one standard offer along with a Free Delivery offer from your store in one order.
+            Customers can apply only one standard offer along with a Free Delivery offer from your store in every order.
           </Text>
         </View>
 

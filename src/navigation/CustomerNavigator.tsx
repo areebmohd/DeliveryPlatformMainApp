@@ -29,6 +29,7 @@ const Tab = createBottomTabNavigator();
 const HomeStackNav = createNativeStackNavigator();
 const CartStackNav = createNativeStackNavigator();
 const AccountStackNav = createNativeStackNavigator();
+const OffersStackNav = createNativeStackNavigator();
 
 const HomeStack = () => {
   return (
@@ -73,6 +74,16 @@ const CartStack = () => {
       <CartStackNav.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
       <CartStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
     </CartStackNav.Navigator>
+  );
+};
+
+const OffersStack = () => {
+  return (
+    <OffersStackNav.Navigator screenOptions={{ headerShown: false }}>
+      <OffersStackNav.Screen name="OffersMain" component={CustomerOffersScreen} />
+      <OffersStackNav.Screen name="StoreDetails" component={StoreDetailsScreen} />
+      <OffersStackNav.Screen name="ProductDetail" component={ProductDetailScreen} />
+    </OffersStackNav.Navigator>
   );
 };
 
@@ -127,7 +138,7 @@ export const CustomerNavigator = () => {
       }}
     >
       <Tab.Screen name="Home" component={HomeStack} />
-      <Tab.Screen name="Offers" component={CustomerOffersScreen} />
+      <Tab.Screen name="Offers" component={OffersStack} />
       <Tab.Screen name="Cart" component={CartStack} />
       <Tab.Screen name="Account" component={AccountStack} />
     </Tab.Navigator>

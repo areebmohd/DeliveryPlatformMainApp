@@ -206,9 +206,11 @@ export const CartScreen = ({ navigation }: any) => {
     }
 
     if (conditions.product_ids && conditions.product_ids.length > 0) {
-      const hasProduct = items.some(item => conditions.product_ids.includes(item.id));
-      if (!hasProduct) {
-        errors.push("Missing required products for this offer.");
+      const allPresent = conditions.product_ids.every((pid: string) => 
+        items.some(item => item.id === pid)
+      );
+      if (!allPresent) {
+        errors.push(`All ${conditions.product_ids.length} required products must be in your cart.`);
       }
     }
 
@@ -491,11 +493,13 @@ export const CartScreen = ({ navigation }: any) => {
 
       // 3. Product check
       if (offer.conditions.product_ids && offer.conditions.product_ids.length > 0) {
-        const hasProduct = items.some(item => offer.conditions.product_ids?.includes(item.id));
-        if (!hasProduct) {
+        const allPresent = offer.conditions.product_ids.every((pid: string) => 
+          items.some(item => item.id === pid)
+        );
+        if (!allPresent) {
           delete newOffers[offerKey];
           changed = true;
-          showToast(`Offer removed: Required products missing.`, 'info');
+          showToast(`Offer removed: All required products must be in cart.`, 'info');
         }
       }
     });
@@ -740,6 +744,19 @@ export const CartScreen = ({ navigation }: any) => {
         .insert(orderItems);
 
       if (itemsError) throw itemsError;
+
+      // Increment used_count for all applied offers
+      const appliedOfferIds = Object.values(appliedOffers as Record<string, any>).map(o => o.id).filter(Boolean);
+      if (appliedOfferIds.length > 0) {
+        // Use an RPC or manual updates to increment the count
+        // Supabase JS doesn't support bulk increments easily, so we use multiple update calls
+        // or a single call with an increment expression via RPC
+        await Promise.all(
+          appliedOfferIds.map(oid => 
+            supabase.rpc('increment_offer_used_count', { offer_id: oid })
+          )
+        );
+      }
 
       clearCart();
       navigation.navigate('Account', { screen: 'CustomerOrders' });
@@ -1342,6 +1359,13 @@ export const CartScreen = ({ navigation }: any) => {
                       
                       <Text style={styles.offerModalOfferTitle}>{offer.name || 'Special Offer'}</Text>
                       <Text style={styles.offerModalOfferDesc}>{getOfferDescription(offer)}</Text>
+
+                      {(() => {
+                        const hasCond = offer.conditions.min_price || offer.conditions.start_time || (offer.conditions.product_ids && offer.conditions.product_ids.length > 0);
+                        return !hasCond && (
+                          <Text style={styles.offerModalConditionText}>• No Condition</Text>
+                        );
+                      })()}
 
                       {offer.conditions.min_price && (
                         <Text style={styles.offerModalConditionText}>• Min. Order: ₹{offer.conditions.min_price}</Text>
@@ -2106,7 +2130,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 5,
   },
   offerModalTitle: {
     fontSize: 22,

@@ -11,15 +11,19 @@ import {
   Linking,
   Image,
   Platform,
+  Dimensions,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
-import { getOfferDescription } from '../../utils/offerUtils';
+import { getOfferDescription, getOfferConditionList, validateOffer, getTheme } from '../../utils/offerUtils';
 import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
-import { useCart } from '../../context/CartContext';
+import { useCart, Offer } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../api/supabase';
 
 const formatOpeningHours = (hoursJson: string) => {
@@ -46,13 +50,68 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const [isFavourite, setIsFavourite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
+  const [conditionModal, setConditionModal] = useState<{ visible: boolean; offer: any | null }>({
+    visible: false,
+    offer: null
+  });
+  const [storeProducts, setStoreProducts] = useState<any[]>([]);
+  const [favouriteOfferIds, setFavouriteOfferIds] = useState<string[]>([]);
+  const { user, profile } = useAuth();
+  const { showAlert } = useAlert();
+  const { width } = Dimensions.get('window');
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchProducts();
     fetchStoreOffers();
     checkFavourite();
+    fetchFavouriteOfferIds();
   }, []);
+
+  const fetchFavouriteOfferIds = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('favourites')
+        .select('offer_id')
+        .eq('user_id', user.id)
+        .not('offer_id', 'is', null);
+      
+      if (error) throw error;
+      setFavouriteOfferIds((data || []).map(f => f.offer_id));
+    } catch (e) {
+      console.error('Error fetching favorite offers:', e);
+    }
+  };
+
+  const toggleOfferFavourite = async (offerId: string) => {
+    if (!user) {
+      showAlert({ title: 'Authentication Required', message: 'Please sign in to favorite offers', type: 'info' });
+      return;
+    }
+
+    const isFav = favouriteOfferIds.includes(offerId);
+    
+    try {
+      if (isFav) {
+        const { error } = await supabase
+          .from('favourites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('offer_id', offerId);
+        if (error) throw error;
+        setFavouriteOfferIds(prev => prev.filter(id => id !== offerId));
+      } else {
+        const { error } = await supabase
+          .from('favourites')
+          .insert({ user_id: user.id, offer_id: offerId });
+        if (error) throw error;
+        setFavouriteOfferIds(prev => [...prev, offerId]);
+      }
+    } catch (e) {
+      console.error('Error toggling offer favorite:', e);
+    }
+  };
 
   const checkFavourite = async () => {
     try {
@@ -189,6 +248,52 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const handleApplyOfferInternal = (offer: any, appliedOffers: any, setAppliedOffers: any) => {
+    const offerKey = offer.type === 'free_delivery' ? `${offer.store_id}_delivery` : offer.store_id;
+    const isApplied = appliedOffers[offerKey]?.id === offer.id;
+
+    if (isApplied) {
+      const newOffers = { ...appliedOffers };
+      delete newOffers[offerKey];
+      setAppliedOffers(newOffers);
+      return;
+    }
+
+    // Check if ALL required products are in cart
+    if (offer.conditions.product_ids && offer.conditions.product_ids.length > 0) {
+        const allPresent = offer.conditions.product_ids.every((pid: string) => 
+            items.some(item => item.id === pid)
+        );
+        if (!allPresent) {
+            showAlert({ 
+                title: 'Missing Products', 
+                message: `This offer requires all ${offer.conditions.product_ids.length} specific products in your cart. Click "View" to see the list.`, 
+                type: 'warning' 
+            });
+            return;
+        }
+    }
+
+    // Validation
+    const validation = validateOffer(offer, subtotal, 0, profile?.order_count || 0, items);
+    
+    if (!validation.valid) {
+      showAlert({
+        title: 'Conditions Not Met',
+        message: validation.errors.join('\n\n'),
+        type: 'warning'
+      });
+      return;
+    }
+
+    setAppliedOffers({
+      ...appliedOffers,
+      [offerKey]: offer
+    });
+    
+    showAlert({ title: 'Offer Applied!', message: 'The offer has been applied to your cart.', type: 'success' });
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
@@ -219,43 +324,45 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
       </View>
 
       <ScrollView 
-        stickyHeaderIndices={[3]}
+        stickyHeaderIndices={[1]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: totalItems > 0 ? 120 : insets.bottom + 20 }}
       >
-        {/* Banner */}
-        <View style={styles.bannerContainer}>
-          {store.banner_url ? (
-            <Image source={{ uri: store.banner_url }} style={styles.banner} />
-          ) : (
-            <View style={[styles.banner, styles.bannerPlaceholder]}>
-              <Icon name="store" size={60} color={Colors.border} />
-              <Text style={styles.placeholderText}>Welcome to our store</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Store Branding (Moved below banner) */}
-        <View style={styles.brandingContainer}>
-          <Text style={styles.storeName}>{store.name}</Text>
-          <View style={styles.badgeRow}>
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{store.category}</Text>
-            </View>
-            {store.city && (
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryText}>{store.city}</Text>
+        <View>
+          {/* Banner */}
+          <View style={styles.bannerContainer}>
+            {store.banner_url ? (
+              <Image source={{ uri: store.banner_url }} style={styles.banner} />
+            ) : (
+              <View style={[styles.banner, styles.bannerPlaceholder]}>
+                <Icon name="store" size={60} color={Colors.border} />
+                <Text style={styles.placeholderText}>Welcome to our store</Text>
               </View>
             )}
           </View>
-        </View>
 
-        {!store.is_currently_open && (
-          <View style={styles.closedBanner}>
-            <Icon name="clock-alert-outline" size={20} color={Colors.white} />
-            <Text style={styles.closedText}>Store is currently closed for online orders</Text>
+          {/* Store Branding (Moved below banner) */}
+          <View style={styles.brandingContainer}>
+            <Text style={styles.storeName}>{store.name}</Text>
+            <View style={styles.badgeRow}>
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryText}>{store.category}</Text>
+              </View>
+              {store.city && (
+                <View style={styles.categoryBadge}>
+                  <Text style={styles.categoryText}>{store.city}</Text>
+                </View>
+              )}
+            </View>
           </View>
-        )}
+
+          {!store.is_currently_open && (
+            <View style={styles.closedBanner}>
+              <Icon name="clock-alert-outline" size={20} color={Colors.white} />
+              <Text style={styles.closedText}>Store is currently closed for online orders</Text>
+            </View>
+          )}
+        </View>
 
         {/* Tabs */}
         <View style={styles.tabWrapper}>
@@ -335,49 +442,78 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
               {offersLoading ? (
                 <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
               ) : storeOffers.length > 0 ? (
-                storeOffers.map((offer) => (
-                  <View key={offer.id} style={styles.offerTabCard}>
-                    <View style={styles.offerTabHeader}>
-                      <View style={[styles.offerTabBadge, { backgroundColor: offer.type === 'free_delivery' ? '#FEF3C7' : (offer.type === 'free_product' ? '#FCE7F3' : '#D1FAE5') }]}>
-                        <Icon 
-                          name={offer.type === 'free_delivery' ? 'truck-delivery' : (offer.type === 'free_product' ? 'gift' : 'cash')} 
-                          size={14} 
-                          color={offer.type === 'free_delivery' ? '#D97706' : (offer.type === 'free_product' ? '#DB2777' : '#10B981')} 
-                        />
-                        <Text style={[styles.offerTabBadgeText, { color: offer.type === 'free_delivery' ? '#D97706' : (offer.type === 'free_product' ? '#DB2777' : '#10B981') }]}>
-                          {offer.type.replace('_', ' ').toUpperCase()}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <Text style={styles.offerTabTitle}>{offer.name || 'Special Offer'}</Text>
-                    <Text style={styles.offerTabDesc}>
-                      {(() => {
-                        const getNames = (ids?: string[]) => {
-                          if (!ids || ids.length === 0) return '';
-                          const names = ids.map(id => products.find(p => String(p.id) === String(id))?.name).filter(Boolean);
-                          if (names.length === 0) return '';
-                          return names.join(', ');
-                        };
-                        const resolvedName = getNames(offer.reward_data?.product_ids);
-                        return getOfferDescription(offer, resolvedName);
-                      })()}
-                    </Text>
+                <View style={{ paddingHorizontal: Spacing.md }}>
+                  {storeOffers.map((offer) => {
+                    const theme = getTheme(offer.type);
+                    const { appliedOffers, setAppliedOffers } = useCart();
+                    const offerKey = offer.type === 'free_delivery' ? `${offer.store_id}_delivery` : offer.store_id;
+                    const isApplied = appliedOffers[offerKey]?.id === offer.id;
+                    const conditionTexts = getOfferConditionList(offer);
 
-                    <View style={styles.offerTabConditions}>
-                      {offer.conditions?.min_price && (
-                        <View style={styles.offerTabCondPill}>
-                          <Text style={styles.offerTabCondText}>Min. ₹{offer.conditions.min_price}</Text>
+                    return (
+                      <View key={offer.id} style={styles.offerTabCard}>
+                        <View style={styles.offerTabHeader}>
+                          <View style={styles.badgeStoreRow}>
+                            <View style={[styles.offerTabBadge, { backgroundColor: theme.bg }]}>
+                              <Text style={[styles.offerTabBadgeText, { color: theme.color }]}>
+                                {offer.type.replace('_', ' ').toUpperCase()}
+                              </Text>
+                            </View>
+                          </View>
                         </View>
-                      )}
-                      {offer.conditions?.max_distance && (
-                        <View style={styles.offerTabCondPill}>
-                          <Text style={styles.offerTabCondText}>Under {offer.conditions.max_distance}km</Text>
+                        
+                        <Text style={styles.offerTabTitle} numberOfLines={1}>{offer.name || 'Special Offer'}</Text>
+                        <Text style={styles.offerTabDesc} numberOfLines={2}>
+                          {(() => {
+                            const getNames = (ids?: string[]) => {
+                              if (!ids || ids.length === 0) return '';
+                              const names = ids.map(id => products.find(p => String(p.id) === String(id))?.name).filter(Boolean);
+                              if (names.length === 0) return '';
+                              return names.join(', ');
+                            };
+                            const resolvedName = getNames(offer.reward_data?.product_ids);
+                            return getOfferDescription(offer, resolvedName);
+                          })()}
+                        </Text>
+
+                        <View style={styles.conditionsLine}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            {conditionTexts.slice(0, 2).map((text, idx) => (
+                              <View key={idx} style={styles.offerTabCondPill}>
+                                <Text style={styles.offerTabCondText}>{text}</Text>
+                              </View>
+                            ))}
+                            {conditionTexts.length > 2 && (
+                              <TouchableOpacity 
+                                style={styles.offerTabCondPill}
+                                onPress={() => setConditionModal({ visible: true, offer })}
+                              >
+                                <Text style={styles.offerTabCondText}>+ More</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
                         </View>
-                      )}
-                    </View>
-                  </View>
-                ))
+
+                        <View style={styles.cardActions}>
+                          <TouchableOpacity 
+                            style={styles.viewBtn}
+                            onPress={() => setConditionModal({ visible: true, offer })}
+                          >
+                            <Text style={styles.viewBtnText}>View</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={[styles.applyBtn, isApplied && styles.appliedBtn]}
+                            onPress={() => handleApplyOfferInternal(offer, appliedOffers, setAppliedOffers)}
+                          >
+                            <Text style={[styles.applyBtnText, isApplied && styles.appliedBtnText]}>
+                              {isApplied ? "Remove" : "Apply"}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
               ) : (
                 <View style={styles.emptyContainer}>
                   <Icon name="tag-off-outline" size={64} color={Colors.border} />
@@ -529,6 +665,153 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         onClose={() => setSelectedProductOptions(null)}
         onConfirm={(options) => addItem({ ...selectedProductOptions, selectedOptions: options }, store)}
       />
+
+      {/* Detailed View Modal */}
+      <Modal 
+        visible={conditionModal.visible} 
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setConditionModal({ visible: false, offer: null })}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeaderHeader}>
+              <View style={{ flex: 1 }}>
+                <View style={[styles.offerTabBadge, { 
+                  backgroundColor: getTheme(conditionModal.offer?.type || '').bg,
+                  alignSelf: 'flex-start',
+                  marginBottom: 8
+                }]}>
+                  <Text style={[styles.offerTabBadgeText, { color: getTheme(conditionModal.offer?.type || '').color }]}>
+                    {conditionModal.offer?.type.replace('_', ' ').toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={styles.modalTitleDetail}>{conditionModal.offer?.name || 'Offer Details'}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setConditionModal({ visible: false, offer: null })}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {conditionModal.offer && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.modalDesc}>
+                  {(() => {
+                    const resolvedName = conditionModal.offer.reward_data?.product_ids && conditionModal.offer.reward_data.product_ids.length > 0
+                      ? products.find((p: any) => p.id === conditionModal.offer.reward_data.product_ids[0])?.name
+                      : undefined;
+                    return getOfferDescription(conditionModal.offer, resolvedName);
+                  })()}
+                </Text>
+                
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Complete Offer Details</Text>
+                  
+                  <View style={styles.fullCondItem}>
+                     <View style={styles.condBullet} />
+                     <Text style={styles.fullCondText}>
+                       <Text style={{ fontWeight: '800' }}>Eligibility: </Text>
+                       {conditionModal.offer.conditions.applicable_orders === 'all' 
+                         ? 'Open for all existing and new customers.' 
+                         : `Valid only for your first ${conditionModal.offer.conditions.applicable_orders} orders from this store.`}
+                     </Text>
+                  </View>
+
+                  {conditionModal.offer.conditions.min_price && (
+                    <View style={styles.fullCondItem}>
+                       <View style={styles.condBullet} />
+                       <Text style={styles.fullCondText}>
+                         <Text style={{ fontWeight: '800' }}>Minimum Purchase: </Text>
+                         You need to buy products worth ₹{conditionModal.offer.conditions.min_price} or more from this store to apply this offer.
+                       </Text>
+                    </View>
+                  )}
+
+                  {conditionModal.offer.conditions.start_time && (
+                    <View style={styles.fullCondItem}>
+                       <View style={styles.condBullet} />
+                       <Text style={styles.fullCondText}>
+                         <Text style={{ fontWeight: '800' }}>Offer Timing: </Text>
+                         This offer is only available between {conditionModal.offer.conditions.start_time} and {conditionModal.offer.conditions.end_time}.
+                       </Text>
+                    </View>
+                  )}
+
+                  {conditionModal.offer.conditions.max_distance && (
+                    <View style={styles.fullCondItem}>
+                       <View style={styles.condBullet} />
+                       <Text style={styles.fullCondText}>
+                         <Text style={{ fontWeight: '800' }}>Distance Limit: </Text>
+                         Your delivery address must be within {conditionModal.offer.conditions.max_distance}km from this store.
+                       </Text>
+                    </View>
+                  )}
+
+                  {conditionModal.offer.conditions.product_ids && conditionModal.offer.conditions.product_ids.length > 0 && (
+                    <View style={styles.fullCondItem}>
+                       <View style={styles.condBullet} />
+                       <View style={{ flex: 1 }}>
+                         <Text style={styles.fullCondText}>
+                           <Text style={{ fontWeight: '800' }}>Required Products: </Text>
+                           To apply this offer, you must have at least one of these items in your cart:
+                         </Text>
+                         <View style={styles.productNamesList}>
+                            {conditionModal.offer.conditions.product_ids.map((pid: string) => {
+                               const product = products.find(p => p.id === pid);
+                               return (
+                                 <Text key={pid} style={styles.productNameItem}>• {product?.name || 'Specific Product'}</Text>
+                               );
+                            })}
+                         </View>
+                       </View>
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+            )}
+            
+            <View>
+              {(() => {
+                const { appliedOffers, setAppliedOffers } = useCart();
+                const off = conditionModal.offer;
+                const isApp = off && appliedOffers[off.type === 'free_delivery' ? `${off.store_id}_delivery` : off.store_id]?.id === off.id;
+                
+                return (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, gap: 12 }}>
+                    <Button 
+                      title={isApp ? "Remove Offer" : "Apply Offer"} 
+                      onPress={() => {
+                          setConditionModal({ visible: false, offer: null });
+                          handleApplyOfferInternal(off, appliedOffers, setAppliedOffers);
+                      }} 
+                      style={{ flex: 1, marginVertical: 0 }}
+                    />
+                    <TouchableOpacity 
+                      onPress={() => toggleOfferFavourite(off?.id)}
+                      style={{ 
+                        width: 56, 
+                        height: 56, 
+                        borderRadius: 16, 
+                        backgroundColor: Colors.white,
+                        borderWidth: 1.5,
+                        borderColor: favouriteOfferIds.includes(off?.id) ? Colors.error : Colors.border,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Icon 
+                        name={favouriteOfferIds.includes(off?.id) ? "heart" : "heart-outline"} 
+                        size={28} 
+                        color={favouriteOfferIds.includes(off?.id) ? Colors.error : Colors.border} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -593,23 +876,22 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginBottom: 7,
   },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   categoryBadge: {
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 10,
-    alignSelf: 'flex-start',
   },
   categoryText: {
-    fontSize: 12,
     color: Colors.primary,
+    fontSize: 12,
     fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
   },
   bannerContainer: {
     width: '100%',
@@ -633,6 +915,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: Colors.textSecondary,
     fontWeight: '500',
+  },
+  closedBanner: {
+    marginHorizontal: Spacing.md,
+    backgroundColor: Colors.error,
+    padding: 12,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  closedText: {
+    color: Colors.white,
+    fontWeight: '700',
+    fontSize: 14,
   },
   tabWrapper: {
     backgroundColor: '#F8F9FA',
@@ -668,8 +967,11 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   tabContent: {
-    paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  productsSection: {
+    flex: 1,
+    paddingHorizontal: Spacing.md,
   },
   productsGrid: {
     flexDirection: 'row',
@@ -677,18 +979,112 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: Spacing.md,
   },
-  productsSection: {
+  offersSection: {
     flex: 1,
+  },
+  offerTabCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 18,
+    marginBottom: 16,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  offerTabHeader: {
+    marginBottom: 12,
+  },
+  badgeStoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  offerTabBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  offerTabBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  offerTabTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  offerTabDesc: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  conditionsLine: {
+    marginBottom: 16,
+    height: 28,
+  },
+  offerTabCondPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  offerTabCondText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '800',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  viewBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  viewBtnText: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  applyBtn: {
+    flex: 2,
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  applyBtnText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  appliedBtn: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  appliedBtnText: {
+    color: Colors.primary,
   },
   infoSection: {
     flex: 1,
+    paddingHorizontal: Spacing.md,
   },
   infoCard: {
     backgroundColor: Colors.white,
     borderRadius: 24,
     padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   infoItem: {
     marginVertical: 4,
@@ -707,6 +1103,16 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '500',
   },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  infoDivider: {
+    height: 1,
+    backgroundColor: '#F1F3F5',
+    marginVertical: Spacing.lg,
+  },
   mapLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -718,16 +1124,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.primary,
     fontWeight: '700',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  infoDivider: {
-    height: 1,
-    backgroundColor: '#F1F3F5',
-    marginVertical: Spacing.lg,
   },
   contactActions: {
     flexDirection: 'row',
@@ -768,19 +1164,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  emptyContainer: {
-    marginTop: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    marginTop: 12,
-  },
   cartBar: {
     position: 'absolute',
     left: 20,
     right: 20,
+    bottom: 20,
     backgroundColor: Colors.primary,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -817,82 +1205,91 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginRight: 8,
   },
-  closedBanner: {
-    marginHorizontal: Spacing.md,
-    backgroundColor: Colors.error,
-    padding: 12,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.xs,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
   },
-  closedText: {
-    color: Colors.white,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  offersSection: {
-    paddingBottom: 100,
-  },
-  offerTabCard: {
+  modalContent: {
     backgroundColor: Colors.white,
-    borderRadius: 20,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    maxHeight: '90%',
   },
-  offerTabHeader: {
+  modalHeaderHeader: {
     flexDirection: 'row',
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 5,
   },
-  offerTabBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  offerTabBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  offerTabTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.text,
+  modalTypeLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: Colors.primary,
     marginBottom: 4,
   },
-  offerTabDesc: {
+  modalTitleDetail: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: Colors.text,
+    letterSpacing: -0.5,
+  },
+  modalDesc: {
     fontSize: 14,
     color: Colors.textSecondary,
-    marginBottom: 12,
     lineHeight: 20,
+    marginBottom: 24,
   },
-  offerTabConditions: {
+  modalSection: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+  },
+  modalSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  fullCondItem: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    marginBottom: 16,
+    gap: 12,
   },
-  offerTabCondPill: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  condBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+    marginTop: 8,
   },
-  offerTabCondText: {
-    fontSize: 11,
+  fullCondText: {
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+    flex: 1,
+  },
+  productNamesList: {
+    marginTop: 8,
+    gap: 4,
+  },
+  productNameItem: {
+    fontSize: 13,
     color: Colors.textSecondary,
     fontWeight: '600',
+    paddingLeft: 8,
+  },
+  emptyContainer: {
+    marginTop: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    marginTop: 12,
   },
 });

@@ -155,44 +155,47 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
           <View style={styles.divider} />
 
-          {product.options && Array.isArray(product.options) && product.options.map((opt: any, idx: number) => (
-            <View key={idx} style={styles.optionGroup}>
-              <View style={styles.optionHeader}>
-                <Text style={styles.optionTitle}>{opt.title}</Text>
-                {!selectedOptions[opt.title] && (
-                  <View style={styles.requiredBadge}>
-                    <Text style={styles.requiredText}>Choose One</Text>
+          {product.options && Array.isArray(product.options) && product.options.length > 0 && (
+            <>
+              {product.options.map((opt: any, idx: number) => (
+                <View key={idx} style={styles.optionGroup}>
+                  <View style={styles.optionHeader}>
+                    <Text style={styles.optionTitle}>{opt.title}</Text>
+                    {!selectedOptions[opt.title] && (
+                      <View style={styles.requiredBadge}>
+                        <Text style={styles.requiredText}>Choose One</Text>
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
-              <View style={styles.optionsContainer}>
-                {opt.values.map((val: string, vIdx: number) => {
-                  const isSelected = selectedOptions[opt.title] === val;
-                  return (
-                    <TouchableOpacity 
-                      key={vIdx}
-                      activeOpacity={0.7}
-                      style={[
-                        styles.optionChip,
-                        isSelected && styles.optionChipSelected
-                      ]}
-                      onPress={() => setSelectedOptions({ ...selectedOptions, [opt.title]: val })}
-                    >
-                      {isSelected && (
-                        <Icon name="check-circle" size={16} color={Colors.white} style={{ marginRight: 6 }} />
-                      )}
-                      <Text style={[
-                        styles.optionChipText,
-                        isSelected && styles.optionChipSelectedText
-                      ]}>{val}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          ))}
-
-          <View style={styles.divider} />
+                  <View style={styles.optionsContainer}>
+                    {opt.values.map((val: string, vIdx: number) => {
+                      const isSelected = selectedOptions[opt.title] === val;
+                      return (
+                        <TouchableOpacity 
+                          key={vIdx}
+                          activeOpacity={0.7}
+                          style={[
+                            styles.optionChip,
+                            isSelected && styles.optionChipSelected
+                          ]}
+                          onPress={() => setSelectedOptions({ ...selectedOptions, [opt.title]: val })}
+                        >
+                          {isSelected && (
+                            <Icon name="check-circle" size={16} color={Colors.white} style={{ marginRight: 6 }} />
+                          )}
+                          <Text style={[
+                            styles.optionChipText,
+                            isSelected && styles.optionChipSelectedText
+                          ]}>{val}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+              <View style={styles.divider} />
+            </>
+          )}
 
           <Text style={styles.sectionTitle}>Description</Text>
           {(() => {
