@@ -498,8 +498,13 @@ export const OffersScreen = ({ navigation }: any) => {
                      selectedType === 'free_product' ? 'Free Product Offer' : 
                      selectedType === 'cheap_product' ? 'Cheap Product Offer' : 'Free Cash Offer'}
                   </Text>
-                  <Text style={styles.modalSubtitle}>Configure rewards & conditions</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {selectedType === 'free_delivery' 
+                      ? 'Delivery fee will be deducted from your earnings.' 
+                      : 'Configure rewards & conditions'}
+                  </Text>
                 </View>
+
                 <TouchableOpacity onPress={resetForm}>
                   <Icon name="close" size={24} color={Colors.text} />
                 </TouchableOpacity>
@@ -1322,5 +1327,22 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: '600',
     paddingLeft: 8,
+  },
+  warningInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  warningInfoText: {
+    fontSize: 13,
+    color: '#B45309',
+    fontWeight: '600',
+    marginLeft: 8,
+    flex: 1,
   },
 });

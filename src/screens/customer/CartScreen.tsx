@@ -767,6 +767,7 @@ export const CartScreen = ({ navigation }: any) => {
           subtotal: subtotal,
           total_amount: grandTotal, 
           delivery_fee: deliveryFee,
+          rider_delivery_fee: baseDeliveryFee,
           platform_fee: platformFee,
           status: 'pending_verification',
           payment_method: paymentMethod,
