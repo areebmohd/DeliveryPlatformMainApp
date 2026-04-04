@@ -127,10 +127,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
 
   const getStatusInfo = (status: string) => {
     switch (status) {
-      case 'pending_verification':
-      case 'accepted':
-      case 'preparing':
-      case 'ready':
+      case 'waiting_for_pickup':
         return { label: 'Waiting for Pickup', color: Colors.warning, icon: 'clock-outline' };
       case 'picked_up':
         return { label: 'Picked Up', color: Colors.primary, icon: 'truck-delivery-outline' };
@@ -178,7 +175,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
     const formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     
     // Can cancel if status is one of the "waiting" statuses
-    const canCancel = ['pending_verification', 'accepted', 'preparing', 'ready'].includes(item.status);
+    const canCancel = item.status === 'waiting_for_pickup';
 
     return (
       <View style={styles.orderCard}>
@@ -333,7 +330,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           )}
 
-          {['ready', 'picked_up'].includes(item.status) && (
+          {['waiting_for_pickup', 'picked_up'].includes(item.status) && (
             <View style={styles.otpSection}>
               <Icon name="shield-lock" size={18} color={Colors.primary} />
               <View style={styles.otpInfo}>

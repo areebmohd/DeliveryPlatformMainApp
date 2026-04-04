@@ -88,7 +88,7 @@ export const OrdersScreen = () => {
     if (error) console.error('Error fetching orders:', error);
     else {
       // Filter based on active tab and only show the specified statuses
-      const allowedActiveStatuses = ['pending_verification', 'accepted', 'preparing', 'ready', 'picked_up'];
+      const allowedActiveStatuses = ['waiting_for_pickup', 'picked_up'];
       const allowedPastStatuses = ['delivered', 'cancelled'];
       
       const visibleOrders = (data || []).filter((o: any) => {
@@ -184,10 +184,7 @@ export const OrdersScreen = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending_verification':
-      case 'accepted':
-      case 'preparing':
-      case 'ready': return Colors.warning;
+      case 'waiting_for_pickup': return Colors.warning;
       case 'picked_up': return '#FF9800';
       case 'delivered': return Colors.success;
       case 'cancelled': return Colors.error;
@@ -197,10 +194,7 @@ export const OrdersScreen = () => {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending_verification':
-      case 'accepted':
-      case 'preparing':
-      case 'ready': return 'Waiting for Pickup';
+      case 'waiting_for_pickup': return 'Waiting for Pickup';
       case 'picked_up': return 'Picked Up';
       case 'delivered': return 'Delivered';
       case 'cancelled': return 'Cancelled';
@@ -237,7 +231,7 @@ export const OrdersScreen = () => {
     const activeItems = storeItems.filter((i: any) => !i.is_removed);
     
     if (activeItems.length === 0) return null; // Should not happen with inner join but safe
-    const isModifiable = ['pending_verification', 'accepted', 'preparing', 'ready'].includes(item.status);
+    const isModifiable = item.status === 'waiting_for_pickup';
     const statusColor = getStatusColor(item.status);
 
     return (

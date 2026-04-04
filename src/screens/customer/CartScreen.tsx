@@ -628,7 +628,7 @@ export const CartScreen = ({ navigation }: any) => {
     setTotalStoreFees(totalStoreContribution);
   }, [JSON.stringify(storeContributions), totalStoreContribution]);
 
-  const grandTotal = Math.max(0, baseGrandTotal - totalOfferDiscount);
+  const grandTotal = Math.max(0, subtotal + deliveryFee + platformFee + helperFee - totalOfferDiscount);
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
@@ -777,7 +777,7 @@ export const CartScreen = ({ navigation }: any) => {
           delivery_fee: deliveryFee,
           rider_delivery_fee: baseDeliveryFee,
           platform_fee: platformFee,
-          status: 'pending_verification',
+          status: 'waiting_for_pickup',
           payment_method: paymentMethod,
           payment_status: payment_status,
           utr_number: utr_number,
@@ -1293,7 +1293,7 @@ export const CartScreen = ({ navigation }: any) => {
         <View style={styles.checkoutInfo}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={styles.checkoutTotal}>₹{grandTotal.toFixed(2)}</Text>
-            {totalOfferDiscount > 0 && (
+            {(totalOfferDiscount > 0 || totalStoreFees > 0) && (
               <Text style={[styles.originalTotalText, { marginBottom: 0 }]}>₹{baseGrandTotal.toFixed(2)}</Text>
             )}
           </View>
