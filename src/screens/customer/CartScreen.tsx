@@ -766,6 +766,9 @@ export const CartScreen = ({ navigation }: any) => {
       const storesInCart = [...new Set(items.map(i => i.store_id))];
       const isMultiStore = storesInCart.length > 1;
 
+      const maxPrepTime = Math.max(0, ...items.map(i => i.preparation_time || 0));
+      const readyAt = maxPrepTime > 0 ? new Date(Date.now() + maxPrepTime * 60000).toISOString() : null;
+
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -787,7 +790,8 @@ export const CartScreen = ({ navigation }: any) => {
           helper_fee: helperFee,
           applied_offers: appliedOffers,
           total_store_delivery_fees: totalStoreFees,
-          store_delivery_fees: storeDeliveryFees
+          store_delivery_fees: storeDeliveryFees,
+          ready_at: readyAt
         })
         .select()
         .single();
@@ -979,36 +983,43 @@ export const CartScreen = ({ navigation }: any) => {
                 }
 
                 return (
-                  <View key={item.id} style={styles.itemCard}>
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemName}>
-                        {item.name}
-                        {item.selected_options && Object.keys(item.selected_options).length > 0 && (
-                          <Text style={styles.itemOptionsText}>
-                            {` (${Object.values(item.selected_options).join(', ')})`}
-                          </Text>
-                        )}
-                      </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        {hasDiscount && discountedPrice < item.price ? (
-                          <>
-                            <Text style={styles.itemPrice}>₹{discountedPrice.toFixed(2)}</Text>
-                            <Text style={styles.itemPriceStrikethrough}>₹{item.price}</Text>
-                          </>
-                        ) : (
-                          <Text style={styles.itemPrice}>₹{item.price}</Text>
-                        )}
+                  <View key={item.id} style={{ marginBottom: Spacing.md }}>
+                    <View style={styles.itemCard}>
+                      <View style={styles.itemInfo}>
+                        <Text style={styles.itemName}>
+                          {item.name}
+                          {item.selected_options && Object.keys(item.selected_options).length > 0 && (
+                            <Text style={styles.itemOptionsText}>
+                              {` (${Object.values(item.selected_options).join(', ')})`}
+                            </Text>
+                          )}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          {hasDiscount && discountedPrice < item.price ? (
+                            <>
+                              <Text style={styles.itemPrice}>₹{discountedPrice.toFixed(2)}</Text>
+                              <Text style={styles.itemPriceStrikethrough}>₹{item.price}</Text>
+                            </>
+                          ) : (
+                            <Text style={styles.itemPrice}>₹{item.price}</Text>
+                          )}
+                        </View>
+                      </View>
+                      <View style={styles.quantityControls}>
+                        <TouchableOpacity onPress={() => updateQuantity(item.id, -1)} style={styles.qtyBtn}>
+                          <Icon name="minus" size={18} color={Colors.primary} />
+                        </TouchableOpacity>
+                        <Text style={styles.quantity}>{item.quantity}</Text>
+                        <TouchableOpacity onPress={() => updateQuantity(item.id, 1)} style={styles.qtyBtn}>
+                          <Icon name="plus" size={18} color={Colors.primary} />
+                        </TouchableOpacity>
                       </View>
                     </View>
-                    <View style={styles.quantityControls}>
-                      <TouchableOpacity onPress={() => updateQuantity(item.id, -1)} style={styles.qtyBtn}>
-                        <Icon name="minus" size={18} color={Colors.primary} />
-                      </TouchableOpacity>
-                      <Text style={styles.quantity}>{item.quantity}</Text>
-                      <TouchableOpacity onPress={() => updateQuantity(item.id, 1)} style={styles.qtyBtn}>
-                        <Icon name="plus" size={18} color={Colors.primary} />
-                      </TouchableOpacity>
-                    </View>
+                    {item.preparation_time > 0 && (
+                      <Text style={styles.prepTimeText}>
+                        This product has {item.preparation_time} minutes preparing time so order will be picked up after {item.preparation_time} minutes.
+                      </Text>
+                    )}
                   </View>
                 );
               })}
@@ -1018,7 +1029,7 @@ export const CartScreen = ({ navigation }: any) => {
                 const offer = appliedOffers[storeId];
                 if (offer?.type === 'free_product' && checkOfferConditions(offer).length === 0) {
                   return (
-                    <View style={[styles.itemCard, styles.freeItemCard]}>
+                    <View style={[styles.itemCard, styles.freeItemCard, { marginBottom: Spacing.md }]}>
                       {(() => {
                         const rewardId = (offer.reward_data as any)?.product_ids?.[0];
                         const manualItem = storeData.items.find((i: any) => i.id === rewardId);
@@ -1578,7 +1589,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
   },
   itemInfo: {
     flex: 1,
@@ -1588,6 +1598,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.text,
     flex: 1,
+  },
+  prepTimeText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: Colors.primary,
+    marginTop: 2,
+    marginBottom: 4,
   },
   itemOptionsText: {
     fontSize: 13,
@@ -1641,7 +1658,7 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   quantity: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 2,
     fontSize: 16,
     fontWeight: '800',
     color: Colors.primary,

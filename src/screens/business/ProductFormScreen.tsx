@@ -65,6 +65,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [tags, setTags] = useState<string[]>(product?.tags || []);
   const [tagInput, setTagInput] = useState('');
   const [inStock, setInStock] = useState(product?.in_stock !== false);
+  const [preparationTime, setPreparationTime] = useState(product?.preparation_time?.toString() || '0');
   const [isLoading, setIsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
@@ -121,6 +122,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             setImageUrl(data.image_url || '');
             setStockQuantity(data.stock_quantity?.toString() || '0');
             setInStock(data.in_stock !== false);
+            setPreparationTime(data.preparation_time?.toString() || '0');
             setRawImageUrl(data.raw_image_url || null);
             setIsOversized(data.needs_large_vehicle || false);
             
@@ -391,6 +393,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         needs_large_vehicle: needsLarge,
         is_info_complete: isComplete, // Mark as complete once saved with details
         raw_image_url: rawImageUrl,
+        preparation_time: parseInt(preparationTime) || 0,
         updated_at: new Date().toISOString(),
       };
 
@@ -649,6 +652,19 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                   <Icon name="chevron-down" size={20} color={Colors.textSecondary} />
                 </View>
               </TouchableOpacity>
+
+              {category === 'Food' && (productType === 'common' || productType === 'personal') && (
+                <Input
+                  label="Preparation Time (minutes)"
+                  placeholder="0"
+                  value={preparationTime}
+                  onChangeText={setPreparationTime}
+                  keyboardType="numeric"
+                  containerStyle={styles.inputSpacing}
+                  editable={canEditDetails}
+                  leftIcon={<Icon name="clock-outline" size={20} color={Colors.textSecondary} style={{marginRight: 8}} />}
+                />
+              )}
 
               <View style={styles.descriptionSection}>
                 <View style={styles.specHeader}>

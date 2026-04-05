@@ -453,7 +453,9 @@ export const OffersScreen = ({ navigation }: any) => {
         <View style={styles.modalOverlay}>
           <View style={styles.typeModalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Offer Type</Text>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.modalTitle}>Select Offer Type</Text>
+              </View>
               <TouchableOpacity onPress={() => setShowTypeModal(false)}>
                 <Icon name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
@@ -490,18 +492,13 @@ export const OffersScreen = ({ navigation }: any) => {
         <View style={styles.modalOverlay}>
           <View style={styles.formModalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeader}>
-                <View>
+              <View style={[styles.modalHeader, { marginBottom: 8 }]}>
+                <View style={{ flex: 1, marginRight: 12 }}>
                   <Text style={styles.modalTitle}>
                     {selectedType === 'discount' ? 'Instant Discount' : 
                      selectedType === 'free_delivery' ? 'Free Delivery Offer' : 
                      selectedType === 'free_product' ? 'Free Product Offer' : 
                      selectedType === 'cheap_product' ? 'Cheap Product Offer' : 'Free Cash Offer'}
-                  </Text>
-                  <Text style={styles.modalSubtitle}>
-                    {selectedType === 'free_delivery' 
-                      ? 'Delivery fee will be deducted from your earnings.' 
-                      : 'Configure rewards & conditions'}
                   </Text>
                 </View>
 
@@ -509,6 +506,12 @@ export const OffersScreen = ({ navigation }: any) => {
                   <Icon name="close" size={24} color={Colors.text} />
                 </TouchableOpacity>
               </View>
+
+              <Text style={[styles.modalSubtitle, { marginBottom: 20 }]}>
+                {selectedType === 'free_delivery' 
+                  ? `Delivery fee will be deducted from your earnings for riders and the rest for platform for managing multiple stores in a order if available.` 
+                  : 'Configure rewards & conditions'}
+              </Text>
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Offer Name <Text style={{ color: Colors.error }}>*</Text></Text>
@@ -629,7 +632,6 @@ export const OffersScreen = ({ navigation }: any) => {
                   onChangeText={setOrderCount} 
                   keyboardType="numeric"
                 />
-                <Text style={styles.subLabel}>Setting "3" means offer applies for the customer's first 3 orders from your store.</Text>
               </View>
 
               <View style={styles.conditionCard}>
@@ -715,19 +717,20 @@ export const OffersScreen = ({ navigation }: any) => {
       <Modal visible={showProductModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.productModalContent}>
-            <View style={styles.modalHeader}>
-              <View>
+            <View style={[styles.modalHeader, { marginBottom: 8 }]}>
+              <View style={{ flex: 1, marginRight: 12 }}>
                 <Text style={styles.modalTitle}>
                   {productModalMode === 'reward' ? 'Select Free Products' : 'Select Target Products'}
-                </Text>
-                <Text style={styles.modalSubtitle}>
-                  {productModalMode === 'reward' ? selectedRewardProducts.length : selectedProducts.length} selected
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setShowProductModal(false)}>
                 <Icon name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
+
+            <Text style={[styles.modalSubtitle, { marginBottom: 20 }]}>
+              {productModalMode === 'reward' ? selectedRewardProducts.length : selectedProducts.length} selected
+            </Text>
 
             <ScrollView showsVerticalScrollIndicator={false} style={styles.productList}>
               {storeProducts.map((product) => {
@@ -1028,6 +1031,7 @@ const styles = StyleSheet.create({
   },
   modalSubtitle: {
     fontSize: 14,
+    fontStyle: 'italic',
     color: Colors.textSecondary,
   },
   typeGrid: {

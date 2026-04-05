@@ -23,6 +23,7 @@ interface CartItem {
   store_lat: number;
   store_lng: number;
   selected_options: Record<string, string>;
+  preparation_time: number;
 }
 
 export type OfferType = 'free_cash' | 'discount' | 'free_delivery' | 'free_product' | 'cheap_product' | 'combo';
@@ -154,7 +155,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 needs_large_vehicle: productNeedsLarge,
                 store_lat: storeLat,
                 store_lng: storeLng,
-                selected_options: product.selectedOptions || {}
+                selected_options: product.selectedOptions || {},
+                preparation_time: product.preparation_time || 0
               }]);
             }
           }
@@ -195,7 +197,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         needs_large_vehicle: productNeedsLarge,
         store_lat: storeLat,
         store_lng: storeLng,
-        selected_options: selectedOptions
+        selected_options: selectedOptions,
+        preparation_time: product.preparation_time || 0
       }];
     });
   };
