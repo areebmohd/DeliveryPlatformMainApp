@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 12.5,
-    fontWeight: '400',
+    fontWeight: '500',
     color: Colors.text,
     height: 34,
     lineHeight: 17,

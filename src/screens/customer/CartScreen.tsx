@@ -578,7 +578,7 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
-  const platformFee = subtotal >= 500 ? (subtotal * 0.01) : 5;
+  const platformFee = subtotal >= 1000 ? 20 : (subtotal >= 500 ? 10 : 5);
   const baseDeliveryFee = items.length === 0 ? 0 : (
     isLargeVehicle 
       ? 300 + (distance * 30)
@@ -1017,7 +1017,7 @@ export const CartScreen = ({ navigation }: any) => {
                     </View>
                     {item.preparation_time > 0 && (
                       <Text style={styles.prepTimeText}>
-                        This product has {item.preparation_time} minutes preparing time so order will be picked up after {item.preparation_time} minutes.
+                        This product has {item.preparation_time} minutes preparing time so order will be picked up when it is prepared.
                       </Text>
                     )}
                   </View>
@@ -1215,7 +1215,7 @@ export const CartScreen = ({ navigation }: any) => {
               <TouchableOpacity onPress={() => setInfoModal({
                 visible: true,
                 title: 'Platform Fee',
-                content: '• Orders below ₹500: ₹5 platform fee\n• Orders above ₹500: 1% platform fee'
+                content: '• Orders below ₹500: ₹5 platform fee\n• Orders below ₹1000: ₹10 platform fee\n• Orders above ₹1000: ₹20 platform fee'
               })}>
                 <Icon name="information-outline" size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
