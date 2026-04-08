@@ -11,6 +11,8 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CartProvider } from './src/context/CartContext';
 import { AlertProvider } from './src/context/AlertContext';
 import { MainNavigator } from './src/navigation/MainNavigator';
+import { useNotificationListener } from './src/hooks/useNotificationListener';
+import { notificationService } from './src/utils/notificationService';
 
 function App() {
   return (
@@ -27,8 +29,17 @@ function App() {
 }
 
 function AppContent() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
   const insets = useSafeAreaInsets();
+
+  useNotificationListener();
+
+  useEffect(() => {
+    notificationService.requestPermissions();
+    if (profile) {
+      notificationService.saveToken(profile.id, profile.role);
+    }
+  }, [profile]);
 
 
   if (loading) {

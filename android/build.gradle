@@ -15,6 +15,7 @@ buildscript {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        classpath("com.google.gms:google-services:4.4.2")
     }
 }
 
@@ -26,6 +27,11 @@ allprojects {
             url 'https://maven.mappls.com/repository/mappls/'
         }
         google()
+        mavenCentral()
+    }
+
+    // Redirect legacy jcenter() calls to mavenCentral() for compatibility with older libraries
+    project.ext.jcenter = {
         mavenCentral()
     }
 }

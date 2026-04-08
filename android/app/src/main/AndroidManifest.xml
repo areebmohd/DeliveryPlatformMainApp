@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
 
     <application
@@ -39,5 +42,17 @@
             <data android:scheme="com.mainapp" android:host="reset-password" />
         </intent-filter>
       </activity>
+
+      <meta-data  android:name="com.dieam.reactnativepushnotification.notification_channel_name" android:value="Delivery Platform Notifications"/>
+      <meta-data  android:name="com.dieam.reactnativepushnotification.notification_channel_description" android:value="Delivery Platform notifications for orders and updates"/>
+      <meta-data  android:name="com.dieam.reactnativepushnotification.notification_color" android:resource="@android:color/white"/>
+
+      <receiver android:name="com.dieam.reactnativepushnotification.modules.RNPushNotificationActions" android:exported="true" />
+      <receiver android:name="com.dieam.reactnativepushnotification.modules.RNPushNotificationPublisher" android:exported="true" />
+      <receiver android:name="com.dieam.reactnativepushnotification.modules.RNPushNotificationBootEventReceiver" android:exported="false">
+          <intent-filter>
+              <action android:name="android.intent.action.BOOT_COMPLETED" />
+          </intent-filter>
+      </receiver>
     </application>
 </manifest>
