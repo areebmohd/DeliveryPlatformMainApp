@@ -26,7 +26,7 @@ import { Colors, Spacing, borderRadius, Typography } from '../../theme/colors';
 
 const { width, height } = Dimensions.get('window');
 
-type OfferType = 'free_cash' | 'discount' | 'free_delivery' | 'free_product' | 'cheap_product' | 'combo';
+type OfferType = 'free_cash' | 'discount' | 'free_delivery' | 'free_product' | 'cheap_product' | 'combo' | 'fixed_price';
 
 interface OfferCondition {
   min_price: number | null;
@@ -177,7 +177,7 @@ export const OffersScreen = ({ navigation }: any) => {
       return;
     }
 
-    if (type !== 'free_cash' && type !== 'discount' && type !== 'free_delivery' && type !== 'free_product' && type !== 'cheap_product' && type !== 'combo') {
+    if (type !== 'free_cash' && type !== 'discount' && type !== 'free_delivery' && type !== 'free_product' && type !== 'cheap_product' && type !== 'combo' && type !== 'fixed_price') {
       showAlert({
         title: 'Coming Soon',
         message: `${(type as string).replace('_', ' ')} offers will be available in the next update!`,
@@ -209,7 +209,7 @@ export const OffersScreen = ({ navigation }: any) => {
   };
 
   const saveOffer = async () => {
-    if ((selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo') && selectedRewardProducts.length === 0) {
+    if ((selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo' || selectedType === 'fixed_price') && selectedRewardProducts.length === 0) {
       showToast('Please select at least one product', 'error');
       return;
     }
@@ -239,7 +239,7 @@ export const OffersScreen = ({ navigation }: any) => {
           start_time: startTimeActive ? startTime : null,
           end_time: endTimeActive ? endTime : null,
         },
-        reward_data: (selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo') ? { 
+        reward_data: (selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo' || selectedType === 'fixed_price') ? { 
           product_ids: selectedRewardProducts,
           product_name: selectedRewardProducts.length === 1 
             ? (storeProducts.find(p => String(p.id) === String(selectedRewardProducts[0]))?.name || 'Item')
@@ -467,19 +467,20 @@ export const OffersScreen = ({ navigation }: any) => {
                 { id: 'discount', icon: 'percent', label: 'Instant Discount', color: '#3B82F6' },
                 { id: 'free_delivery', icon: 'truck-delivery', label: 'Free Delivery', color: '#F59E0B' },
                 { id: 'free_product', icon: 'gift', label: 'Free Products', color: '#EC4899' },
-                { id: 'cheap_product', icon: 'tag-outline', label: 'Cheap Products', color: '#8B5CF6' },
+                { id: 'cheap_product', icon: 'tag-outline', label: 'Price Drop', color: '#8B5CF6' },
+                { id: 'fixed_price', icon: 'tag-multiple-outline', label: 'Fixed Price', color: '#0891B2' },
                 { id: 'combo', icon: 'layers-outline', label: 'Combo Offer', color: '#F97316' },
               ].map(type => (
                 <TouchableOpacity 
                   key={type.id} 
-                  style={[styles.typeItem, (type.id !== 'free_cash' && type.id !== 'discount' && type.id !== 'free_delivery' && type.id !== 'free_product' && type.id !== 'cheap_product' && type.id !== 'combo') && { opacity: 0.6 }]} 
+                  style={[styles.typeItem, (type.id !== 'free_cash' && type.id !== 'discount' && type.id !== 'free_delivery' && type.id !== 'free_product' && type.id !== 'cheap_product' && type.id !== 'combo' && type.id !== 'fixed_price') && { opacity: 0.6 }]} 
                   onPress={() => selectType(type.id as OfferType)}
                 >
                   <View style={[styles.typeIconBg, { backgroundColor: type.color + '20' }]}>
                     <Icon name={type.icon} size={28} color={type.color} />
                   </View>
                   <Text style={styles.typeLabel}>{type.label}</Text>
-                  {(type.id !== 'free_cash' && type.id !== 'discount' && type.id !== 'free_delivery' && type.id !== 'free_product' && type.id !== 'cheap_product' && type.id !== 'combo') && <Text style={styles.soonText}>Soon</Text>}
+                  {(type.id !== 'free_cash' && type.id !== 'discount' && type.id !== 'free_delivery' && type.id !== 'free_product' && type.id !== 'cheap_product' && type.id !== 'combo' && type.id !== 'fixed_price') && <Text style={styles.soonText}>Soon</Text>}
                 </TouchableOpacity>
               ))}
             </View>
@@ -498,7 +499,8 @@ export const OffersScreen = ({ navigation }: any) => {
                     {selectedType === 'discount' ? 'Instant Discount' : 
                      selectedType === 'free_delivery' ? 'Free Delivery Offer' : 
                      selectedType === 'free_product' ? 'Free Product Offer' : 
-                     selectedType === 'cheap_product' ? 'Cheap Product Offer' : 'Free Cash Offer'}
+                     selectedType === 'cheap_product' ? 'Price Drop Offer' : 
+                     selectedType === 'fixed_price' ? 'Fixed Price Offer' : 'Free Cash Offer'}
                   </Text>
                 </View>
 
@@ -526,10 +528,12 @@ export const OffersScreen = ({ navigation }: any) => {
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>
                     {selectedType === 'discount' || selectedType === 'cheap_product' ? 'Discount Percentage (%)' : 
+                     selectedType === 'fixed_price' ? 'Fixed Price (₹)' : 
                      selectedType === 'combo' ? 'Combo Price (₹)' : 'Free Cash Amount (₹)'}
                   </Text>
                   <Input 
                     placeholder={selectedType === 'discount' || selectedType === 'cheap_product' ? "e.g. 10" : 
+                                 selectedType === 'fixed_price' ? "e.g. 120" :
                                  selectedType === 'combo' ? "e.g. 299" : "e.g. 50"} 
                     value={amount} 
                     onChangeText={setAmount} 
@@ -538,10 +542,11 @@ export const OffersScreen = ({ navigation }: any) => {
                 </View>
               )}
 
-              {(selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo') && (
+              {(selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo' || selectedType === 'fixed_price') && (
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>
                     {selectedType === 'free_product' ? 'Select Free Products' : 
+                     selectedType === 'fixed_price' ? 'Select Products for Fixed Price' : 
                      selectedType === 'combo' ? 'Select Combo Items' : 'Select Discounted Products'}
                   </Text>
                   <TouchableOpacity 
@@ -552,18 +557,22 @@ export const OffersScreen = ({ navigation }: any) => {
                     }}
                   >
                     <View style={styles.productSelectLeft}>
-                      <Icon 
+                        <Icon 
                         name={selectedType === 'free_product' ? "gift-outline" : 
+                              selectedType === 'fixed_price' ? "tag-multiple-outline" :
                               selectedType === 'combo' ? "layers-outline" : "tag-outline"} 
                         size={20} 
                         color={selectedType === 'free_product' ? "#DB2777" : 
+                               selectedType === 'fixed_price' ? "#0891B2" :
                                selectedType === 'combo' ? "#EA580C" : "#7C3AED"} 
                       />
                       <Text style={[styles.productSelectText, { color: selectedType === 'free_product' ? "#DB2777" : 
+                                                                    selectedType === 'fixed_price' ? "#0891B2" : 
                                                                     selectedType === 'combo' ? "#EA580C" : "#7C3AED" }]}>
                         {selectedRewardProducts.length > 0 
                           ? `${selectedRewardProducts.length} Products Selected` 
                           : selectedType === 'free_product' ? 'Tap to select free products' : 
+                            selectedType === 'fixed_price' ? 'Tap to select products' : 
                             selectedType === 'combo' ? 'Tap to select combo items' : 'Tap to select discounted products'}
                       </Text>
                     </View>

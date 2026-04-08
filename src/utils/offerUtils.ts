@@ -12,6 +12,8 @@ export const getTheme = (type: string) => {
       return { color: '#7C3AED', bg: '#EDE9FE', icon: 'tag-outline' };
     case 'combo':
       return { color: '#EA580C', bg: '#FFEDD5', icon: 'layers-outline' };
+    case 'fixed_price':
+      return { color: '#0891B2', bg: '#CFFAFE', icon: 'tag-multiple-outline' };
     case 'trending':
       return { color: '#EA580C', bg: '#FFEDD5', icon: 'fire' };
     case 'best_value':
@@ -38,6 +40,8 @@ export const getOfferDescription = (offer: any, resolvedName?: string) => {
       return `${amount}% Instant Discount on ${nameToUse || 'Some Items'}`;
     case 'combo':
       return `${nameToUse || 'Items'} at Only ₹${amount}`;
+    case 'fixed_price':
+      return `${nameToUse || 'Selected Items'} at only ₹${amount}`;
     case 'free_cash':
       return `₹${amount} Free Cash amount`;
     default:

@@ -26,7 +26,7 @@ interface CartItem {
   preparation_time: number;
 }
 
-export type OfferType = 'free_cash' | 'discount' | 'free_delivery' | 'free_product' | 'cheap_product' | 'combo';
+export type OfferType = 'free_cash' | 'discount' | 'free_delivery' | 'free_product' | 'cheap_product' | 'combo' | 'fixed_price';
 
 export interface OfferCondition {
   min_price?: number;

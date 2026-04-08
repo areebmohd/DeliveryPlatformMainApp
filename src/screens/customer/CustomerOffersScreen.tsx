@@ -57,7 +57,8 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
     { id: 'free_cash', label: 'Free Cash', icon: 'cash' },
     { id: 'free_delivery', label: 'Free Delivery', icon: 'truck-delivery' },
     { id: 'free_product', label: 'Free Products', icon: 'gift' },
-    { id: 'cheap_product', label: 'Cheap Products', icon: 'tag-outline' },
+    { id: 'cheap_product', label: 'Price Drop', icon: 'tag-outline' },
+    { id: 'fixed_price', label: 'Fixed Price', icon: 'tag-multiple-outline' },
     { id: 'discount', label: 'Instant Discount', icon: 'percent' },
     { id: 'combo', label: 'Combo', icon: 'layers-outline' },
   ];
@@ -215,6 +216,7 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
             case 'discount': return amt;
             case 'free_delivery': return amt || 50;
             case 'cheap_product': return amt * 1.1;
+            case 'fixed_price': return amt * 1.2;
             default: return amt * 0.9;
           }
         };

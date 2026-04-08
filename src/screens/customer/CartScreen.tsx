@@ -387,6 +387,7 @@ export const CartScreen = ({ navigation }: any) => {
       case 'free_delivery': return '#E0F2FE';
       case 'free_cash': return '#DCFCE7';
       case 'discount': return '#FEF3C7';
+      case 'fixed_price': return '#CFFAFE';
       default: return '#F3F4F6';
     }
   };
@@ -616,6 +617,12 @@ export const CartScreen = ({ navigation }: any) => {
       const comboItems = items.filter(item => offer.reward_data?.product_ids?.includes(item.id));
       const comboSubtotal = comboItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
       offerDiscount = Math.max(0, comboSubtotal - offer.amount);
+    } else if (offer.type === 'fixed_price') {
+      const eligibleItems = items.filter(item => offer.reward_data?.product_ids?.includes(item.id));
+      offerDiscount = eligibleItems.reduce((sum, item) => {
+        const diff = item.price - offer.amount;
+        return sum + (diff > 0 ? diff * item.quantity : 0);
+      }, 0);
     }
     totalOfferDiscount += offerDiscount;
   });
