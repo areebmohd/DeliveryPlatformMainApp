@@ -2,6 +2,7 @@ import PushNotification, { Importance } from 'react-native-push-notification';
 import messaging from '@react-native-firebase/messaging';
 import { Platform, PermissionsAndroid } from 'react-native';
 import { supabase } from '../api/supabase';
+import { navigationRef } from '../../App';
 
 class NotificationService {
   constructor() {
@@ -10,12 +11,18 @@ class NotificationService {
   }
 
   private configure() {
+    const self = this;
     PushNotification.configure({
       onRegister: function (token) {
         console.log('TOKEN:', token);
       },
       onNotification: function (notification) {
         console.log('NOTIFICATION:', notification);
+        
+        // Handle notification tap
+        if (notification.userInteraction) {
+          self.handleNotificationTap(notification.data);
+        }
       },
       permissions: {
         alert: true,
@@ -25,6 +32,22 @@ class NotificationService {
       popInitialNotification: true,
       requestPermissions: Platform.OS === 'ios',
     });
+
+    // Handle background notification click (FCM)
+    messaging().onNotificationOpenedApp(remoteMessage => {
+      console.log('Notification caused app to open from background state:', remoteMessage);
+      this.handleNotificationTap(remoteMessage.data);
+    });
+
+    // Handle killed state notification click (FCM)
+    messaging()
+      .getInitialNotification()
+      .then(remoteMessage => {
+        if (remoteMessage) {
+          console.log('Notification caused app to open from quit state:', remoteMessage);
+          this.handleNotificationTap(remoteMessage.data);
+        }
+      });
   }
 
   private createDefaultChannels() {
@@ -105,6 +128,30 @@ class NotificationService {
       playSound: true,
       soundName: "default",
     });
+  }
+
+  private handleNotificationTap(data: any) {
+    if (!data) return;
+
+    const { order_id, target_group } = data;
+    if (!order_id) return;
+
+    // Direct navigation using global ref
+    if (navigationRef.isReady()) {
+      if (target_group === 'business') {
+        // Business app uses tabs, navigate to 'Orders' tab
+        (navigationRef as any).navigate('Orders');
+      } else {
+        // Customer app uses a stack inside Account tab
+        (navigationRef as any).navigate('Account', {
+          screen: 'CustomerOrders',
+          params: { orderId: order_id }
+        });
+      }
+    } else {
+      // If navigation is not ready, retry after a short delay
+      setTimeout(() => this.handleNotificationTap(data), 500);
+    }
   }
 }
 

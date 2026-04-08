@@ -28,8 +28,11 @@ export const useNotificationListener = () => {
         },
         (payload) => {
           console.log('New notification received:', payload);
-          const { title, description } = payload.new;
-          notificationService.showLocalNotification(title, description);
+          const { title, description, order_id, target_group } = payload.new;
+          notificationService.showLocalNotification(title, description, {
+            order_id,
+            target_group,
+          });
         }
       )
       .subscribe();

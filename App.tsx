@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { supabase } from './src/api/supabase';
@@ -13,6 +13,8 @@ import { AlertProvider } from './src/context/AlertContext';
 import { MainNavigator } from './src/navigation/MainNavigator';
 import { useNotificationListener } from './src/hooks/useNotificationListener';
 import { notificationService } from './src/utils/notificationService';
+
+export const navigationRef = createNavigationContainerRef();
 
 function App() {
   return (
@@ -55,6 +57,7 @@ function AppContent() {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       
       <NavigationContainer
+        ref={navigationRef}
         linking={{
           prefixes: ['com.mainapp://'],
           config: {
