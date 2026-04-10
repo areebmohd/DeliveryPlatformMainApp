@@ -14,8 +14,8 @@ import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const { width } = Dimensions.get('window');
-const SUPPORT_EMAIL = 'support@deliveryplatform.com';
-const SUPPORT_PHONE = '+919876543210';
+const SUPPORT_EMAIL = 'zorodeliveryapp@gmail.com';
+const SUPPORT_PHONE = '+91 7534846938';
 
 const SupportActionCard = ({ 
   icon, 
@@ -69,7 +69,7 @@ export const SupportScreen = ({ navigation }: any) => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Icon name="arrow-left" size={24} color={Colors.white} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Support Center</Text>
+          <Text style={styles.headerTitle}>Customer Support</Text>
           <View style={{ width: 44 }} />
         </View>
         <View style={styles.headerContent}>
