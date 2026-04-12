@@ -48,6 +48,17 @@ const SupportActionCard = ({
   </TouchableOpacity>
 );
 
+const TipItem = ({ number, text }: { number: number; text: string }) => (
+  <View style={styles.tipItem}>
+    <View style={styles.tipNumberBox}>
+      <Text style={styles.tipNumber}>{number}</Text>
+    </View>
+    <View style={styles.tipContent}>
+      <Text style={styles.tipText}>{text}</Text>
+    </View>
+  </View>
+);
+
 export const SupportScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
 
@@ -112,6 +123,30 @@ export const SupportScreen = ({ navigation }: any) => {
             <Icon name="email-outline" size={20} color={Colors.textSecondary} />
             <Text style={styles.contactText}>{SUPPORT_EMAIL}</Text>
           </View>
+        </View>
+
+        <View style={styles.tipsSection}>
+          <View style={styles.tipsHeader}>
+            <Icon name="lightbulb-on-outline" size={24} color={Colors.primary} />
+            <Text style={styles.tipsSectionTitle}>Success Tips</Text>
+          </View>
+          
+          <TipItem 
+            number={1} 
+            text="Pack the products as soon as possible when order arrives so rider wont have to wait longer for pickup." 
+          />
+          <TipItem 
+            number={2} 
+            text="Keep a separate stock of products for online orders and enter that stock amount in product form so that you never run out of products when order arrives." 
+          />
+          <TipItem 
+            number={3} 
+            text="If you remove some products from the stock of products for online orders for offline use then update stock amount in product form." 
+          />
+          <TipItem 
+            number={4} 
+            text="If still your product is not available when order arrives then it is better to buy that product from neighbour shop or give the money for buying the product to rider and ask him to buy it from other shop and deliver to customer so that your customer do not get disappointed with your service." 
+          />
         </View>
 
         <View style={styles.infoBox}>
@@ -274,5 +309,55 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.text,
     fontWeight: '600',
+  },
+  tipsSection: {
+    marginTop: 32,
+    backgroundColor: Colors.white,
+    padding: 20,
+    borderRadius: 24,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+  },
+  tipsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 10,
+  },
+  tipsSectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  tipItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 12,
+  },
+  tipNumberBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  tipNumber: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  tipContent: {
+    flex: 1,
+  },
+  tipText: {
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+    fontWeight: '500',
   },
 });

@@ -199,7 +199,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     const missingFields = [];
     if (!name) missingFields.push('Store Name');
     if (!category) missingFields.push('Category');
-    if (!addressLine1 || !city || !state || !pincode) missingFields.push('Complete Address');
+    if (!addressLine1?.trim() || !city?.trim() || !state?.trim() || !pincode?.trim()) missingFields.push('Complete Address');
     if (!location) missingFields.push('Live Location');
     
     // Check opening hours (must have at least one slot)
@@ -382,16 +382,16 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
           <Input label="Address Line 1 *" value={addressLine1} onChangeText={setAddressLine1} placeholder="Flat/House No, Building, Street" />
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Input label="Pin Code *" value={pincode} onChangeText={setPincode} placeholder="122001" keyboardType="numeric" editable={false} />
+              <Input label="Pin Code *" value={pincode} onChangeText={setPincode} placeholder="122001" keyboardType="numeric" />
             </View>
           </View>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Input label="City *" value={city} onChangeText={setCity} placeholder="Gurugram" editable={false} />
+              <Input label="City *" value={city} onChangeText={setCity} placeholder="Gurugram" />
             </View>
             <View style={{ width: 16 }} />
             <View style={{ flex: 1 }}>
-              <Input label="State *" value={state} onChangeText={setState} placeholder="Haryana" editable={false} />
+              <Input label="State *" value={state} onChangeText={setState} placeholder="Haryana" />
             </View>
           </View>
         </View>

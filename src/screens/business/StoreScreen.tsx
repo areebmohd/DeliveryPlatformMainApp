@@ -267,6 +267,10 @@ export const StoreScreen = ({ navigation }: any) => {
   };
 
   const handleNavigateToProductForm = (product?: any) => {
+    if (!store?.id) {
+      handleNavigateToStoreForm();
+      return;
+    }
     navigation.navigate('ProductForm', {
       storeId: store.id,
       product,
@@ -357,11 +361,13 @@ export const StoreScreen = ({ navigation }: any) => {
       <View style={styles.headerContent}>
         <Text style={styles.headerName}>{store?.name || 'Your Store'}</Text>
         <View style={styles.badgeRow}>
-          <View style={styles.headerCategoryBadge}>
-            <Text style={styles.headerCategoryText}>
-              {store?.category || 'General Store'}
-            </Text>
-          </View>
+          {store?.category && (
+            <View style={styles.headerCategoryBadge}>
+              <Text style={styles.headerCategoryText}>
+                {store.category}
+              </Text>
+            </View>
+          )}
           {store?.city && (
             <View style={styles.headerCategoryBadge}>
               <Text style={styles.headerCategoryText}>
@@ -739,21 +745,25 @@ export const StoreScreen = ({ navigation }: any) => {
 
       <TouchableOpacity
         style={[styles.fab, { bottom: 20 + insets.bottom }]}
-        onPress={() =>
-          activeTab === 'products'
-            ? handleNavigateToProductForm()
-            : handleNavigateToStoreForm()
-        }
+        onPress={() => {
+          if (!store) {
+            handleNavigateToStoreForm();
+          } else if (activeTab === 'products') {
+            handleNavigateToProductForm();
+          } else {
+            handleNavigateToStoreForm();
+          }
+        }}
         activeOpacity={0.9}
       >
         <View style={styles.fabGradient}>
           <Icon
-            name={activeTab === 'products' ? 'plus' : 'pencil-outline'}
-            size={activeTab === 'products' ? 30 : 24}
+            name={!store ? 'store-plus' : (activeTab === 'products' ? 'plus' : 'pencil-outline')}
+            size={(!store || activeTab === 'products') ? 30 : 24}
             color={Colors.white}
           />
           <Text style={styles.fabText}>
-            {activeTab === 'products' ? 'Add Product' : 'Edit Info'}
+            {!store ? 'Setup Store' : (activeTab === 'products' ? 'Add Product' : 'Edit Info')}
           </Text>
         </View>
       </TouchableOpacity>
