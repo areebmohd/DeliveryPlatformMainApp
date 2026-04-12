@@ -257,7 +257,7 @@ export const OrdersScreen = () => {
               <Icon name="account" size={16} color={Colors.primary} />
             </View>
             <View>
-              <Text style={styles.personName}>{item.customer?.full_name || 'Guest Customer'}</Text>
+              <Text style={styles.personName}>{item.customer?.full_name || 'Deleted User'}</Text>
               {item.customer?.phone ? (
                 <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
                   <Text style={[styles.personRole, { color: Colors.primary }]}>Customer • {item.customer.phone}</Text>

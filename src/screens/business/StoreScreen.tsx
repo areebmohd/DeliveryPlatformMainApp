@@ -414,7 +414,7 @@ export const StoreScreen = ({ navigation }: any) => {
           <Text style={[styles.alertSubtitle, isPending && styles.pendingSubtitle, !isPending && { color: '#92400E' }]}>
             {isPending 
               ? 'You have submitted all the verifications details and your request is still pending please wait for some time.'
-              : `Please fill all necessary details for verification or your account will be deleted in ${remaining} days.`
+              : `Please fill all necessary details for verification otherwise this account will be deleted in ${remaining} days.`
             }
           </Text>
         </View>
@@ -557,11 +557,6 @@ export const StoreScreen = ({ navigation }: any) => {
                   <Text style={styles.emptySubtitle}>
                     Start adding store items to begin selling.
                   </Text>
-                  <Button
-                    title="Add Your First Product"
-                    onPress={() => handleNavigateToProductForm()}
-                    style={styles.emptyButton}
-                  />
                 </View>
               )}
             </View>

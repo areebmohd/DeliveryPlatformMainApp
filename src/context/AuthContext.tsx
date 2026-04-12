@@ -7,6 +7,8 @@ interface AuthContextType {
   user: User | null;
   profile: any | null;
   loading: boolean;
+  isResettingPassword: boolean;
+  setIsResettingPassword: (val: boolean) => void;
   signOut: () => Promise<void>;
   updateProfile: (updates: { full_name?: string; phone?: string; upi_id?: string }) => Promise<{ success: boolean; error?: any }>;
 }
@@ -18,6 +20,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -48,10 +51,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // PGRST116 is the error code for 0 rows returned by .single()
+        if (error.code === 'PGRST116') {
+          console.log('Profile record not found. Signing out to clear stale session.');
+          await signOut();
+        }
+        throw error;
+      }
       setProfile(data);
     } catch (e) {
       console.error('Error fetching profile:', e);
+      setProfile(null);
     } finally {
       setLoading(false);
     }
@@ -85,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, signOut, updateProfile }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, isResettingPassword, setIsResettingPassword, signOut, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

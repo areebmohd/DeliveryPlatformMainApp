@@ -15,9 +15,11 @@ import { Input } from '../../components/ui/Input';
 import { supabase } from '../../api/supabase';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../../context/AuthContext';
 
 export const VerifyResetOTPScreen = ({ navigation, route }: any) => {
   const insets = useSafeAreaInsets();
+  const { setIsResettingPassword } = useAuth();
   const { email } = route.params;
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +27,7 @@ export const VerifyResetOTPScreen = ({ navigation, route }: any) => {
 
   const handleVerifyOTP = async () => {
     if (!token || token.length < 6) {
-      setError('Please enter the 6-digit code');
+      setError('Please enter the verification code');
       return;
     }
 
@@ -42,6 +44,9 @@ export const VerifyResetOTPScreen = ({ navigation, route }: any) => {
       if (error) throw error;
       
       // On success, user is logged in with recovery session.
+      // Prevent App.tsx from redirecting to MainNavigator before password is set
+      setIsResettingPassword(true);
+      
       // Navigate to ResetPasswordScreen to finalize the update.
       navigation.navigate('ResetPassword');
     } catch (e: any) {
@@ -84,18 +89,18 @@ export const VerifyResetOTPScreen = ({ navigation, route }: any) => {
           <View style={styles.header}>
             <Text style={styles.title}>Verify Code</Text>
             <Text style={styles.subtitle}>
-              Enter the 6-digit code sent to {email}
+              Enter the verification code sent to {email}
             </Text>
           </View>
 
           <View style={styles.form}>
             <Input
               label="Verification Code"
-              placeholder="000000"
+              placeholder="00000000"
               value={token}
               onChangeText={setToken}
               keyboardType="number-pad"
-              maxLength={6}
+              maxLength={8}
               error={error}
             />
 

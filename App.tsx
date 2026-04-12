@@ -8,6 +8,8 @@ import { View, ActivityIndicator, StatusBar } from 'react-native';
 import { Colors } from './src/theme/colors';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { GOOGLE_WEB_CLIENT_ID } from '@env';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { CartProvider } from './src/context/CartContext';
 import { AlertProvider } from './src/context/AlertContext';
 import { MainNavigator } from './src/navigation/MainNavigator';
@@ -31,7 +33,7 @@ function App() {
 }
 
 function AppContent() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, isResettingPassword } = useAuth();
   const insets = useSafeAreaInsets();
 
   useNotificationListener();
@@ -43,6 +45,12 @@ function AppContent() {
     }
   }, [profile]);
 
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+    });
+  }, []);
 
   if (loading) {
     return (
@@ -59,15 +67,16 @@ function AppContent() {
       <NavigationContainer
         ref={navigationRef}
         linking={{
-          prefixes: ['com.mainapp://'],
+          prefixes: ['com.zorodelivery.app://'],
           config: {
             screens: {
+              Login: 'login',
               ResetPassword: 'reset-password',
             },
           },
         }}
       >
-        {session ? <MainNavigator /> : <AuthNavigator />}
+        {session && profile && !isResettingPassword ? <MainNavigator /> : <AuthNavigator />}
       </NavigationContainer>
     </View>
   );

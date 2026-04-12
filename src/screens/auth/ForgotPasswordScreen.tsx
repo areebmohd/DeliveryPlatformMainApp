@@ -35,7 +35,7 @@ export const ForgotPasswordScreen = ({ navigation }: any) => {
     
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim(), {
-        redirectTo: 'com.mainapp://reset-password',
+        redirectTo: 'com.zorodelivery.app://reset-password',
       });
 
       if (error) throw error;

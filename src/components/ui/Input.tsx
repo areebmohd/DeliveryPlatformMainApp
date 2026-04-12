@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ViewStyle,
   TextInputProps,
+  TouchableOpacity,
 } from 'react-native';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -29,6 +30,7 @@ export const Input = ({
   ...props
 }: InputProps) => {
   const [isFocused, setIsFocused] = React.useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
 
   const handleFocus = (e: any) => {
     setIsFocused(true);
@@ -39,6 +41,13 @@ export const Input = ({
     setIsFocused(false);
     onBlur?.(e);
   };
+
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible(!isPasswordVisible);
+  };
+
+  const isPasswordInput = props.secureTextEntry;
+  const secureTextEntry = isPasswordInput && !isPasswordVisible;
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -64,12 +73,25 @@ export const Input = ({
             onFocus={handleFocus}
             onBlur={handleBlur}
             {...props}
+            secureTextEntry={secureTextEntry}
           />
-          {rightIcon && (
+          {isPasswordInput ? (
+            <TouchableOpacity 
+              style={styles.rightIconContainer} 
+              onPress={togglePasswordVisibility}
+              activeOpacity={0.6}
+            >
+              <Icon 
+                name={isPasswordVisible ? 'eye-off' : 'eye'} 
+                size={22} 
+                color={isFocused ? Colors.primary : Colors.textSecondary} 
+              />
+            </TouchableOpacity>
+          ) : rightIcon ? (
             <View style={styles.rightIconContainer}>
               {rightIcon}
             </View>
-          )}
+          ) : null}
         </View>
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}

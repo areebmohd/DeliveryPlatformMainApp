@@ -100,7 +100,7 @@ export const AccountScreen = ({ navigation }: any) => {
             </View>
             <View style={styles.profileMainInfo}>
               <Text style={styles.profileUserName} numberOfLines={1}>
-                {profile?.full_name || 'Guest User'}
+                {profile?.full_name || ''}
               </Text>
               <View style={styles.membershipBadge}>
                 <Icon name="shield-check" size={12} color={Colors.success} />

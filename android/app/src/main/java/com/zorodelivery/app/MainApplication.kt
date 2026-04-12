@@ -1,4 +1,4 @@
-package com.mainapp
+package com.zorodelivery.app
 
 import android.app.Application
 import com.facebook.react.PackageList

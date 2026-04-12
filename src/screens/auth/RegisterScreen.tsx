@@ -14,6 +14,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { AlertModal } from '../../components/ui/AlertModal';
 import { supabase } from '../../api/supabase';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export const RegisterScreen = ({ navigation }: any) => {
   const [fullName, setFullName] = useState('');
@@ -78,6 +80,7 @@ export const RegisterScreen = ({ navigation }: any) => {
         email: email.toLowerCase().trim(),
         password,
         options: {
+          emailRedirectTo: 'com.zorodelivery.app://login',
           data: {
             full_name: fullName,
             role: role,
@@ -98,15 +101,47 @@ export const RegisterScreen = ({ navigation }: any) => {
         throw signUpError;
       }
       
-      showAlert(
-        'Success',
-        'Registration successful! Please check your email for verification.',
-        'success',
-        { text: 'OK', onPress: () => navigation.navigate('Login') },
-        false
-      );
+      navigation.navigate('VerifyEmailOTP', { email: email.toLowerCase().trim() });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      setLoading(true);
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      
+      if (userInfo.data?.idToken) {
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: userInfo.data.idToken,
+        });
+
+        if (error) throw error;
+        
+        // If login is successful, we should ensure the role is set
+        // Note: For Google auth, the role is default. If we need specific roles, 
+        // we might need a metadata update after first login.
+        if (data.user) {
+          await supabase.auth.updateUser({
+            data: { role: role }
+          });
+        }
+      } else {
+        throw new Error('No ID token present!');
+      }
     } catch (e: any) {
-      setError(e.message || 'An error occurred during registration');
+      if (e.code === statusCodes.SIGN_IN_CANCELLED) {
+        // User cancelled the login flow
+      } else if (e.code === statusCodes.IN_PROGRESS) {
+        // Operation (e.g. sign in) is in progress already
+      } else if (e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        setError('Play services not available or outdated');
+      } else {
+        setError(e.message || 'An error occurred during Google sign in');
+      }
     } finally {
       setLoading(false);
     }
@@ -176,6 +211,23 @@ export const RegisterScreen = ({ navigation }: any) => {
               loading={loading}
               style={styles.button}
             />
+
+            <View style={styles.dividerContainer}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.googleButton} 
+              onPress={handleGoogleLogin}
+              disabled={loading}
+            >
+              <View style={styles.googleIconContainer}>
+                <Icon name="google" size={20} color={Colors.white} />
+              </View>
+              <Text style={styles.googleButtonText}>Continue with Google</Text>
+            </TouchableOpacity>
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Already have an account? </Text>
@@ -277,5 +329,48 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700',
     fontSize: 14,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: Spacing.lg,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.surface,
+  },
+  dividerText: {
+    marginHorizontal: Spacing.md,
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 12,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  googleIconContainer: {
+    backgroundColor: '#db4437',
+    borderRadius: 8,
+    padding: 4,
+    marginRight: 12,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
   },
 });
