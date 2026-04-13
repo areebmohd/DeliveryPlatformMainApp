@@ -824,7 +824,7 @@ const styles = StyleSheet.create({
   },
   banner: {
     width: '100%',
-    height: 180,
+    aspectRatio: 2 / 1,
     borderRadius: 24,
     backgroundColor: Colors.surface,
   },

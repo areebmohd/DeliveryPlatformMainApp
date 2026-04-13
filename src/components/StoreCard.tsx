@@ -38,7 +38,7 @@ export const StoreCard = ({ store, onPress, width, horizontal }: StoreCardProps)
       onPress={onPress}
       activeOpacity={0.9}
     >
-      <View style={[styles.imageContainer, horizontal ? { height: 120 } : null]}>
+      <View style={[styles.imageContainer, horizontal ? { aspectRatio: 2 / 1 } : null]}>
         {store.banner_url ? (
           <Image source={{ uri: store.banner_url }} style={styles.image} />
         ) : (
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    height: 160,
+    aspectRatio: 2 / 1,
     position: 'relative',
   },
   image: {

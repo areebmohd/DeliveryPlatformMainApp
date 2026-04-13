@@ -848,8 +848,8 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     marginTop: Spacing.sm,
-    height: 180,
     width: width,
+    aspectRatio: 2 / 1,
     position: 'relative',
   },
   bannerWrapper: {

@@ -29,7 +29,6 @@ import { TimeSlotPicker } from '../../components/ui/TimeSlotPicker';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
 
 const { width } = Dimensions.get('window');
-const BANNER_HEIGHT = width * (10 / 16);
 
 export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const { user } = useAuth();
@@ -317,7 +316,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Branding</Text>
-          <Text style={styles.inputLabel}>Store Banner</Text>
+          <Text style={styles.inputLabel}>Store Banner (2:1 Ratio)</Text>
           <TouchableOpacity 
             style={styles.bannerPicker} 
             onPress={pickImage}
@@ -328,7 +327,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
             ) : (
               <View style={styles.imagePlaceholder}>
                 <Icon name="image-plus" size={40} color={Colors.primary} />
-                <Text style={styles.imagePlaceholderText}>Upload Store Banner</Text>
+                <Text style={styles.imagePlaceholderText}>Upload 2:1 Store Banner</Text>
               </View>
             )}
             {isUploadingBanner && (
@@ -570,7 +569,7 @@ const styles = StyleSheet.create({
   },
   bannerPicker: {
     width: '100%',
-    height: BANNER_HEIGHT * 0.7,
+    aspectRatio: 2 / 1,
     backgroundColor: Colors.primaryLight,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
