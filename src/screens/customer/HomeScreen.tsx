@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -47,6 +47,10 @@ export const HomeScreen = ({ navigation }: any) => {
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const { addItem, updateQuantity, items, sessionAddress, setSessionAddress } = useCart();
   const { user } = useAuth();
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const activeBannerIndexRef = useRef(0);
+  const bannerScrollViewRef = useRef<ScrollView>(null);
+  const autoScrollTimer = useRef<any>(null);
 
   const getQuantity = (productId: string) => {
     const item = items.find(i => i.id === productId);
@@ -82,6 +86,37 @@ export const HomeScreen = ({ navigation }: any) => {
 
     return unsubscribe;
   }, [user, navigation]);
+
+  useEffect(() => {
+    if (homeBanners.length > 1) {
+      startAutoScroll();
+    }
+    return () => stopAutoScroll();
+  }, [homeBanners]);
+
+  useEffect(() => {
+    activeBannerIndexRef.current = activeBannerIndex;
+  }, [activeBannerIndex]);
+
+  const startAutoScroll = () => {
+    stopAutoScroll();
+    autoScrollTimer.current = setInterval(() => {
+      if (homeBanners.length > 0) {
+        const nextIndex = (activeBannerIndexRef.current + 1) % homeBanners.length;
+        bannerScrollViewRef.current?.scrollTo({
+          x: nextIndex * width,
+          animated: true,
+        });
+        setActiveBannerIndex(nextIndex);
+      }
+    }, 5000);
+  };
+
+  const stopAutoScroll = () => {
+    if (autoScrollTimer.current) {
+      clearInterval(autoScrollTimer.current);
+    }
+  };
 
   const checkNotifications = async () => {
     try {
@@ -200,7 +235,7 @@ export const HomeScreen = ({ navigation }: any) => {
         .from('home_banners')
         .select('*')
         .eq('is_active', true)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
       if (error) throw error;
       setHomeBanners(data || []);
     } catch (e) {
@@ -350,12 +385,16 @@ export const HomeScreen = ({ navigation }: any) => {
         {homeBanners.length > 0 && (
           <View style={styles.bannerContainer}>
             <ScrollView 
+              ref={bannerScrollViewRef}
               horizontal 
               pagingEnabled 
               showsHorizontalScrollIndicator={false}
               onMomentumScrollEnd={(e) => {
-                // Could implement pagination dot update here
+                const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+                setActiveBannerIndex(newIndex);
               }}
+              onTouchStart={stopAutoScroll}
+              onTouchEnd={startAutoScroll}
             >
               {homeBanners.map((banner) => (
                 <View key={banner.id} style={styles.bannerWrapper}>
@@ -363,6 +402,21 @@ export const HomeScreen = ({ navigation }: any) => {
                 </View>
               ))}
             </ScrollView>
+            
+            {/* Pagination Dots */}
+            {homeBanners.length > 1 && (
+              <View style={styles.paginationContainer}>
+                {homeBanners.map((_, index) => (
+                  <View 
+                    key={index} 
+                    style={[
+                      styles.dot, 
+                      activeBannerIndex === index ? styles.activeDot : styles.inactiveDot
+                    ]} 
+                  />
+                ))}
+              </View>
+            )}
           </View>
         )}
 
@@ -794,11 +848,13 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     marginTop: Spacing.sm,
-    height: 160,
+    height: 180,
     width: width,
+    position: 'relative',
   },
   bannerWrapper: {
     width: width,
+    height: '100%',
     paddingHorizontal: Spacing.md,
   },
   bannerImage: {
@@ -806,6 +862,24 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 16,
     resizeMode: 'cover',
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    position: 'absolute',
+    bottom: 12,
+    alignSelf: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  activeDot: {
+    backgroundColor: Colors.white,
+  },
+  inactiveDot: {
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
   categoryImage: {
     width: '100%',
