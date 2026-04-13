@@ -82,6 +82,11 @@ export const OffersScreen = ({ navigation }: any) => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
+  const [conditionModal, setConditionModal] = useState<{ visible: boolean; offer: Offer | null }>({
+    visible: false,
+    offer: null
+  });
+
 
   useEffect(() => {
     fetchStoreAndOffers();
@@ -343,10 +348,19 @@ export const OffersScreen = ({ navigation }: any) => {
               <Text style={styles.offerTabCondText} numberOfLines={1}>{c}</Text>
             </View>
           ))}
+          {hasMore && (
+            <TouchableOpacity 
+              style={styles.offerTabCondPill} 
+              onPress={() => setConditionModal({ visible: true, offer })}
+            >
+              <Text style={styles.offerTabCondText}>+ More</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
   };
+
 
   const renderOfferCard = (offer: Offer) => {
     const theme = getTheme(offer.type);
@@ -805,6 +819,135 @@ export const OffersScreen = ({ navigation }: any) => {
           }
         }}
       />
+
+      <Modal 
+        visible={conditionModal.visible} 
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setConditionModal({ visible: false, offer: null })}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <View style={[styles.offerTabBadge, { 
+                  backgroundColor: getTheme(conditionModal.offer?.type || '').bg,
+                  alignSelf: 'flex-start',
+                  marginBottom: 8
+                }]}>
+                  <Text style={[styles.offerTabBadgeText, { color: getTheme(conditionModal.offer?.type || '').color }]}>
+                    {conditionModal.offer?.type.replace('_', ' ').toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={styles.modalTitle}>{conditionModal.offer?.name || 'Offer Details'}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setConditionModal({ visible: false, offer: null })}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {conditionModal.offer && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.modalDesc}>
+                  {(() => {
+                    const getNames = (ids?: string[]) => {
+                      if (!ids || ids.length === 0) return '';
+                      const names = ids.map(id => storeProducts.find(p => String(p.id) === String(id))?.name).filter(Boolean);
+                      if (names.length === 0) return '';
+                      return names.join(', ');
+                    };
+                    const resolvedName = getNames(conditionModal.offer.reward_data?.product_ids);
+                    return getOfferDescription(conditionModal.offer, resolvedName);
+                  })()}
+                </Text>
+                
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Complete Offer Details</Text>
+                  
+                  <View style={styles.fullCondItem}>
+                     <View style={styles.condBullet} />
+                     <Text style={styles.fullCondText}>
+                       <Text style={{ fontWeight: '800' }}>Eligibility: </Text>
+                       {conditionModal.offer.conditions.applicable_orders === 'all' 
+                         ? 'Open for all existing and new customers.' 
+                         : `Valid only for first ${conditionModal.offer.conditions.applicable_orders} orders from this store.`}
+                     </Text>
+                  </View>
+
+                  {conditionModal.offer.conditions.min_price && (
+                    <View style={styles.fullCondItem}>
+                       <View style={styles.condBullet} />
+                       <Text style={styles.fullCondText}>
+                         <Text style={{ fontWeight: '800' }}>Minimum Purchase: </Text>
+                         Customers need to buy products worth ₹{conditionModal.offer.conditions.min_price} or more to apply this offer.
+                       </Text>
+                    </View>
+                  )}
+
+                  {conditionModal.offer.conditions.start_time && (
+                    <View style={styles.fullCondItem}>
+                       <View style={styles.condBullet} />
+                       <Text style={styles.fullCondText}>
+                         <Text style={{ fontWeight: '800' }}>Offer Timing: </Text>
+                         This offer is only available between {conditionModal.offer.conditions.start_time} and {conditionModal.offer.conditions.end_time}.
+                       </Text>
+                    </View>
+                  )}
+
+                  {conditionModal.offer.conditions.max_distance && (
+                    <View style={styles.fullCondItem}>
+                       <View style={styles.condBullet} />
+                       <Text style={styles.fullCondText}>
+                         <Text style={{ fontWeight: '800' }}>Distance Limit: </Text>
+                         Delivery address must be within {conditionModal.offer.conditions.max_distance}km from {store?.name || 'your store'}.
+                       </Text>
+                    </View>
+                  )}
+
+                  {conditionModal.offer.conditions.product_ids && conditionModal.offer.conditions.product_ids.length > 0 && (
+                    <View style={styles.fullCondItem}>
+                       <View style={styles.condBullet} />
+                       <View style={{ flex: 1 }}>
+                         <Text style={styles.fullCondText}>
+                           <Text style={{ fontWeight: '800' }}>Required Products: </Text>
+                           To apply this offer, customers must have at least one of these items in their cart:
+                         </Text>
+                         <View style={styles.productNamesList}>
+                            {conditionModal.offer.conditions.product_ids.map((pid: string) => {
+                               const product = storeProducts.find(p => String(p.id) === String(pid));
+                               return (
+                                 <Text key={pid} style={styles.productNameItem}>• {product?.name || 'Specific Product'}</Text>
+                               );
+                            })}
+                         </View>
+                       </View>
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+            )}
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, gap: 12 }}>
+              <Button 
+                title="Edit Offer" 
+                onPress={() => {
+                  const off = conditionModal.offer;
+                  setConditionModal({ visible: false, offer: null });
+                  if (off) handleEditOffer(off);
+                }} 
+                style={{ flex: 1, marginVertical: 0 }}
+              />
+              <Button 
+                title="Close" 
+                variant="outline"
+                onPress={() => setConditionModal({ visible: false, offer: null })} 
+                style={{ flex: 1, marginVertical: 0 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
 
     </View>
   );

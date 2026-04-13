@@ -262,9 +262,50 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         storeData.verification_images = verificationImages;
       }
 
-      // If store is already active, set has_pending_changes to true
+      // Check if any sensitive fields changed (excluding banner_url)
+      const sensitiveFields = [
+        'name', 'description', 'category', 'upi_id', 'phone', 'email', 
+        'whatsapp_number', 'address_line_1', 'city', 'state', 'pincode',
+        'owner_name', 'owner_number', 'opening_hours'
+      ];
+      
+      let sensitiveChanged = false;
       if (store && store.is_active) {
-        storeData.has_pending_changes = true;
+        // Check standard fields
+        for (const field of sensitiveFields) {
+          if (store[field] !== storeData[field]) {
+            sensitiveChanged = true;
+            break;
+          }
+        }
+        
+        // Check location
+        if (!sensitiveChanged && location) {
+          const newLoc = `POINT(${location.longitude} ${location.latitude})`;
+          if (store.location_wkt !== newLoc && store.location !== newLoc) {
+            sensitiveChanged = true;
+          }
+        }
+      }
+
+      // If store is already active, only set pending changes if sensitive info changed
+      if (store && store.is_active) {
+        if (sensitiveChanged) {
+          storeData.has_pending_changes = true;
+        } else if (store.banner_url !== bannerUrl) {
+          // If ONLY banner changed, keep has_pending_changes as is (false or current)
+          // and update approved_details to stay in sync with the new banner
+          const updatedApproved = { ...(store.approved_details || {}) };
+          updatedApproved.banner_url = bannerUrl;
+          
+          // Fix location key if it was legacy 'location'
+          if (updatedApproved.location && !updatedApproved.location_wkt) {
+            updatedApproved.location_wkt = updatedApproved.location;
+            delete updatedApproved.location;
+          }
+          
+          storeData.approved_details = updatedApproved;
+        }
       }
 
       if (location) {
