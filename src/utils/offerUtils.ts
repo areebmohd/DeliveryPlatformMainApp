@@ -41,7 +41,7 @@ export const getOfferDescription = (offer: any, resolvedName?: string) => {
     case 'combo':
       return `${nameToUse || 'Items'} at Only ₹${amount}`;
     case 'fixed_price':
-      return `${nameToUse || 'Selected Items'} at only ₹${amount}`;
+      return `${nameToUse || 'Selected Items'} at ₹${amount} each`;
     case 'free_cash':
       return `₹${amount} Free Cash amount`;
     default:
