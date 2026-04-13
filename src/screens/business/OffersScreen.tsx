@@ -117,12 +117,16 @@ export const OffersScreen = ({ navigation }: any) => {
             setOffers(offersData || []);
         }
 
-        const { data: productsData } = await supabase
+        const { data: productsData, error: productsError } = await supabase
           .from('products')
-          .select('id, name')
+          .select('id, name, price')
           .eq('store_id', storeData.id)
-          .eq('is_deleted', false);
+          .eq('is_deleted', false)
+          .order('name');
         
+        if (productsError) {
+          console.error('Error fetching products:', productsError);
+        }
         setStoreProducts(productsData || []);
       }
     } catch (e) {
@@ -244,7 +248,7 @@ export const OffersScreen = ({ navigation }: any) => {
           product_name: selectedRewardProducts.length === 1 
             ? (storeProducts.find(p => String(p.id) === String(selectedRewardProducts[0]))?.name || 'Item')
             : (selectedRewardProducts.length > 1 ? `${selectedRewardProducts.length} Items` : 'Items'),
-          product_price: storeProducts.find(p => p.id === selectedRewardProducts[0])?.price || 0
+          product_price: storeProducts.find(p => String(p.id) === String(selectedRewardProducts[0]))?.price || 0
         } : {},
         status: editingOffer ? editingOffer.status : 'active'
       };
@@ -702,6 +706,86 @@ export const OffersScreen = ({ navigation }: any) => {
               />
               <View style={{ height: 20 }} />
             </ScrollView>
+
+            {/* Product Selection Modal - Nested for Android Reliability */}
+            <Modal visible={showProductModal} transparent animationType="slide">
+              <View style={styles.modalOverlay}>
+                <View style={styles.productModalContent}>
+                  <View style={[styles.modalHeader, { marginBottom: 8 }]}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={styles.modalTitle}>
+                        {productModalMode === 'reward' ? 'Select Free Products' : 'Select Target Products'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setShowProductModal(false)}>
+                      <Icon name="close" size={24} color={Colors.text} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={[styles.modalSubtitle, { marginBottom: 20 }]}>
+                    {productModalMode === 'reward' ? selectedRewardProducts.length : selectedProducts.length} selected
+                  </Text>
+
+                  <ScrollView showsVerticalScrollIndicator={false} style={styles.productList}>
+                    {storeProducts.length > 0 ? (
+                      storeProducts.map((product) => {
+                        const isSelected = productModalMode === 'reward' 
+                          ? selectedRewardProducts.includes(String(product.id))
+                          : selectedProducts.includes(String(product.id));
+
+                        return (
+                          <TouchableOpacity 
+                            key={product.id} 
+                            style={styles.productItem}
+                            onPress={() => {
+                              const pId = String(product.id);
+                              if (productModalMode === 'reward') {
+                                if (isSelected) setSelectedRewardProducts(selectedRewardProducts.filter(id => id !== pId));
+                                else setSelectedRewardProducts([...selectedRewardProducts, pId]);
+                              } else {
+                                if (isSelected) setSelectedProducts(selectedProducts.filter(id => id !== pId));
+                                else setSelectedProducts([...selectedProducts, pId]);
+                              }
+                            }}
+                          >
+                            <Text style={[styles.productName, isSelected && styles.productNameActive]}>
+                              {product.name}
+                            </Text>
+                            <Icon 
+                              name={isSelected ? "checkbox-marked" : "checkbox-blank-outline"} 
+                              size={24} 
+                              color={isSelected ? Colors.primary : Colors.border} 
+                            />
+                          </TouchableOpacity>
+                        );
+                      })
+                    ) : (
+                      <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                        <Icon name="package-variant" size={48} color={Colors.border} />
+                        <Text style={{ color: Colors.textSecondary, marginTop: 12, fontWeight: '600' }}>No products found</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+
+                  <View style={styles.productModalActions}>
+                    <TouchableOpacity 
+                      style={styles.clearBtn} 
+                      onPress={() => {
+                        if (productModalMode === 'reward') setSelectedRewardProducts([]);
+                        else setSelectedProducts([]);
+                      }}
+                    >
+                      <Text style={styles.clearBtnText}>Clear All</Text>
+                    </TouchableOpacity>
+                    <Button 
+                      title="Done" 
+                      onPress={() => setShowProductModal(false)} 
+                      style={styles.doneBtn}
+                    />
+                  </View>
+                </View>
+              </View>
+            </Modal>
           </View>
         </View>
       </Modal>
@@ -722,77 +806,6 @@ export const OffersScreen = ({ navigation }: any) => {
         }}
       />
 
-      {/* Product Selection Modal */}
-      <Modal visible={showProductModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.productModalContent}>
-            <View style={[styles.modalHeader, { marginBottom: 8 }]}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={styles.modalTitle}>
-                  {productModalMode === 'reward' ? 'Select Free Products' : 'Select Target Products'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowProductModal(false)}>
-                <Icon name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.modalSubtitle, { marginBottom: 20 }]}>
-              {productModalMode === 'reward' ? selectedRewardProducts.length : selectedProducts.length} selected
-            </Text>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.productList}>
-              {storeProducts.map((product) => {
-                const isSelected = productModalMode === 'reward' 
-                  ? selectedRewardProducts.includes(product.id)
-                  : selectedProducts.includes(product.id);
-
-                return (
-                  <TouchableOpacity 
-                    key={product.id} 
-                    style={styles.productItem}
-                    onPress={() => {
-                      if (productModalMode === 'reward') {
-                        if (isSelected) setSelectedRewardProducts(selectedRewardProducts.filter(id => id !== product.id));
-                        else setSelectedRewardProducts([...selectedRewardProducts, product.id]);
-                      } else {
-                        if (isSelected) setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                        else setSelectedProducts([...selectedProducts, product.id]);
-                      }
-                    }}
-                  >
-                    <Text style={[styles.productName, isSelected && styles.productNameActive]}>
-                      {product.name}
-                    </Text>
-                    <Icon 
-                      name={isSelected ? "checkbox-marked" : "checkbox-blank-outline"} 
-                      size={24} 
-                      color={isSelected ? Colors.primary : Colors.border} 
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            <View style={styles.productModalActions}>
-              <TouchableOpacity 
-                style={styles.clearBtn} 
-                onPress={() => {
-                  if (productModalMode === 'reward') setSelectedRewardProducts([]);
-                  else setSelectedProducts([]);
-                }}
-              >
-                <Text style={styles.clearBtnText}>Clear All</Text>
-              </TouchableOpacity>
-              <Button 
-                title="Done" 
-                onPress={() => setShowProductModal(false)} 
-                style={styles.doneBtn}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };

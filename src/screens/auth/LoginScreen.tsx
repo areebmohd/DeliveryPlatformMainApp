@@ -86,9 +86,36 @@ export const LoginScreen = ({ navigation }: any) => {
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
       const idToken = userInfo.data?.idToken;
+      const emailAddress = userInfo.data?.user?.email;
 
       if (!idToken) {
         throw new Error('No ID token present');
+      }
+
+      // Check if email already exists with a different role
+      if (emailAddress) {
+        const { data: existingRole, error: checkError } = await supabase.rpc('check_email_exists', {
+          email_to_check: emailAddress.toLowerCase().trim(),
+        });
+
+        if (checkError) {
+          console.error('Error checking role:', checkError);
+        } else if (existingRole) {
+          const isBusinessSelection = role === 'store';
+          const isBusinessRole = existingRole === 'store' || existingRole === 'admin';
+          
+          if (isBusinessSelection && !isBusinessRole) {
+            setError('This account is registered as a Customer. Please select the correct option.');
+            await GoogleSignin.signOut();
+            setLoading(false);
+            return;
+          } else if (!isBusinessSelection && isBusinessRole) {
+            setError('This account is registered as a Business. Please select the correct option.');
+            await GoogleSignin.signOut();
+            setLoading(false);
+            return;
+          }
+        }
       }
 
       const { data, error } = await supabase.auth.signInWithIdToken({

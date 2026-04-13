@@ -110,10 +110,38 @@ export const RegisterScreen = ({ navigation }: any) => {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
+      setError('');
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
+      const emailAddress = userInfo.data?.user?.email;
       
       if (userInfo.data?.idToken) {
+        // Check if email already exists with a different role
+        if (emailAddress) {
+          const { data: existingRole, error: checkError } = await supabase.rpc('check_email_exists', {
+            email_to_check: emailAddress.toLowerCase().trim(),
+          });
+
+          if (checkError) {
+            console.error('Error checking role:', checkError);
+          } else if (existingRole) {
+            const isBusinessSelection = role === 'store';
+            const isBusinessRole = existingRole === 'store' || existingRole === 'admin';
+            
+            if ((isBusinessSelection && !isBusinessRole) || (!isBusinessSelection && isBusinessRole)) {
+              showAlert(
+                'Email Already Registered',
+                `This email is already registered as a ${existingRole}. One email can only be used for one account type. Please sign in or use a different email.`,
+                'warning',
+                { text: 'OK', onPress: () => navigation.navigate('Login') }
+              );
+              await GoogleSignin.signOut();
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'google',
           token: userInfo.data.idToken,
@@ -122,8 +150,6 @@ export const RegisterScreen = ({ navigation }: any) => {
         if (error) throw error;
         
         // If login is successful, we should ensure the role is set
-        // Note: For Google auth, the role is default. If we need specific roles, 
-        // we might need a metadata update after first login.
         if (data.user) {
           await supabase.auth.updateUser({
             data: { role: role }
@@ -136,7 +162,7 @@ export const RegisterScreen = ({ navigation }: any) => {
       if (e.code === statusCodes.SIGN_IN_CANCELLED) {
         // User cancelled the login flow
       } else if (e.code === statusCodes.IN_PROGRESS) {
-        // Operation (e.g. sign in) is in progress already
+        setError('Operation in progress');
       } else if (e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
         setError('Play services not available or outdated');
       } else {
