@@ -50,6 +50,12 @@ export const LoginScreen = ({ navigation }: any) => {
         setLoading(false);
         return;
       } else {
+        if (existingRole === 'rider') {
+          setError('This email is registered for a rider account. Please use a different email or log in to the Rider app.');
+          setLoading(false);
+          return;
+        }
+
         const isBusinessSelection = role === 'store';
         const isBusinessRole = existingRole === 'store' || existingRole === 'admin';
         
@@ -118,16 +124,25 @@ export const LoginScreen = ({ navigation }: any) => {
         if (checkError) {
           console.error('Error checking role:', checkError);
         } else if (existingRole) {
+          if (existingRole === 'rider') {
+            setError('This email is registered for a rider account. Please use a different email or log in to the Rider app.');
+            await GoogleSignin.signOut();
+            setLoading(false);
+            return;
+          }
+
           const isBusinessSelection = role === 'store';
           const isBusinessRole = existingRole === 'store' || existingRole === 'admin';
           
           if (isBusinessSelection && !isBusinessRole) {
-            setError('This account is registered as a Customer. Please select the correct option.');
+            const roleLabel = existingRole === 'store' ? 'Business' : existingRole.charAt(0).toUpperCase() + existingRole.slice(1);
+            setError(`This email is registered as a ${roleLabel}. Please select the correct option.`);
             await GoogleSignin.signOut();
             setLoading(false);
             return;
           } else if (!isBusinessSelection && isBusinessRole) {
-            setError('This account is registered as a Business. Please select the correct option.');
+            const roleLabel = existingRole === 'store' ? 'Business' : existingRole.charAt(0).toUpperCase() + existingRole.slice(1);
+            setError(`This email is registered as a ${roleLabel}. Please select the correct option.`);
             await GoogleSignin.signOut();
             setLoading(false);
             return;
@@ -141,6 +156,13 @@ export const LoginScreen = ({ navigation }: any) => {
       });
 
       if (error) throw error;
+      
+      // Sync role metadata after successful login/link
+      if (data.user) {
+        await supabase.auth.updateUser({
+          data: { role: role }
+        });
+      }
       
     } catch (e: any) {
       console.error('Google Sign-In Error:', e);

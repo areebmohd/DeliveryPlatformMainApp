@@ -66,9 +66,10 @@ export const RegisterScreen = ({ navigation }: any) => {
       if (checkError) {
         console.error('Error checking email existence:', checkError);
       } else if (existingRole) {
+        const roleLabel = existingRole === 'store' ? 'Business' : existingRole === 'rider' ? 'Rider' : existingRole.charAt(0).toUpperCase() + existingRole.slice(1);
         showAlert(
           'Email Already Registered',
-          `This email is already registered as a ${existingRole}. One email can only be used for one account type. Please sign in or use a different email.`,
+          `This email is already registered as a ${roleLabel}. One email can only be used for one account type. Please sign in or use a different email.`,
           'warning',
           { text: 'OK', onPress: () => navigation.navigate('Login') }
         );
@@ -148,13 +149,26 @@ export const RegisterScreen = ({ navigation }: any) => {
           if (checkError) {
             console.error('Error checking role:', checkError);
           } else if (existingRole) {
+            if (existingRole === 'rider') {
+              showAlert(
+                'Email Already Registered',
+                'This email is already registered for a rider account. Please use a different email or log in to the Rider app.',
+                'warning',
+                { text: 'OK', onPress: () => navigation.navigate('Login') }
+              );
+              await GoogleSignin.signOut();
+              setLoading(false);
+              return;
+            }
+
             const isBusinessSelection = role === 'store';
             const isBusinessRole = existingRole === 'store' || existingRole === 'admin';
             
             if ((isBusinessSelection && !isBusinessRole) || (!isBusinessSelection && isBusinessRole)) {
+              const roleLabel = existingRole === 'store' ? 'Business' : existingRole.charAt(0).toUpperCase() + existingRole.slice(1);
               showAlert(
                 'Email Already Registered',
-                `This email is already registered as a ${existingRole}. One email can only be used for one account type. Please sign in or use a different email.`,
+                `This email is already registered as a ${roleLabel}. One email can only be used for one account type. Please sign in or use a different email.`,
                 'warning',
                 { text: 'OK', onPress: () => navigation.navigate('Login') }
               );
@@ -163,6 +177,7 @@ export const RegisterScreen = ({ navigation }: any) => {
               return;
             }
           }
+        }
         }
 
         const { data, error } = await supabase.auth.signInWithIdToken({

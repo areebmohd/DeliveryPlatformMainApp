@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   ScrollView,
   BackHandler,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -27,6 +28,10 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { showAlert } = useAlert();
+  const [breakdownModal, setBreakdownModal] = useState<{ visible: boolean; order: any }>({ 
+    visible: false, 
+    order: null 
+  });
 
   useEffect(() => {
     fetchOrders();
@@ -287,7 +292,15 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
                 </Text>
               </View>
             </View>
-            <Text style={styles.totalAmount}>₹{item.total_amount}</Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.totalAmount}>₹{item.total_amount}</Text>
+              <TouchableOpacity 
+                onPress={() => setBreakdownModal({ visible: true, order: item })}
+                style={{ marginTop: 4 }}
+              >
+                <Text style={styles.viewSharesText}>View Shares</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {item.payment_method === 'pay_online' && (
@@ -346,6 +359,102 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
         </TouchableOpacity>
         <Text style={styles.screenTitle}>Orders</Text>
       </View>
+
+      <Modal
+        visible={breakdownModal.visible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setBreakdownModal({ ...breakdownModal, visible: false })}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setBreakdownModal({ ...breakdownModal, visible: false })}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Price Breakdown</Text>
+              <TouchableOpacity onPress={() => setBreakdownModal({ ...breakdownModal, visible: false })}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {breakdownModal.order && (
+              <ScrollView style={styles.modalBody}>
+                <View style={styles.breakdownSection}>
+                  <Text style={styles.breakdownSectionTitle}>Store Shares</Text>
+                  {(() => {
+                    const storeShares: { [key: string]: number } = {};
+                    breakdownModal.order.order_items.forEach((oi: any) => {
+                      const sName = oi.products?.stores?.name || breakdownModal.order.stores?.name || 'Store';
+                      const storeId = oi.products?.store_id || breakdownModal.order.store_id || 'unknown';
+                      
+                      // Calculate item total after store-wide discount if any
+                      const storeOffer = breakdownModal.order.applied_offers?.[storeId];
+                      let itemTotal = oi.product_price * oi.quantity;
+                      
+                      if (storeOffer?.type === 'discount') {
+                        itemTotal = itemTotal * (1 - storeOffer.amount / 100);
+                      } else if (storeOffer?.type === 'free_cash') {
+                        // For display, we just show the proportionally reduced share
+                        const totalStoreAmount = breakdownModal.order.order_items
+                          .filter((i: any) => (i.products?.store_id || breakdownModal.order.store_id) === storeId)
+                          .reduce((acc: number, curr: any) => acc + curr.product_price * curr.quantity, 0);
+                        const proportion = (oi.product_price * oi.quantity) / (totalStoreAmount || 1);
+                        itemTotal = (oi.product_price * oi.quantity) - (storeOffer.amount * proportion);
+                      }
+
+                      if (!storeShares[sName]) storeShares[sName] = 0;
+                      storeShares[sName] += itemTotal;
+                    });
+
+                    return Object.entries(storeShares).map(([name, amount], idx) => (
+                      <View key={idx} style={styles.breakdownRow}>
+                        <Text style={styles.breakdownLabel}>{name}</Text>
+                        <Text style={styles.breakdownValue}>₹{Math.round(amount)}</Text>
+                      </View>
+                    ));
+                  })()}
+                </View>
+
+                <View style={styles.breakdownSection}>
+                  <Text style={styles.breakdownSectionTitle}>Fees & Services</Text>
+                  {breakdownModal.order.delivery_fee > 0 && (
+                    <View style={styles.breakdownRow}>
+                      <Text style={styles.breakdownLabel}>Delivery Fee</Text>
+                      <Text style={styles.breakdownValue}>₹{breakdownModal.order.delivery_fee}</Text>
+                    </View>
+                  )}
+                  {breakdownModal.order.platform_fee > 0 && (
+                    <View style={styles.breakdownRow}>
+                      <Text style={styles.breakdownLabel}>Platform Fee</Text>
+                      <Text style={styles.breakdownValue}>₹{breakdownModal.order.platform_fee}</Text>
+                    </View>
+                  )}
+                  {breakdownModal.order.helper_fee > 0 && (
+                    <View style={styles.breakdownRow}>
+                      <Text style={styles.breakdownLabel}>Helper Fee</Text>
+                      <Text style={styles.breakdownValue}>₹{breakdownModal.order.helper_fee}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={[styles.breakdownRow, styles.grandTotalRow]}>
+                  <Text style={styles.grandTotalLabel}>Grand Total</Text>
+                  <Text style={styles.grandTotalValue}>₹{breakdownModal.order.total_amount}</Text>
+                </View>
+              </ScrollView>
+            )}
+
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setBreakdownModal({ ...breakdownModal, visible: false })}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {loading ? (
         <View style={styles.center}>
@@ -716,5 +825,99 @@ const styles = StyleSheet.create({
     color: Colors.success,
     fontWeight: '600',
     marginTop: 1,
+  },
+  viewSharesText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '800',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: Spacing.xl,
+    paddingTop: Spacing.lg,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    paddingBottom: Spacing.sm,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: Colors.text,
+  },
+  modalBody: {
+    marginBottom: Spacing.lg,
+  },
+  breakdownSection: {
+    marginBottom: Spacing.xl,
+  },
+  breakdownSectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: Spacing.md,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  breakdownLabel: {
+    fontSize: 15,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+  breakdownValue: {
+    fontSize: 15,
+    color: Colors.text,
+    fontWeight: '800',
+  },
+  grandTotalRow: {
+    borderTopWidth: 2,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  grandTotalLabel: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: Colors.text,
+  },
+  grandTotalValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: Colors.primary,
+  },
+  closeButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  closeButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '800',
   },
 });
