@@ -178,7 +178,6 @@ export const RegisterScreen = ({ navigation }: any) => {
             }
           }
         }
-        }
 
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'google',

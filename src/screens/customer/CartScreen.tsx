@@ -270,7 +270,7 @@ export const CartScreen = ({ navigation }: any) => {
         !items.some(item => item.id === pid)
       );
       if (missingIds.length > 0) {
-        const missingNames = missingIds.map(id => offerProductNames[id] || 'Unknown Product').join(', ');
+        const missingNames = missingIds.map((id: string) => offerProductNames[id] || 'Unknown Product').join(', ');
         errors.push(`Required products missing from cart: ${missingNames}`);
       }
     }
@@ -641,7 +641,7 @@ export const CartScreen = ({ navigation }: any) => {
   const baseDeliveryFee = items.length === 0 ? 0 : (
     isLargeVehicle 
       ? 300 + (distance * 30)
-      : 20 + (distance * 5)
+      : 10 + (distance * 5)
   );
   const helperFee = hasHelper ? 400 : 0;
   const baseGrandTotal = subtotal + baseDeliveryFee + platformFee + helperFee;
@@ -657,7 +657,7 @@ export const CartScreen = ({ navigation }: any) => {
       const dist = storeDistances[offer.store_id] || 0;
       const storeFee = isLargeVehicle 
         ? 300 + (dist * 30)
-        : 20 + (dist * 5);
+        : 10 + (dist * 5);
       
       storeContributions[offer.store_id] = storeFee;
       totalStoreContribution += storeFee;
