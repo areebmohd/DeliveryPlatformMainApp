@@ -76,7 +76,7 @@ export const RegisterScreen = ({ navigation }: any) => {
         return;
       }
 
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
         options: {
@@ -89,13 +89,36 @@ export const RegisterScreen = ({ navigation }: any) => {
       });
 
       if (signUpError) {
-        if (signUpError.message.includes('already registered')) {
-          showAlert(
-            'Account Exists',
-            'An account with this email already exists. Please sign in instead.',
-            'warning',
-            { text: 'Go to Login', onPress: () => navigation.navigate('Login') }
-          );
+        if (signUpError.message.toLowerCase().includes('already registered') || signUpError.message.toLowerCase().includes('already been taken')) {
+          try {
+            const { error: resendError } = await supabase.auth.resend({
+              type: 'signup',
+              email: email.toLowerCase().trim(),
+            });
+            
+            if (resendError) {
+              showAlert(
+                'Account Exists',
+                'An account with this email already exists. Please sign in instead.',
+                'warning',
+                { text: 'Go to Login', onPress: () => navigation.navigate('Login') }
+              );
+            } else {
+              showAlert(
+                'Welcome Back',
+                'Your account exists but is not verified. A new verification code has been sent.',
+                'info',
+                { text: 'OK', onPress: () => navigation.navigate('VerifyEmailOTP', { email: email.toLowerCase().trim() }) }
+              );
+            }
+          } catch (resendError: any) {
+            showAlert(
+              'Account Exists',
+              'An account with this email already exists. Please sign in instead.',
+              'warning',
+              { text: 'Go to Login', onPress: () => navigation.navigate('Login') }
+            );
+          }
           return;
         }
         throw signUpError;

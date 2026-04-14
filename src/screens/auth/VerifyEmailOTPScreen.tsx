@@ -33,13 +33,24 @@ export const VerifyEmailOTPScreen = ({ navigation, route }: any) => {
     setError('');
     
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      // Try with 'signup' type first
+      const { data, error } = await supabase.auth.verifyOtp({
         email,
         token,
         type: 'signup',
       });
 
-      if (error) throw error;
+      if (error) {
+        // Fallback to 'email' type
+        console.log('Verification with type signup failed, trying email:', error.message);
+        const { error: retryError } = await supabase.auth.verifyOtp({
+          email,
+          token,
+          type: 'email',
+        });
+        
+        if (retryError) throw retryError;
+      }
       
       // Success modal or direct navigation
       navigation.navigate('Login', { 

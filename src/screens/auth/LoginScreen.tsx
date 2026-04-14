@@ -64,12 +64,29 @@ export const LoginScreen = ({ navigation }: any) => {
         }
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.toLowerCase().includes('email not confirmed')) {
+          try {
+            await supabase.auth.resend({
+              type: 'signup',
+              email: email.toLowerCase().trim(),
+            });
+            setError('Your email is not verified. A new code has been sent.');
+            navigation.navigate('VerifyEmailOTP', { email: email.toLowerCase().trim() });
+          } catch (resendError: any) {
+            setError(resendError.message || error.message);
+          }
+        } else {
+          throw error;
+        }
+        setLoading(false);
+        return;
+      }
       // Navigation handled by auth state listener in App.tsx
     } catch (e: any) {
       setError(e.message || 'An error occurred during login');
