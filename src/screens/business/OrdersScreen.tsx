@@ -18,6 +18,7 @@ import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { getItemTotals } from '../../utils/offerUtils';
 
 export const OrdersScreen = () => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -302,16 +303,8 @@ export const OrdersScreen = () => {
           {activeItems.map((product: any, idx: number) => {
             const storeId = store?.id;
             const storeOffer = item.applied_offers?.[storeId];
-            const hasStoreWideDiscount = storeOffer && (storeOffer.type === 'discount' || storeOffer.type === 'free_cash');
             
-            let discountedUnitPrice = product.product_price;
-            if (storeOffer?.type === 'discount') {
-              discountedUnitPrice = product.product_price * (1 - storeOffer.amount / 100);
-            } else if (storeOffer?.type === 'free_cash') {
-              const totalStoreAmount = activeItems.reduce((acc: number, curr: any) => acc + curr.product_price * curr.quantity, 0);
-              const proportion = (product.product_price * product.quantity) / totalStoreAmount;
-              discountedUnitPrice = (product.product_price * product.quantity - storeOffer.amount * proportion) / product.quantity;
-            }
+            const { original, discounted } = getItemTotals(product, activeItems, storeOffer);
 
             return (
               <View key={idx} style={styles.itemRowContainer}>
@@ -324,24 +317,24 @@ export const OrdersScreen = () => {
                     {product.selected_options && Object.keys(product.selected_options).length > 0 && (
                       <Text style={styles.itemOptionsText}>
                         {` (${Object.entries(product.selected_options)
-                          .map(([k, v]) => `${v}`)
+                          .map(([k, v]) => k === 'gift' ? 'Gift' : `${v}`)
                           .join(', ')})`}
                       </Text>
                     )}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginHorizontal: 8 }}>
-                  {hasStoreWideDiscount ? (
+                  {discounted < original ? (
                     <>
                       <Text style={[styles.itemPriceText, { color: Colors.success, fontWeight: '800' }]}>
-                        ₹{Math.round(discountedUnitPrice * product.quantity)}
+                        ₹{Math.round(discounted)}
                       </Text>
                       <Text style={[styles.itemPriceText, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 11 }]}>
-                        ₹{product.product_price * product.quantity}
+                        ₹{original}
                       </Text>
                     </>
                   ) : (
-                    <Text style={styles.itemPriceText}>₹{product.product_price * product.quantity}</Text>
+                    <Text style={styles.itemPriceText}>₹{original}</Text>
                   )}
                 </View>
                 {isModifiable && (
@@ -402,49 +395,46 @@ export const OrdersScreen = () => {
         })()}
 
         <View style={styles.orderFooter}>
-          <Text style={styles.amountLabel}>Grand Total</Text>
-          <View style={{ alignItems: 'flex-end' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-              {(() => {
-                const storeId = store?.id;
-                const storeOffer = item.applied_offers?.[storeId];
-                const deliveryOffer = item.applied_offers?.[`${storeId}_delivery`];
-                const hasDiscount = storeOffer || deliveryOffer;
-                
-                if (!hasDiscount) {
-                  return <Text style={styles.amountValue}>₹{item.total_amount}</Text>;
-                }
-
-                // Calculate original total before this store's discounts
-                let originalTotal = item.total_amount;
-                if (storeOffer?.type === 'discount') {
-                  const storeSubtotal = activeItems.reduce((acc: number, curr: any) => acc + curr.product_price * curr.quantity, 0);
-                  const discountAmount = storeSubtotal * (storeOffer.amount / 100);
-                  originalTotal += discountAmount;
-                } else if (storeOffer?.type === 'free_cash') {
-                  originalTotal += storeOffer.amount;
-                }
-                
-                if (deliveryOffer) {
-                  originalTotal += 25; // Standard delivery fee to add back for strike-through
-                }
-
-                return (
-                  <>
-                    <Text style={styles.amountValue}>₹{item.total_amount}</Text>
-                    <Text style={[styles.amountValue, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 16 }]}>
-                      ₹{Math.round(originalTotal)}
-                    </Text>
-                  </>
-                );
-              })()}
-            </View>
-            <TouchableOpacity 
-              onPress={() => setBreakdownModal({ visible: true, order: item })}
-              style={{ marginTop: 4 }}
-            >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={styles.amountLabel}>Grand Total</Text>
+            <TouchableOpacity onPress={() => setBreakdownModal({ visible: true, order: item })}>
               <Text style={styles.viewSharesText}>View Shares</Text>
             </TouchableOpacity>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            {(() => {
+              const storeId = store?.id;
+              const storeOffer = item.applied_offers?.[storeId];
+              const deliveryOffer = item.applied_offers?.[`${storeId}_delivery`];
+              const hasDiscount = storeOffer || deliveryOffer;
+              
+              if (!hasDiscount) {
+                return <Text style={styles.amountValue}>₹{item.total_amount}</Text>;
+              }
+
+              // Calculate original total before this store's discounts
+              let originalTotal = item.total_amount;
+              if (storeOffer?.type === 'discount') {
+                const storeSubtotal = activeItems.reduce((acc: number, curr: any) => acc + curr.product_price * curr.quantity, 0);
+                const discountAmount = storeSubtotal * (storeOffer.amount / 100);
+                originalTotal += discountAmount;
+              } else if (storeOffer?.type === 'free_cash') {
+                originalTotal += storeOffer.amount;
+              }
+              
+              if (deliveryOffer) {
+                originalTotal += 25; // Standard delivery fee to add back for strike-through
+              }
+
+              return (
+                <>
+                  <Text style={styles.amountValue}>₹{item.total_amount}</Text>
+                  <Text style={[styles.amountValue, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 16 }]}>
+                    ₹{Math.round(originalTotal)}
+                  </Text>
+                </>
+              );
+            })()}
           </View>
         </View>
       </View>
@@ -489,36 +479,44 @@ export const OrdersScreen = () => {
                   <Text style={styles.breakdownSectionTitle}>Store Shares</Text>
                   {(() => {
                     const storeShares: { [key: string]: number } = {};
+                    const deliverySponsored: { [key: string]: number } = {};
+                    
                     breakdownModal.order.order_items.forEach((oi: any) => {
-                      // Note: In business app, we might want to see other stores too if available, 
-                      // but the query usually restricts or highlights THIS store.
-                      // For a "Grand Total" breakdown, we show all stores in the order.
                       const sName = oi.products?.stores?.name || breakdownModal.order.stores?.name || 'Store';
                       const sId = oi.products?.store_id || breakdownModal.order.store_id;
                       
                       const storeOffer = breakdownModal.order.applied_offers?.[sId];
-                      let itemAmount = oi.product_price * oi.quantity;
+                      const allStoreItems = breakdownModal.order.order_items.filter((i: any) => (i.products?.store_id || breakdownModal.order.store_id) === sId);
                       
-                      if (storeOffer?.type === 'discount') {
-                        itemAmount = itemAmount * (1 - storeOffer.amount / 100);
-                      } else if (storeOffer?.type === 'free_cash') {
-                        const totalStoreAmount = breakdownModal.order.order_items
-                          .filter((i: any) => (i.products?.store_id || breakdownModal.order.store_id) === sId)
-                          .reduce((acc: number, curr: any) => acc + curr.product_price * curr.quantity, 0);
-                        const proportion = (oi.product_price * oi.quantity) / (totalStoreAmount || 1);
-                        itemAmount = (oi.product_price * oi.quantity) - (storeOffer.amount * proportion);
-                      }
-
+                      const { discounted } = getItemTotals(oi, allStoreItems, storeOffer);
+                      
                       if (!storeShares[sName]) storeShares[sName] = 0;
-                      storeShares[sName] += itemAmount;
+                      storeShares[sName] += discounted;
+                      
+                      // Calculate store sponsored delivery explicitly once per store
+                      if (deliverySponsored[sName] === undefined) {
+                        const deliveryFeePaidByStore = breakdownModal.order.store_delivery_fees?.[sId] || (breakdownModal.order.applied_offers?.[`${sId}_delivery`] ? 25 : 0);
+                        deliverySponsored[sName] = deliveryFeePaidByStore;
+                        storeShares[sName] -= deliveryFeePaidByStore;
+                      }
                     });
 
-                    return Object.entries(storeShares).map(([name, amount], idx) => (
-                      <View key={idx} style={styles.breakdownRow}>
-                        <Text style={styles.breakdownLabel}>{name}</Text>
-                        <Text style={styles.breakdownValue}>₹{Math.round(amount)}</Text>
-                      </View>
-                    ));
+                    return (
+                      <>
+                        {Object.entries(storeShares).map(([name, amount], idx) => (
+                          <View key={idx} style={styles.breakdownRow}>
+                            <Text style={styles.breakdownLabel}>{name}</Text>
+                            <Text style={styles.breakdownValue}>₹{Math.round(amount)}</Text>
+                          </View>
+                        ))}
+                        {Object.entries(deliverySponsored).filter(([_, amt]) => amt > 0).map(([name, amount], idx) => (
+                          <View key={`del-${idx}`} style={styles.breakdownRow}>
+                            <Text style={styles.breakdownLabel}>{name} Sponsored Delivery</Text>
+                            <Text style={[styles.breakdownValue, { color: Colors.error }]}>-₹{Math.round(amount)}</Text>
+                          </View>
+                        ))}
+                      </>
+                    );
                   })()}
                 </View>
 

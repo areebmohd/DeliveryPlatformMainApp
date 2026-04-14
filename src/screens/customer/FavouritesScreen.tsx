@@ -275,7 +275,7 @@ export const FavouritesScreen = ({ navigation }: any) => {
           <View style={styles.badgeStoreRow}>
             <View style={[styles.offerTabBadge, { backgroundColor: theme.bg }]}>
               <Text style={[styles.offerTabBadgeText, { color: theme.color }]}>
-                {offer.type.replace('_', ' ').toUpperCase()}
+                {offer.type === 'cheap_product' ? 'PRICE DROP' : offer.type.replace('_', ' ').toUpperCase()}
               </Text>
             </View>
           </View>
@@ -465,7 +465,7 @@ export const FavouritesScreen = ({ navigation }: any) => {
                   marginBottom: 8
                 }]}>
                   <Text style={[styles.offerTabBadgeText, { color: getTheme(conditionModal.offer?.type || '').color }]}>
-                    {conditionModal.offer?.type.replace('_', ' ').toUpperCase()}
+                    {conditionModal.offer?.type === 'cheap_product' ? 'PRICE DROP' : (conditionModal.offer?.type || '').replace('_', ' ').toUpperCase()}
                   </Text>
                 </View>
                 <Text style={styles.modalTitle}>{conditionModal.offer?.name || 'Offer Details'}</Text>
@@ -477,7 +477,18 @@ export const FavouritesScreen = ({ navigation }: any) => {
 
             {conditionModal.offer && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.modalDesc}>{getOfferDescription(conditionModal.offer)}</Text>
+                <Text style={styles.modalDesc}>
+                  {(() => {
+                    const getNames = (ids?: string[]) => {
+                      if (!ids || ids.length === 0) return '';
+                      const names = ids.map(id => storeProducts.find(p => String(p.id) === String(id))?.name).filter(Boolean);
+                      if (names.length === 0) return '';
+                      return names.join(', ');
+                    };
+                    const resolvedName = getNames(conditionModal.offer.reward_data?.product_ids);
+                    return getOfferDescription(conditionModal.offer, resolvedName);
+                  })()}
+                </Text>
                 
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Complete Offer Details</Text>

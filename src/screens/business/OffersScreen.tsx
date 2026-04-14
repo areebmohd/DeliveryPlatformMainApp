@@ -376,7 +376,7 @@ export const OffersScreen = ({ navigation }: any) => {
                 color={theme.color} 
               />
               <Text style={[styles.offerTabBadgeText, { color: theme.color }]}>
-                {offer.type.replace('_', ' ').toUpperCase()}
+                {offer.type === 'cheap_product' ? 'PRICE DROP' : offer.type.replace('_', ' ').toUpperCase()}
               </Text>
             </View>
           </View>
@@ -836,7 +836,7 @@ export const OffersScreen = ({ navigation }: any) => {
                   marginBottom: 8
                 }]}>
                   <Text style={[styles.offerTabBadgeText, { color: getTheme(conditionModal.offer?.type || '').color }]}>
-                    {conditionModal.offer?.type.replace('_', ' ').toUpperCase()}
+                    {conditionModal.offer?.type === 'cheap_product' ? 'PRICE DROP' : (conditionModal.offer?.type || '').replace('_', ' ').toUpperCase()}
                   </Text>
                 </View>
                 <Text style={styles.modalTitle}>{conditionModal.offer?.name || 'Offer Details'}</Text>

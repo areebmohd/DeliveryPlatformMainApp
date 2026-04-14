@@ -456,7 +456,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                           <View style={styles.badgeStoreRow}>
                             <View style={[styles.offerTabBadge, { backgroundColor: theme.bg }]}>
                               <Text style={[styles.offerTabBadgeText, { color: theme.color }]}>
-                                {offer.type.replace('_', ' ').toUpperCase()}
+                                {offer.type === 'cheap_product' ? 'PRICE DROP' : offer.type.replace('_', ' ').toUpperCase()}
                               </Text>
                             </View>
                           </View>
@@ -683,7 +683,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                   marginBottom: 8
                 }]}>
                   <Text style={[styles.offerTabBadgeText, { color: getTheme(conditionModal.offer?.type || '').color }]}>
-                    {conditionModal.offer?.type.replace('_', ' ').toUpperCase()}
+                    {conditionModal.offer?.type === 'cheap_product' ? 'PRICE DROP' : (conditionModal.offer?.type || '').replace('_', ' ').toUpperCase()}
                   </Text>
                 </View>
                 <Text style={styles.modalTitleDetail}>{conditionModal.offer?.name || 'Offer Details'}</Text>
@@ -697,9 +697,13 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
               <ScrollView showsVerticalScrollIndicator={false}>
                 <Text style={styles.modalDesc}>
                   {(() => {
-                    const resolvedName = conditionModal.offer.reward_data?.product_ids && conditionModal.offer.reward_data.product_ids.length > 0
-                      ? products.find((p: any) => p.id === conditionModal.offer.reward_data.product_ids[0])?.name
-                      : undefined;
+                    const getNames = (ids?: string[]) => {
+                      if (!ids || ids.length === 0) return '';
+                      const names = ids.map(id => products.find((p: any) => p.id === id)?.name).filter(Boolean);
+                      if (names.length === 0) return '';
+                      return names.join(', ');
+                    };
+                    const resolvedName = getNames(conditionModal.offer.reward_data?.product_ids);
                     return getOfferDescription(conditionModal.offer, resolvedName);
                   })()}
                 </Text>

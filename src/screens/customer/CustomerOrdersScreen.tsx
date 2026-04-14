@@ -19,7 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
-import { getOfferDescription } from '../../utils/offerUtils';
+import { getOfferDescription, getItemTotals } from '../../utils/offerUtils';
 
 export const CustomerOrdersScreen = ({ navigation }: any) => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -216,24 +216,44 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
                 <Text style={styles.storeName}>{sName}</Text>
               </View>
               <View style={styles.itemsList}>
-                {groups[sName].map((oi: any, idx: number) => (
-                  <View key={idx} style={styles.orderItemWrapper}>
-                    <View style={styles.orderItemRow}>
-                      <Text style={styles.itemQty}>{oi.quantity} x</Text>
-                      <Text style={styles.itemName} numberOfLines={1}>
-                        {oi.product_name}
-                        {oi.selected_options && Object.keys(oi.selected_options).length > 0 && (
-                          <Text style={styles.itemOptionsText}>
-                            {` (${Object.entries(oi.selected_options)
-                              .map(([k, v]) => `${v}`)
-                              .join(', ')})`}
-                          </Text>
-                        )}
-                      </Text>
-                      <Text style={styles.itemPrice}>₹{oi.product_price * oi.quantity}</Text>
-                    </View>
-                  </View>
-                ))}
+                {(() => {
+                  const storeId = groups[sName][0]?.products?.stores?.id || item.stores?.id || 'unknown';
+                  const storeOffer = item.applied_offers?.[storeId];
+                  return groups[sName].map((oi: any, idx: number) => {
+                    const { original, discounted } = getItemTotals(oi, groups[sName], storeOffer);
+                    return (
+                      <View key={idx} style={styles.orderItemWrapper}>
+                        <View style={styles.orderItemRow}>
+                          <Text style={styles.itemQty}>{oi.quantity} x</Text>
+                          <View style={{flex: 1}}>
+                            <Text style={styles.itemName} numberOfLines={1}>
+                              {oi.product_name}
+                              {oi.selected_options && Object.keys(oi.selected_options).length > 0 && (
+                                <Text style={styles.itemOptionsText}>
+                                  {` (${Object.entries(oi.selected_options)
+                                    .map(([k, v]) => k === 'gift' ? 'Gift' : `${v}`)
+                                    .join(', ')})`}
+                                </Text>
+                              )}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginLeft: 8 }}>
+                            {discounted < original ? (
+                              <>
+                                <Text style={styles.itemPrice}>₹{Math.round(discounted)}</Text>
+                                <Text style={[styles.itemPrice, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 11 }]}>
+                                  ₹{original}
+                                </Text>
+                              </>
+                            ) : (
+                              <Text style={styles.itemPrice}>₹{original}</Text>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  });
+                })()}
               </View>
 
               {/* Applied Offers for this store */}

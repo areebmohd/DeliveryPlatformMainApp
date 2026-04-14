@@ -673,7 +673,7 @@ export const CartScreen = ({ navigation }: any) => {
       offerDiscount = (eligibleSubtotal * offer.amount) / 100;
     } else if (offer.type === 'combo') {
       const comboItems = items.filter(item => offer.reward_data?.product_ids?.includes(item.id));
-      const comboSubtotal = comboItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      const comboSubtotal = comboItems.reduce((sum, i) => sum + i.price, 0);
       offerDiscount = Math.max(0, comboSubtotal - offer.amount);
     } else if (offer.type === 'fixed_price') {
       const eligibleItems = items.filter(item => offer.reward_data?.product_ids?.includes(item.id));
@@ -1046,6 +1046,11 @@ export const CartScreen = ({ navigation }: any) => {
                     if (standardOffer.reward_data?.product_ids?.includes(item.id)) {
                       hasDiscount = true;
                     }
+                  } else if (standardOffer.type === 'fixed_price') {
+                    if (standardOffer.reward_data?.product_ids?.includes(item.id)) {
+                      discountedPrice = standardOffer.amount;
+                      hasDiscount = true;
+                    }
                   }
                 }
 
@@ -1057,7 +1062,7 @@ export const CartScreen = ({ navigation }: any) => {
                           {item.name}
                           {item.selected_options && Object.keys(item.selected_options).length > 0 && (
                             <Text style={styles.itemOptionsText}>
-                              {` (${Object.values(item.selected_options).join(', ')})`}
+                              {` (${Object.entries(item.selected_options).map(([k, v]) => k === 'gift' ? 'Gift' : v).join(', ')})`}
                             </Text>
                           )}
                         </Text>
@@ -1108,16 +1113,15 @@ export const CartScreen = ({ navigation }: any) => {
                             <View style={styles.itemInfo}>
                               <Text style={styles.itemName} numberOfLines={1}>
                                 {pName}
-                                <Text style={styles.freeBadgeTextSub}> (Gift)</Text>
                               </Text>
+                              {pPrice && (
+                                <Text style={[styles.itemPriceStrikethrough, { marginTop: 2 }]}>₹{pPrice}</Text>
+                              )}
                             </View>
                             <View style={[styles.freeBadge, { flexDirection: 'row', gap: 6, alignItems: 'center' }]}>
                               <Icon name="gift" size={14} color={Colors.white} />
                               <Text style={styles.freeBadgeText}>Free</Text>
                             </View>
-                            {pPrice && (
-                              <Text style={[styles.itemPriceStrikethrough, { marginLeft: 8 }]}>₹{pPrice}</Text>
-                            )}
                           </>
                         );
                       })()}
@@ -1146,6 +1150,17 @@ export const CartScreen = ({ navigation }: any) => {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.storeOfferName}>
                           {offer.name || 'Special Offer'}
+                        </Text>
+                        <Text style={styles.storeOfferDesc}>
+                          {(() => {
+                            const getNames = (ids?: string[]) => {
+                              if (!ids || ids.length === 0) return '';
+                              const names = ids.map(id => offerProductNames[id]).filter(Boolean);
+                              return names.join(', ');
+                            };
+                            const resolvedName = getNames(offer.reward_data?.product_ids || offer.conditions?.product_ids);
+                            return getOfferDescription(offer, resolvedName);
+                          })()}
                         </Text>
                       </View>
                       <TouchableOpacity 
@@ -1214,7 +1229,10 @@ export const CartScreen = ({ navigation }: any) => {
                   d = (eItems.reduce((s, i) => s + (i.price * i.quantity), 0) * o.amount) / 100;
                 } else if (o.type === 'combo') {
                   const cItems = items.filter(i => o.reward_data?.product_ids?.includes(i.id));
-                  d = Math.max(0, cItems.reduce((s, i) => s + (i.price * i.quantity), 0) - o.amount);
+                  d = Math.max(0, cItems.reduce((s, i) => s + i.price, 0) - o.amount);
+                } else if (o.type === 'fixed_price') {
+                  const fItems = items.filter(i => o.reward_data?.product_ids?.includes(i.id));
+                  d = fItems.reduce((s, i) => s + (Math.max(0, i.price - o.amount) * i.quantity), 0);
                 }
                 return sum + d;
               }, 0))).toFixed(2)}</Text>
@@ -1232,7 +1250,7 @@ export const CartScreen = ({ navigation }: any) => {
                 title: 'Delivery Fee',
                 content: isLargeVehicle 
                   ? `₹300 pickup fee + ₹30 per km\n(Large Vehicle / Truck)\n\nDistance: ${distance.toFixed(2)} km`
-                  : `₹20 pickup fee + ₹5 per km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
+                  : `₹10 pickup fee + ₹5 per km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
               })}>
                 <Icon name="information-outline" size={16} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -1502,7 +1520,7 @@ export const CartScreen = ({ navigation }: any) => {
                       <View style={styles.modalOfferHeader}>
                         <View style={[styles.offerTabBadge, { backgroundColor: theme.bg }]}>
                           <Text style={[styles.offerTabBadgeText, { color: theme.color }]}>
-                            {offer.type.replace('_', ' ').toUpperCase()}
+                            {offer.type === 'cheap_product' ? 'PRICE DROP' : offer.type.replace('_', ' ').toUpperCase()}
                           </Text>
                         </View>
                         {isApplied && (
@@ -1520,7 +1538,7 @@ export const CartScreen = ({ navigation }: any) => {
                             if (!ids || ids.length === 0) return '';
                             const names = ids.map(id => offerProductNames[id]).filter(Boolean);
                             if (names.length === 0) return '';
-                            return names.length > 2 ? `${names.slice(0, 2).join(', ')} & more` : names.join(', ');
+                            return names.join(', ');
                           };
                           const resolvedName = getNames(offer.reward_data?.product_ids || offer.conditions?.product_ids);
                           return getOfferDescription(offer, resolvedName);
@@ -2173,6 +2191,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#166534',
+  },
+  storeOfferDesc: {
+    fontSize: 11,
+    color: '#166534',
+    opacity: 0.8,
+    marginTop: 1,
   },
   storeOfferRemove: {
     padding: 2,
