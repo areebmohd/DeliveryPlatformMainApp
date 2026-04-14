@@ -79,6 +79,7 @@ export const OrdersScreen = () => {
         *,
         customer:profiles!orders_customer_id_fkey (full_name, phone),
         rider:profiles!orders_rider_id_fkey (full_name, phone),
+        address:addresses!orders_delivery_address_id_fkey (receiver_name, receiver_phone),
         order_items!inner (*, products!inner(store_id)),
         applied_offers
       `)
@@ -257,10 +258,14 @@ export const OrdersScreen = () => {
               <Icon name="account" size={16} color={Colors.primary} />
             </View>
             <View>
-              <Text style={styles.personName}>{item.customer?.full_name || 'Deleted User'}</Text>
-              {item.customer?.phone ? (
-                <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
-                  <Text style={[styles.personRole, { color: Colors.primary }]}>Customer • {item.customer.phone}</Text>
+              <Text style={styles.personName}>
+                {item.customer?.full_name || item.address?.receiver_name || 'Deleted User'}
+              </Text>
+              {item.customer?.phone || item.address?.receiver_phone ? (
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.customer?.phone || item.address?.receiver_phone}`)}>
+                  <Text style={[styles.personRole, { color: Colors.primary }]}>
+                    Customer • {item.customer?.phone || item.address?.receiver_phone}
+                  </Text>
                 </TouchableOpacity>
               ) : (
                 <Text style={styles.personRole}>Customer • No phone</Text>
