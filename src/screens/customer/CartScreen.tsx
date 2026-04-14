@@ -60,6 +60,7 @@ export const CartScreen = ({ navigation }: any) => {
   const [manuallyRemovedStores, setManuallyRemovedStores] = useState<string[]>([]);
   const [storeDeliveryFees, setStoreDeliveryFees] = useState<Record<string, number>>({});
   const [totalStoreFees, setTotalStoreFees] = useState(0);
+  const [offerProductNames, setOfferProductNames] = useState<Record<string, string>>({});
 
   // Background fetch for reward product details (if missing)
   useEffect(() => {
@@ -166,11 +167,58 @@ export const CartScreen = ({ navigation }: any) => {
       }));
       
       setActiveStoreOffers(formatted);
+
+      // Extract all product IDs needed for names
+      const productIds = new Set<string>();
+      (data || []).forEach((o: any) => {
+        if (o.conditions?.product_ids) {
+          o.conditions.product_ids.forEach((id: string) => productIds.add(id));
+        }
+        if (o.reward_data?.product_ids) {
+          o.reward_data.product_ids.forEach((id: string) => productIds.add(id));
+        }
+      });
+
+      if (productIds.size > 0) {
+        const { data: pData, error: pError } = await supabase
+          .from('products')
+          .select('id, name')
+          .in('id', Array.from(productIds));
+        
+        if (!pError && pData) {
+          const mapping = { ...offerProductNames };
+          pData.forEach(p => {
+            mapping[p.id] = p.name;
+          });
+          setOfferProductNames(mapping);
+        }
+      }
     } catch (e) {
       console.error('Error fetching store offers:', e);
       showAlert({ title: 'Error', message: 'Unable to load offers for this store.', type: 'error' });
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const navigateToStore = async (storeId: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('stores_view')
+        .select('*')
+        .eq('id', storeId)
+        .single();
+      
+      if (error) throw error;
+      if (data) {
+        navigation.navigate('StoreDetails', { store: data });
+      }
+    } catch (e) {
+      console.error('Error navigating to store:', e);
+      showAlert({ title: 'Error', message: 'Unable to open store details.', type: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -183,7 +231,7 @@ export const CartScreen = ({ navigation }: any) => {
     const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
     if (conditions.min_price && storeSubtotal < conditions.min_price) {
-      errors.push(`Minimum order ₹${conditions.min_price} required from ${offer.store_name || 'this store'}.`);
+      errors.push(`Minimum order ₹${conditions.min_price} required from ${offer.store_name || 'this store'}. (Current subtotal: ₹${storeSubtotal.toFixed(2)})`);
     }
 
     if (conditions.max_distance) {
@@ -192,7 +240,7 @@ export const CartScreen = ({ navigation }: any) => {
       if (userCoords && storeCoords) {
         const dist = calculateDistance(userCoords.lat, userCoords.lng, storeCoords.lat, storeCoords.lng);
         if (dist > conditions.max_distance) {
-          errors.push(`Max distance: ${conditions.max_distance}km. (Your: ${dist.toFixed(1)}km)`);
+          errors.push(`Maximum distance: ${conditions.max_distance}km. (Your location is ${dist.toFixed(1)}km from store)`);
         }
       }
     }
@@ -213,16 +261,26 @@ export const CartScreen = ({ navigation }: any) => {
       const endMin = parseTimeToMinutes(conditions.end_time);
 
       if (currentMinutes < startMin || currentMinutes > endMin) {
-        errors.push(`Offer valid only between ${conditions.start_time} and ${conditions.end_time}.`);
+        errors.push(`Offer valid only between ${conditions.start_time} and ${conditions.end_time}. (Current time: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`);
       }
     }
 
     if (conditions.product_ids && conditions.product_ids.length > 0) {
-      const allPresent = conditions.product_ids.every((pid: string) => 
-        items.some(item => item.id === pid)
+      const missingIds = conditions.product_ids.filter((pid: string) => 
+        !items.some(item => item.id === pid)
       );
-      if (!allPresent) {
-        errors.push(`All ${conditions.product_ids.length} required products must be in your cart.`);
+      if (missingIds.length > 0) {
+        const missingNames = missingIds.map(id => offerProductNames[id] || 'Unknown Product').join(', ');
+        errors.push(`Required products missing from cart: ${missingNames}`);
+      }
+    }
+
+    if (conditions.applicable_orders && profile?.order_count !== undefined) {
+      const orderCount = profile.order_count || 0;
+      if (conditions.applicable_orders === 'first' && orderCount > 0) {
+        errors.push('Offer is only valid for your first order.');
+      } else if (typeof conditions.applicable_orders === 'number' && orderCount >= conditions.applicable_orders) {
+        errors.push(`Offer is only for first ${conditions.applicable_orders} orders. (Your orders: ${orderCount})`);
       }
     }
 
@@ -756,7 +814,7 @@ export const CartScreen = ({ navigation }: any) => {
             address_line: sessionAddress.address_line,
             city: sessionAddress.city,
             state: sessionAddress.state,
-            pincode: sessionAddress.pincode,
+            pincode: '',
             location: sessionAddress.location,
             receiver_name: sessionAddress.receiver_name,
             receiver_phone: sessionAddress.receiver_phone,
@@ -948,15 +1006,17 @@ export const CartScreen = ({ navigation }: any) => {
         {Object.entries(groupedItems).map(([storeId, storeData]: [string, any]) => (
           <View key={storeId} style={styles.storeSection}>
             <View style={styles.storeHeader}>
-              <View style={styles.storeHeaderLeft}>
-                <Icon name="storefront-outline" size={20} color={Colors.text} />
-                <Text style={styles.storeName} numberOfLines={1}>{storeData.name}</Text>
-              </View>
+              <TouchableOpacity 
+                style={styles.storeHeaderLeft}
+                onPress={() => navigateToStore(storeId)}
+              >
+                <Icon name="storefront-outline" size={20} color={Colors.primary} />
+                <Text style={styles.storeName} numberOfLines={1} ellipsizeMode="tail">{storeData.name}</Text>
+              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.viewOffersBtn}
                 onPress={() => fetchStoreOffers(storeId)}
               >
-                <Icon name="tag-outline" size={14} color={Colors.white} />
                 <Text style={styles.viewOffersText}>View Offers</Text>
               </TouchableOpacity>
             </View>
@@ -1364,7 +1424,7 @@ export const CartScreen = ({ navigation }: any) => {
                 style={styles.modalOption} 
                 onPress={() => {
                   setAddressModalVisible(false);
-                  navigation.navigate('AddAddress'); 
+                  navigation.navigate('AddAddress', { fromCart: true }); 
                 }}
               >
                 <Icon name="plus" size={24} color={Colors.primary} />
@@ -1455,7 +1515,16 @@ export const CartScreen = ({ navigation }: any) => {
                       
                       <Text style={styles.offerTabTitle} numberOfLines={1}>{offer.name || 'Special Offer'}</Text>
                       <Text style={styles.offerTabDesc} numberOfLines={2}>
-                        {getOfferDescription(offer)}
+                        {(() => {
+                          const getNames = (ids?: string[]) => {
+                            if (!ids || ids.length === 0) return '';
+                            const names = ids.map(id => offerProductNames[id]).filter(Boolean);
+                            if (names.length === 0) return '';
+                            return names.length > 2 ? `${names.slice(0, 2).join(', ')} & more` : names.join(', ');
+                          };
+                          const resolvedName = getNames(offer.reward_data?.product_ids || offer.conditions?.product_ids);
+                          return getOfferDescription(offer, resolvedName);
+                        })()}
                       </Text>
 
                       {renderConditionLine(offer)}
@@ -2076,8 +2145,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   storeAppliedOffers: {
-    marginTop: 16,
-    paddingTop: 12,
+    marginTop: 3,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     gap: 8,
@@ -2205,6 +2274,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: Spacing.md,
   },
   viewOffersBtn: {
     flexDirection: 'row',

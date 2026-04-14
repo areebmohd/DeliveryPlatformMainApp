@@ -119,7 +119,7 @@ export const AddressesScreen = ({ navigation }: any) => {
           )}
         </View>
         <Text style={styles.addressText}>
-          {item.address_line}, {item.city}, {item.state} - {item.pincode}
+          {item.address_line}, {item.city}, {item.state}
         </Text>
         
         <View style={styles.actionRow}>
@@ -166,7 +166,7 @@ export const AddressesScreen = ({ navigation }: any) => {
 
       <TouchableOpacity 
         style={styles.addNewCard}
-        onPress={() => navigation.navigate('AddAddress')}
+        onPress={() => navigation.navigate('AddAddress', { fromAddresses: true })}
       >
         <View style={styles.addIconCircle}>
           <Icon name="plus" size={24} color={Colors.primary} />

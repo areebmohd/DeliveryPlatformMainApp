@@ -74,6 +74,8 @@ const CartStack = () => {
       <CartStackNav.Screen name="CartMain" component={CartScreen} />
       <CartStackNav.Screen name="AddAddress" component={AddAddressScreen} />
       <CartStackNav.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
+      <CartStackNav.Screen name="StoreDetails" component={StoreDetailsScreen} />
+      <CartStackNav.Screen name="ProductDetail" component={ProductDetailScreen} />
       <CartStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
     </CartStackNav.Navigator>
   );

@@ -532,7 +532,7 @@ export const HomeScreen = ({ navigation }: any) => {
                 style={styles.modalOption} 
                 onPress={() => {
                   setAddressModalVisible(false);
-                  navigation.navigate('AddAddress'); 
+                  navigation.navigate('AddAddress', { fromHome: true }); 
                 }}
               >
                 <Icon name="plus" size={24} color={Colors.primary} />

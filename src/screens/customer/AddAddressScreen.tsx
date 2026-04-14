@@ -112,7 +112,6 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
     id: editingAddress?.id || null,
     label: editingAddress?.label || 'Home',
     address_line: editingAddress?.address_line || '',
-    pincode: editingAddress?.pincode || '',
     city: editingAddress?.city || '',
     state: editingAddress?.state || '',
     location: initialLocation,
@@ -126,7 +125,6 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
       setFormData(prev => ({
         ...(preservedFormData || prev),
         location: { latitude, longitude },
-        pincode: details?.pincode || (preservedFormData || prev).pincode || '',
         city: details?.city || (preservedFormData || prev).city || '',
         state: details?.state || (preservedFormData || prev).state || '',
       }));
@@ -138,7 +136,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
 
   const handleSave = async () => {
     // Basic validation
-    if (!formData.address_line || !formData.pincode || !formData.city || !formData.state || !formData.location) {
+    if (!formData.address_line || !formData.city || !formData.state || !formData.location) {
       showAlert({ title: 'Error', message: 'Please fill all required fields and select map location', type: 'warning' });
       return;
     }
@@ -148,6 +146,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
       const { location: locObj, id: addressId, ...restFormData } = formData;
       const dataToSave = {
         ...restFormData,
+        pincode: '',
         location: `SRID=4326;POINT(${locObj.longitude} ${locObj.latitude})`,
         receiver_name: profile?.full_name || '',
         receiver_phone: profile?.phone || '',
@@ -198,7 +197,17 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
         <View style={styles.headerContent}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (route.params?.fromCart) {
+                navigation.navigate('CartMain');
+              } else if (route.params?.fromAddresses) {
+                navigation.navigate('Addresses');
+              } else if (route.params?.fromHome) {
+                navigation.navigate('HomeMain');
+              } else {
+                navigation.goBack();
+              }
+            }}
           >
             <Icon name="arrow-left" size={24} color={Colors.text} />
           </TouchableOpacity>
@@ -245,27 +254,13 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
             value={formData.address_line}
             onChangeText={(t: string) => setFormData({ ...formData, address_line: t })}
           />
-          <View style={styles.row}>
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <InputField 
-                label="Pin Code" 
-                placeholder="6-digit PIN" 
-                value={formData.pincode}
-                onChangeText={(t: string) => setFormData({ ...formData, pincode: t })}
-                keyboardType="numeric"
-                editable={false}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <InputField 
-                label="City" 
-                placeholder="City Name" 
-                value={formData.city}
-                onChangeText={(t: string) => setFormData({ ...formData, city: t })}
-                editable={false}
-              />
-            </View>
-          </View>
+          <InputField 
+            label="City" 
+            placeholder="City Name" 
+            value={formData.city}
+            onChangeText={(t: string) => setFormData({ ...formData, city: t })}
+            editable={false}
+          />
           <InputField 
             label="State" 
             placeholder="State Name" 
@@ -284,6 +279,9 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
                 initialLocation: formData.location,
                 returnScreen: 'AddAddress',
                 preservedFormData: formData,
+                fromCart: route.params?.fromCart,
+                fromAddresses: route.params?.fromAddresses,
+                fromHome: route.params?.fromHome,
               })}
             />
           </View>

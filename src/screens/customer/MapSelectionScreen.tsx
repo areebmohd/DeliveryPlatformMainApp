@@ -145,7 +145,10 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
             address: address,
             details: addressDetails,
             preservedFormData: route.params?.preservedFormData,
-          }
+          },
+          fromCart: route.params?.fromCart,
+          fromAddresses: route.params?.fromAddresses,
+          fromHome: route.params?.fromHome,
         },
         merge: true,
       });
