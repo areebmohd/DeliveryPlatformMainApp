@@ -106,8 +106,6 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
         state: 'Haryana',
         pincode: '',
         location: `SRID=4326;POINT(${location.longitude} ${location.latitude})`,
-        receiver_name: profile?.full_name || '',
-        receiver_phone: profile?.phone || '',
         label: `${profile?.full_name || 'My'}'s Live Location`
       });
       

@@ -18,7 +18,7 @@ import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { getItemTotals } from '../../utils/offerUtils';
+import { getItemTotals, getOfferDescription } from '../../utils/offerUtils';
 
 export const OrdersScreen = () => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -85,7 +85,6 @@ export const OrdersScreen = () => {
         *,
         customer:profiles!orders_customer_id_fkey (full_name, phone),
         rider:profiles!orders_rider_id_fkey (full_name, phone),
-        address:addresses!orders_delivery_address_id_fkey (receiver_name, receiver_phone),
         order_items!inner (*, products!inner(store_id)),
         applied_offers
       `)
@@ -265,12 +264,12 @@ export const OrdersScreen = () => {
             </View>
             <View>
               <Text style={styles.personName}>
-                {item.customer?.full_name || item.address?.receiver_name || 'Deleted User'}
+                {item.customer?.full_name || 'Unknown Customer'}
               </Text>
-              {item.customer?.phone || item.address?.receiver_phone ? (
-                <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.customer?.phone || item.address?.receiver_phone}`)}>
+              {item.customer?.phone ? (
+                <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.customer.phone}`)}>
                   <Text style={[styles.personRole, { color: Colors.primary }]}>
-                    Customer • {item.customer?.phone || item.address?.receiver_phone}
+                    Customer • {item.customer.phone}
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -374,18 +373,7 @@ export const OrdersScreen = () => {
                       {offer.name || (offer.type === 'free_delivery' ? 'Free Delivery' : 'Discount Offer')}
                     </Text>
                     <Text style={styles.promoDescription}>
-                      {(() => {
-                        const { type, amount, name } = offer;
-                        switch (type) {
-                          case 'discount': return `${amount}% Instant Discount on Total Items Price`;
-                          case 'free_delivery': return '₹0 Delivery fee';
-                          case 'free_product': return `Get Free ${name || 'Gift Item'}`;
-                          case 'cheap_product': return `${amount}% Instant Discount on ${name || 'Some Items'}`;
-                          case 'combo': return `${name || 'Items'} at Only ₹${amount}`;
-                          case 'free_cash': return `₹${amount} Free Cash amount`;
-                          default: return 'Special store offer';
-                        }
-                      })()}
+                      {getOfferDescription(offer)}
                     </Text>
                   </View>
                 </View>

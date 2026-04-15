@@ -148,8 +148,6 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
         ...restFormData,
         pincode: '',
         location: `SRID=4326;POINT(${locObj.longitude} ${locObj.latitude})`,
-        receiver_name: profile?.full_name || '',
-        receiver_phone: profile?.phone || '',
       };
 
       if (addressId) {

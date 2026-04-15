@@ -297,7 +297,6 @@ export const CartScreen = ({ navigation }: any) => {
 
       const newAppliedOffers = { ...appliedOffers };
       let appliedCount = 0;
-      let upgradedCount = 0;
 
       for (const storeId of storesInCart) {
         if (manuallyRemovedStores.includes(storeId)) continue;
@@ -347,13 +346,13 @@ export const CartScreen = ({ navigation }: any) => {
         if (standardOffers.length > 0) {
           const best = standardOffers[0];
           const current = newAppliedOffers[standardKey];
-          if (!current || current.id !== best.id) {
+          if (!current) {
             newAppliedOffers[standardKey] = {
               ...best,
               store_name: best.store?.name,
               store_location: best.store?.location
             };
-            if (current) upgradedCount++; else appliedCount++;
+            appliedCount++;
           }
         }
 
@@ -361,24 +360,20 @@ export const CartScreen = ({ navigation }: any) => {
         if (deliveryOffers.length > 0) {
           const best = deliveryOffers[0];
           const current = newAppliedOffers[deliveryKey];
-          if (!current || current.id !== best.id) {
+          if (!current) {
             newAppliedOffers[deliveryKey] = {
               ...best,
               store_name: best.store?.name,
               store_location: best.store?.location
             };
-            if (current) upgradedCount++; else appliedCount++;
+            appliedCount++;
           }
         }
       }
 
-      if (appliedCount > 0 || upgradedCount > 0) {
+      if (appliedCount > 0) {
         setAppliedOffers(newAppliedOffers);
-        if (upgradedCount > 0 && appliedCount === 0) {
-          showToast(`Upgraded to better offers!`, 'success');
-        } else if (appliedCount > 0) {
-          showToast(`${appliedCount} offer(s) applied automatically!`, 'success');
-        }
+        showToast(`${appliedCount} offer(s) applied automatically!`, 'success');
       }
     } catch (e) {
       console.error('Auto-apply error:', e);
@@ -816,8 +811,6 @@ export const CartScreen = ({ navigation }: any) => {
             state: sessionAddress.state,
             pincode: '',
             location: sessionAddress.location,
-            receiver_name: sessionAddress.receiver_name,
-            receiver_phone: sessionAddress.receiver_phone,
             label: sessionAddress.label,
             is_deleted: true
           })
