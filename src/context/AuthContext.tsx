@@ -55,8 +55,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         // PGRST116 is the error code for 0 rows returned by .single()
         if (error.code === 'PGRST116') {
-          console.log('Profile record not found. Signing out to clear stale session.');
-          await signOut();
+          // Profile record not found - likely a new sign-up
+          // Re-fetch user to get latest metadata
+          const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+          
+          if (currentUser) {
+            console.log('Profile missing for:', currentUser.email, '- Attempting manual creation fallback');
+            const { data: newProfile, error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: currentUser.id,
+                email: currentUser.email,
+                full_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || 'New User',
+                role: currentUser.user_metadata?.role || 'customer',
+              })
+              .select()
+              .single();
+
+            if (!insertError) {
+              setProfile(newProfile);
+              return;
+            }
+            // If we get an RLS error (42501), it confirms the user needs to run the SQL trigger/policy
+            if (insertError.code === '42501') {
+              console.warn('Profile creation failed due to RLS. Please ensure you have run the provided SQL in Supabase.');
+            } else {
+              console.error('Error creating profile manually:', insertError);
+            }
+          }
+          
+          setProfile(null);
+          return;
         }
         throw error;
       }

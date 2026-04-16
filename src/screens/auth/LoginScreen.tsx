@@ -46,7 +46,7 @@ export const LoginScreen = ({ navigation }: any) => {
       if (checkError) {
         console.error('Error checking role:', checkError);
       } else if (!existingRole) {
-        setError('No account found with this email.');
+        setError('email not registered');
         setLoading(false);
         return;
       } else {
@@ -124,8 +124,9 @@ export const LoginScreen = ({ navigation }: any) => {
         if (checkError) {
           console.error('Error checking role:', checkError);
         } else if (existingRole) {
+          // If account exists, validate role selection
           if (existingRole === 'rider') {
-            setError('This email is registered for a rider account. Please use a different email or log in to the Rider app.');
+            setError('This email is registered for a rider account. Please log in to the Rider app.');
             await GoogleSignin.signOut();
             setLoading(false);
             return;
@@ -134,20 +135,15 @@ export const LoginScreen = ({ navigation }: any) => {
           const isBusinessSelection = role === 'store';
           const isBusinessRole = existingRole === 'store' || existingRole === 'admin';
           
-          if (isBusinessSelection && !isBusinessRole) {
+          if ((isBusinessSelection && !isBusinessRole) || (!isBusinessSelection && isBusinessRole)) {
             const roleLabel = existingRole === 'store' ? 'Business' : existingRole.charAt(0).toUpperCase() + existingRole.slice(1);
-            setError(`This email is registered as a ${roleLabel}. Please select the correct option.`);
-            await GoogleSignin.signOut();
-            setLoading(false);
-            return;
-          } else if (!isBusinessSelection && isBusinessRole) {
-            const roleLabel = existingRole === 'store' ? 'Business' : existingRole.charAt(0).toUpperCase() + existingRole.slice(1);
-            setError(`This email is registered as a ${roleLabel}. Please select the correct option.`);
+            setError(`This email is already registered as a ${roleLabel}. Please select the correct option.`);
             await GoogleSignin.signOut();
             setLoading(false);
             return;
           }
         }
+        // If existingRole is null, we proceed to allow Google Sign-Up
       }
 
       const { data, error } = await supabase.auth.signInWithIdToken({
@@ -157,10 +153,13 @@ export const LoginScreen = ({ navigation }: any) => {
 
       if (error) throw error;
       
-      // Sync role metadata after successful login/link
+      // Update metadata so the DB trigger knows the role
       if (data.user) {
         await supabase.auth.updateUser({
-          data: { role: role }
+          data: { 
+            role: role,
+            full_name: userInfo.data?.user?.name || 'New User'
+          }
         });
       }
       

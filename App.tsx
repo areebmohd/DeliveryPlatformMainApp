@@ -52,7 +52,7 @@ function AppContent() {
     });
   }, []);
 
-  if (loading) {
+  if (loading || (session && !profile && !isResettingPassword)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white }}>
         <ActivityIndicator size="large" color={Colors.primary} />

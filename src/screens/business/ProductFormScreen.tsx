@@ -440,7 +440,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       
       showAlert({
         title: isEditing ? 'Changes Saved' : 'Product Created',
-        message: `Successfully confirmed on server.\n- ${descCount} description field(s)\n- ${optCount} variant group(s)`,
+        message: `Successfully confirmed on server.\n- ${descCount} description field(s)\n- ${optCount} option group(s)`,
         type: 'success',
         primaryAction: {
           text: 'OK',
