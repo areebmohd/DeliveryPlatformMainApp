@@ -79,13 +79,15 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
         .from('orders')
         .select(`
           *,
-          stores (name, category),
+          stores (id, name, category),
           order_items (
+            product_id,
             product_name, 
             quantity, 
             product_price,
             selected_options,
             products (
+              id,
               stores (id, name)
             )
           ),
@@ -407,25 +409,17 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
                     const storeShares: { [key: string]: number } = {};
                     breakdownModal.order.order_items.forEach((oi: any) => {
                       const sName = oi.products?.stores?.name || breakdownModal.order.stores?.name || 'Store';
-                      const storeId = oi.products?.store_id || breakdownModal.order.store_id || 'unknown';
+                      const storeId = oi.products?.stores?.id || breakdownModal.order.store_id || 'unknown';
                       
-                      // Calculate item total after store-wide discount if any
                       const storeOffer = breakdownModal.order.applied_offers?.[storeId];
-                      let itemTotal = oi.product_price * oi.quantity;
+                      const allStoreItems = breakdownModal.order.order_items.filter((i: any) => 
+                        (i.products?.stores?.id || breakdownModal.order.store_id) === storeId
+                      );
                       
-                      if (storeOffer?.type === 'discount') {
-                        itemTotal = itemTotal * (1 - storeOffer.amount / 100);
-                      } else if (storeOffer?.type === 'free_cash') {
-                        // For display, we just show the proportionally reduced share
-                        const totalStoreAmount = breakdownModal.order.order_items
-                          .filter((i: any) => (i.products?.store_id || breakdownModal.order.store_id) === storeId)
-                          .reduce((acc: number, curr: any) => acc + curr.product_price * curr.quantity, 0);
-                        const proportion = (oi.product_price * oi.quantity) / (totalStoreAmount || 1);
-                        itemTotal = (oi.product_price * oi.quantity) - (storeOffer.amount * proportion);
-                      }
+                      const { discounted } = getItemTotals(oi, allStoreItems, storeOffer);
 
                       if (!storeShares[sName]) storeShares[sName] = 0;
-                      storeShares[sName] += itemTotal;
+                      storeShares[sName] += discounted;
                     });
 
                     return Object.entries(storeShares).map(([name, amount], idx) => (

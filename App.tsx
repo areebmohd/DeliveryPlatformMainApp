@@ -12,6 +12,7 @@ import { GOOGLE_WEB_CLIENT_ID } from '@env';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { CartProvider } from './src/context/CartContext';
 import { AlertProvider } from './src/context/AlertContext';
+import { BusinessStoreProvider } from './src/context/BusinessStoreContext';
 import { MainNavigator } from './src/navigation/MainNavigator';
 import { useNotificationListener } from './src/hooks/useNotificationListener';
 import { notificationService } from './src/utils/notificationService';
@@ -24,7 +25,9 @@ function App() {
       <AuthProvider>
         <AlertProvider>
           <CartProvider>
-            <AppContent />
+            <BusinessStoreProvider>
+              <AppContent />
+            </BusinessStoreProvider>
           </CartProvider>
         </AlertProvider>
       </AuthProvider>

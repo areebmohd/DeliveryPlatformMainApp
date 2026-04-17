@@ -15,10 +15,12 @@ import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { supabase } from '../../api/supabase';
 
+import { useBusinessStore } from '../../context/BusinessStoreContext';
+
 export const BusinessAccountScreen = ({ navigation }: any) => {
   const { profile, signOut, user } = useAuth();
   const insets = useSafeAreaInsets();
-  const [store, setStore] = useState<any>(null);
+  const { stores, activeStore, setActiveStore } = useBusinessStore();
 
   const { showAlert } = useAlert();
 
@@ -34,54 +36,6 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
         variant: 'destructive',
       },
     });
-  };
-
-  useEffect(() => {
-    fetchStore();
-
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchStore();
-    });
-
-    if (!user?.id) return unsubscribe;
-
-    // Subscribe to store changes (to update name/category instantly)
-    const channel = supabase
-      .channel(`account-store-sync-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'stores',
-          filter: `owner_id=eq.${user.id}`,
-        },
-        () => {
-          fetchStore();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      unsubscribe();
-      supabase.removeChannel(channel);
-    };
-  }, [navigation, user?.id]);
-
-  const fetchStore = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('stores')
-        .select('*')
-        .eq('owner_id', user?.id)
-        .order('is_active', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (data) setStore(data);
-    } catch (e) {
-      console.error('Error fetching store info', e);
-    }
   };
 
   const OptionItem = ({ icon, label, onPress, isLast }: { icon: string; label: string; onPress?: () => void; isLast?: boolean }) => (
@@ -109,17 +63,41 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
       >
         <Text style={styles.headerTitle}>Business Account</Text>
 
-        {/* Store Info Box */}
+        {/* Store Selection / Info Box */}
         <View style={[styles.box, { paddingVertical: Spacing.lg }]}>
           <View style={styles.storeHeader}>
             <View style={styles.userCircle}>
               <Icon name="store" size={30} color={Colors.primary} />
             </View>
             <View style={styles.storeText}>
-              <Text style={styles.storeName} numberOfLines={1}>{store?.name || 'Your Store'}</Text>
-              <Text style={styles.storeCategory}>{store?.category || 'No Category'}</Text>
+              <Text style={styles.storeName} numberOfLines={1}>{activeStore?.name || 'Your Store'}</Text>
+              <Text style={styles.storeCategory}>{activeStore?.category || 'No Category'}</Text>
             </View>
           </View>
+          
+          {stores.length > 1 && (
+            <View style={styles.switchStoreSection}>
+              <View style={styles.divider} />
+              <Text style={styles.switchTitle}>Switch Store</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storesScroll}>
+                {stores.map((s) => (
+                  <TouchableOpacity 
+                    key={s.id} 
+                    style={[
+                      styles.storeBadge, 
+                      activeStore?.id === s.id && styles.activeStoreBadge
+                    ]}
+                    onPress={() => setActiveStore(s)}
+                  >
+                    <Text style={[
+                      styles.storeBadgeText, 
+                      activeStore?.id === s.id && styles.activeStoreBadgeText
+                    ]}>{s.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
 
         {/* Options Box */}
@@ -339,5 +317,47 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: Colors.error,
+  },
+  switchStoreSection: {
+    marginTop: Spacing.lg,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginBottom: Spacing.md,
+    opacity: 0.5,
+  },
+  switchTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  storesScroll: {
+    paddingVertical: 4,
+    gap: 10,
+  },
+  storeBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  activeStoreBadge: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  storeBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  activeStoreBadgeText: {
+    color: Colors.white,
+    fontWeight: '700',
   },
 });

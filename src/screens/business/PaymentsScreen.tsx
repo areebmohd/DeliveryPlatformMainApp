@@ -16,9 +16,12 @@ import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 
+import { useBusinessStore } from '../../context/BusinessStoreContext';
+
 export const PaymentsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { activeStore } = useBusinessStore();
   const { showAlert } = useAlert();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -26,15 +29,9 @@ export const PaymentsScreen = ({ navigation }: any) => {
   const [totalEarned, setTotalEarned] = useState(0);
   const [lastPayout, setLastPayout] = useState<any>(null);
 
-  const fetchStoreAndPayouts = async () => {
+  const fetchPayouts = async () => {
     try {
-      const { data: storeData } = await supabase
-        .from('stores')
-        .select('id')
-        .eq('owner_id', user?.id)
-        .maybeSingle();
-
-      if (!storeData) {
+      if (!activeStore?.id) {
         setLoading(false);
         return;
       }
@@ -42,7 +39,7 @@ export const PaymentsScreen = ({ navigation }: any) => {
       const { data, error } = await supabase
         .from('payouts')
         .select('*, orders(order_number)')
-        .eq('recipient_id', storeData.id)
+        .eq('recipient_id', activeStore.id)
         .eq('recipient_type', 'store')
         .order('payment_date', { ascending: false });
 
@@ -72,12 +69,12 @@ export const PaymentsScreen = ({ navigation }: any) => {
   };
 
   useEffect(() => {
-    fetchStoreAndPayouts();
-  }, []);
+    fetchPayouts();
+  }, [activeStore?.id]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchStoreAndPayouts();
+    fetchPayouts();
   };
 
   const groupByDate = (data: any[]) => {

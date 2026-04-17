@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { useAlert } from '../../context/AlertContext';
+import { useBusinessStore } from '../../context/BusinessStoreContext';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -25,7 +26,7 @@ export const OrdersScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
-  const [store, setStore] = useState<any>(null);
+  const { activeStore: store } = useBusinessStore();
   const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
   const insets = useSafeAreaInsets();
   const [breakdownModal, setBreakdownModal] = useState<{ visible: boolean; order: any }>({ 
@@ -36,7 +37,7 @@ export const OrdersScreen = () => {
   const { showAlert } = useAlert();
 
   useEffect(() => {
-    fetchStoreAndOrders();
+    fetchOrders();
 
     if (!store?.id) return;
 
@@ -51,48 +52,30 @@ export const OrdersScreen = () => {
     };
   }, [store?.id, activeTab]);
 
-  const fetchStoreAndOrders = async () => {
+  const fetchOrders = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const { data: storeData, error: storeError } = await supabase
-        .from('stores')
-        .select('id, name')
-        .eq('owner_id', user?.id)
-        .order('is_active', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (storeError) throw storeError;
-      if (storeData) {
-        setStore(storeData);
-        await fetchOrders(storeData.id);
+      const id = store?.id;
+      if (!id) {
+        setOrders([]);
+        return;
       }
-    } catch (e) {
-      console.error('Error fetching store/orders:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const fetchOrders = async (storeId?: string) => {
-    const id = storeId || store?.id;
-    if (!id) return;
+      // Query orders that have items from this store
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          customer:profiles!orders_customer_id_fkey (full_name, phone),
+          rider:profiles!orders_rider_id_fkey (full_name, phone),
+          order_items!inner (*, products!inner(store_id, stores(name))),
+          applied_offers
+        `)
+        .eq('order_items.products.store_id', id)
+        .order('created_at', { ascending: false });
 
-    // Query orders that have items from this store
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        customer:profiles!orders_customer_id_fkey (full_name, phone),
-        rider:profiles!orders_rider_id_fkey (full_name, phone),
-        order_items!inner (*, products!inner(store_id)),
-        applied_offers
-      `)
-      .eq('order_items.products.store_id', id)
-      .order('created_at', { ascending: false });
-
-    if (error) console.error('Error fetching orders:', error);
-    else {
+      if (error) throw error;
+      
       // Filter based on active tab and only show the specified statuses
       const allowedActiveStatuses = ['waiting_for_pickup', 'picked_up'];
       const allowedPastStatuses = ['delivered', 'cancelled'];
@@ -103,6 +86,10 @@ export const OrdersScreen = () => {
         return activeTab === 'active' ? isActive : isPast;
       });
       setOrders(visibleOrders);
+    } catch (e) {
+      console.error('Error fetching orders:', e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -488,6 +475,9 @@ export const OrdersScreen = () => {
                         storeShares[sName] -= deliveryFeePaidByStore;
                       }
                     });
+                    
+                    // A null store_id on the order object is the reliable indicator of a multi-store order
+                    const isMultiStore = breakdownModal.order.store_id === null;
 
                     return (
                       <>
@@ -503,6 +493,11 @@ export const OrdersScreen = () => {
                             <Text style={[styles.breakdownValue, { color: Colors.error }]}>-₹{Math.round(amount)}</Text>
                           </View>
                         ))}
+                        {isMultiStore && (
+                          <Text style={styles.multiStoreNotice}>
+                            Multiple stores included in this order.
+                          </Text>
+                        )}
                       </>
                     );
                   })()}
@@ -1037,6 +1032,18 @@ const styles = StyleSheet.create({
     color: '#15803d',
     fontWeight: '600',
     marginTop: 1,
+  },
+  multiStoreNotice: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 12,
+    textAlign: 'center',
+    backgroundColor: '#F8F9FA',
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
   },
 });
 

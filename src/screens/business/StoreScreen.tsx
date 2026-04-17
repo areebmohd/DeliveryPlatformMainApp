@@ -40,10 +40,12 @@ const formatOpeningHours = (hoursJson: string) => {
   }
 };
 
+import { useBusinessStore } from '../../context/BusinessStoreContext';
+
 export const StoreScreen = ({ navigation }: any) => {
   const { user, profile } = useAuth();
-  const [store, setStore] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { activeStore: store } = useBusinessStore();
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('products');
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
@@ -54,13 +56,11 @@ export const StoreScreen = ({ navigation }: any) => {
   const { showAlert, showToast } = useAlert();
 
   useEffect(() => {
-    fetchStore();
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchStore();
       fetchProducts();
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, store?.id]);
 
   useEffect(() => {
     if (!store?.id) return;
@@ -68,23 +68,6 @@ export const StoreScreen = ({ navigation }: any) => {
     if (activeTab === 'products') {
       fetchProducts();
     }
-
-    // Subscribe to store changes
-    const storeChannel = supabase
-      .channel(`store-updates-${store.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'stores',
-          filter: `id=eq.${store.id}`,
-        },
-        payload => {
-          if (payload.new) setStore(payload.new);
-        },
-      )
-      .subscribe();
 
     // Subscribe to product changes for this store
     const productsChannel = supabase
@@ -104,37 +87,39 @@ export const StoreScreen = ({ navigation }: any) => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(storeChannel);
       supabase.removeChannel(productsChannel);
     };
   }, [store?.id, activeTab]);
 
-  useEffect(() => {
-    if (store && !store.is_active && !isStorePending(store)) {
-      const remaining = calculateDaysRemaining(store.created_at);
-      if (remaining === 0) {
-        handleDeleteAccountCompletely();
-      }
-    }
-  }, [store?.id, store?.is_active, store?.created_at]);
+  const onRefresh = async () => {
+    await fetchProducts();
+  };
 
-  const fetchStore = async () => {
+  const handleToggleAvailability = async () => {
+    if (!store?.id) return;
     try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('stores_view')
-        .select('*')
-        .eq('owner_id', user?.id)
-        .order('is_active', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const nextStatus = !store.is_currently_open;
+      
+      // Optimistic Update
+      const previousStore = { ...store };
+      setStore({ ...store, is_currently_open: nextStatus });
 
-      if (error && error.code !== 'PGRST116') throw error;
-      if (data) setStore(data);
+      const { error } = await supabase
+        .from('stores')
+        .update({ is_currently_open: nextStatus })
+        .eq('id', store.id);
+      
+      if (error) {
+        setStore(previousStore);
+        throw error;
+      }
     } catch (e) {
-      console.error('Error fetching store:', e);
-    } finally {
-      setLoading(false);
+      console.error('Error toggling availability:', e);
+      showAlert({
+        title: 'Error',
+        message: 'Could not update availability',
+        type: 'error',
+      });
     }
   };
 
@@ -164,82 +149,6 @@ export const StoreScreen = ({ navigation }: any) => {
       (s.verification_images?.length > 0) &&
       s.is_approved === false
     );
-  };
-
-  const handleDeleteAccountCompletely = async () => {
-    if (!store?.id || !user?.id) return;
-    try {
-      setLoading(true);
-      // Delete store
-      const { error: storeError } = await supabase
-        .from('stores')
-        .delete()
-        .eq('id', store.id);
-      
-      if (storeError) throw storeError;
-
-      // Delete Profile (Complete Deletion)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', user.id);
-      
-      if (profileError) throw profileError;
-
-      showAlert({
-        title: 'Account Deleted',
-        message: 'Your business account has been completely deleted as the verification details were not filled within the 5-day deadline.',
-        type: 'info',
-        onClose: async () => {
-          await signOut();
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          });
-        }
-      });
-    } catch (e) {
-      console.error('Error deleting account completely:', e);
-      showAlert({
-        title: 'Error',
-        message: 'Could not process account deletion. Please contact support.',
-        type: 'error'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onRefresh = async () => {
-    await Promise.all([fetchStore(), fetchProducts()]);
-  };
-
-  const handleToggleAvailability = async () => {
-    if (!store?.id) return;
-    try {
-      const nextStatus = !store.is_currently_open;
-      
-      // Optimistic Update
-      const previousStore = { ...store };
-      setStore({ ...store, is_currently_open: nextStatus });
-
-      const { error } = await supabase
-        .from('stores')
-        .update({ is_currently_open: nextStatus })
-        .eq('id', store.id);
-      
-      if (error) {
-        setStore(previousStore);
-        throw error;
-      }
-    } catch (e) {
-      console.error('Error toggling availability:', e);
-      showAlert({
-        title: 'Error',
-        message: 'Could not update availability',
-        type: 'error',
-      });
-    }
   };
 
   const fetchProducts = async () => {
