@@ -24,6 +24,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import RNUpiPayment from 'react-native-upi-payment';
 import Geolocation from '@react-native-community/geolocation';
+import { notificationService } from '../../utils/notificationService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -795,12 +796,11 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
-  const finalizeOrderCreation = async (payment_status: string, utr_number: string | null = null) => {
+  const finalizeOrderCreation = async (payment_status: string, utr_number: string | null = null, reservedOrderNumber: string | null = null) => {
     try {
       setLoading(true);
 
       let finalAddressId = selectedAddress?.id;
-
       if (sessionAddress) {
         const { data: tempAddr, error: addrError } = await supabase
           .from('addresses')
@@ -816,14 +816,12 @@ export const CartScreen = ({ navigation }: any) => {
           })
           .select()
           .single();
-        
         if (addrError) throw addrError;
         finalAddressId = tempAddr.id;
       }
       
       const storesInCart = [...new Set(items.map(i => i.store_id))];
       const isMultiStore = storesInCart.length > 1;
-
       const maxPrepTime = Math.max(0, ...items.map(i => i.preparation_time || 0));
       const readyAt = maxPrepTime > 0 ? new Date(Date.now() + maxPrepTime * 60000).toISOString() : null;
 
@@ -842,6 +840,7 @@ export const CartScreen = ({ navigation }: any) => {
           payment_method: paymentMethod,
           payment_status: payment_status,
           utr_number: utr_number,
+          order_number: reservedOrderNumber, // Use reserved ID if provided
           transport_type: isLargeVehicle ? 'heavy' : 'standard',
           total_weight_kg: items.reduce((sum, i) => sum + (i.weight_kg * i.quantity), 0),
           has_helper: hasHelper,
@@ -855,7 +854,17 @@ export const CartScreen = ({ navigation }: any) => {
         .single();
 
       if (orderError) throw orderError;
+      await postOrderActions(order);
+    } catch (e: any) {
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const postOrderActions = async (order: any) => {
+    try {
+      const storesInCart = [...new Set(items.map(i => i.store_id))];
       const orderItems = items.map(item => ({
         order_id: order.id,
         product_id: item.id,
@@ -865,7 +874,6 @@ export const CartScreen = ({ navigation }: any) => {
         selected_options: item.selected_options || {}
       }));
 
-      // Add Free Product Rewards to order
       Object.entries(appliedOffers).forEach(([_, offer]: [string, any]) => {
         if (offer.type === 'free_product' && checkOfferConditions(offer).length === 0) {
           orderItems.push({
@@ -882,64 +890,63 @@ export const CartScreen = ({ navigation }: any) => {
       const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItems);
-
       if (itemsError) throw itemsError;
 
-      // Increment used_count for all applied offers
       const appliedOfferIds = Object.values(appliedOffers as Record<string, any>).map(o => o.id).filter(Boolean);
       if (appliedOfferIds.length > 0) {
-        // Use an RPC or manual updates to increment the count
-        // Supabase JS doesn't support bulk increments easily, so we use multiple update calls
-        // or a single call with an increment expression via RPC
-        await Promise.all(
-          appliedOfferIds.map(oid => 
-            supabase.rpc('increment_offer_used_count', { offer_id: oid })
-          )
-        );
+        await Promise.all(appliedOfferIds.map(oid => supabase.rpc('increment_offer_used_count', { offer_id: oid })));
       }
 
       clearCart();
       navigation.navigate('Account', { screen: 'CustomerOrders' });
       showToast('Order placed successfully!', 'success');
-
     } catch (e: any) {
-      showAlert({ title: 'Error', message: e.message, type: 'error' });
-    } finally {
-      setLoading(false);
+      console.error('Post-order action error:', e);
+      throw e;
     }
   };
 
   const processOrder = async () => {
-    if (paymentMethod === 'pay_online') {
-      if (RNUpiPayment && RNUpiPayment.initializePayment) {
-        setLoading(false); 
-        const tempRef = `TXN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    try {
+      if (paymentMethod === 'pay_online') {
+        setLoading(true);
+        // Reserve the real order number first
+        const { data: reservedOrderNumber, error: resError } = await supabase.rpc('get_next_order_number');
+        setLoading(false);
 
-        RNUpiPayment.initializePayment(
-          {
-            vpa: 'aashu9105628720-1@okicici',
-            payeeName: 'Ashu',
-            amount: grandTotal.toFixed(2),
-            transactionNote: `Delivery Order - ₹${grandTotal.toFixed(2)}`,
-            transactionRef: tempRef,
-          },
-          (response: any) => {
-            const utr = (response && response.txnId) ? response.txnId : 'N/A';
-            finalizeOrderCreation('verified', utr);
-          },
-          () => {
-            showAlert({ 
-              title: 'Payment Failed', 
-              message: 'Order was not placed. Please try again or choose Pay on Delivery.', 
-              type: 'error' 
-            });
-          }
-        );
+        if (resError) throw resError;
+        
+        if (RNUpiPayment && RNUpiPayment.initializePayment) {
+          RNUpiPayment.initializePayment(
+            {
+              vpa: 'Q369351522@ybl',
+              payeeName: 'Mohd Areeb',
+              amount: grandTotal.toFixed(2),
+              transactionNote: `Order ${reservedOrderNumber}`,
+              transactionRef: `T${Date.now()}`,
+            },
+            (response: any) => {
+              const utr = (response && response.txnId) ? response.txnId : 'N/A';
+              finalizeOrderCreation('verified', utr, reservedOrderNumber);
+            },
+            () => {
+              showAlert({ 
+                title: 'Payment Failed', 
+                message: 'Payment was not completed. Please try again.', 
+                type: 'error' 
+              });
+            }
+          );
+        } else {
+          // Mock successful payment for development environment
+          finalizeOrderCreation('verified', 'MOCK_UTR_' + Math.floor(Math.random() * 1000000), reservedOrderNumber);
+        }
       } else {
-        finalizeOrderCreation('verified', 'MOCK_UTR_' + Math.floor(Math.random() * 1000000));
+        finalizeOrderCreation('pending');
       }
-    } else {
-      finalizeOrderCreation('pending');
+    } catch (e: any) {
+      setLoading(false);
+      showAlert({ title: 'Error', message: e.message, type: 'error' });
     }
   };
 

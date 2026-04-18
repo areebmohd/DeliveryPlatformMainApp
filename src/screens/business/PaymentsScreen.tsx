@@ -21,7 +21,7 @@ import { useBusinessStore } from '../../context/BusinessStoreContext';
 export const PaymentsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { activeStore } = useBusinessStore();
+  const { activeStore, loading: storeLoading } = useBusinessStore();
   const { showAlert } = useAlert();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -126,7 +126,7 @@ export const PaymentsScreen = ({ navigation }: any) => {
         <View style={{ width: 44 }} />
       </View>
 
-      {loading && !refreshing ? (
+      {((loading || storeLoading) && !refreshing) ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>

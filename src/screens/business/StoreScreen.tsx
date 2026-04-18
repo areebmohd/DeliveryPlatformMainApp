@@ -44,7 +44,7 @@ import { useBusinessStore } from '../../context/BusinessStoreContext';
 
 export const StoreScreen = ({ navigation }: any) => {
   const { user, profile } = useAuth();
-  const { activeStore: store } = useBusinessStore();
+  const { activeStore: store, loading: storeLoading } = useBusinessStore();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('products');
   const insets = useSafeAreaInsets();
@@ -257,7 +257,7 @@ export const StoreScreen = ({ navigation }: any) => {
   };
 
 
-  if (loading) {
+  if (loading || storeLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />

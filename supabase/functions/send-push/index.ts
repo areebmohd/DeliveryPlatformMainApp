@@ -29,25 +29,40 @@ async function getAccessToken(): Promise<string> {
         body: new URLSearchParams({
             grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
             assertion: token,
-        }),
+        }).toString(),
     })
     
     const data = await response.json()
     return data.access_token
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
     try {
         const payload = await req.json()
+        if (!payload || !payload.record) {
+            console.error("Missing record in payload:", payload)
+            return new Response(JSON.stringify({ error: "Missing record in payload" }), { 
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+            })
+        }
         const { record } = payload
         
-        const { title, description, target_group } = record
+        const { title, description, target_group, user_id } = record
+        console.log(`Processing notification for user: ${user_id || 'Broadcast'}, group: ${target_group}, title: ${title}`)
 
-        // 1. Get tokens for the target group
-        const { data: tokens, error: tokenError } = await supabase
+        // 1. Get tokens for the target group/user
+        let tokenQuery = supabase
             .from('fcm_tokens')
             .select('token')
-            .eq('target_group', target_group)
+
+        if (user_id) {
+            tokenQuery = tokenQuery.eq('user_id', user_id)
+        } else {
+            tokenQuery = tokenQuery.eq('target_group', target_group)
+        }
+
+        const { data: tokens, error: tokenError } = await tokenQuery
 
         if (tokenError) throw tokenError
         if (!tokens || tokens.length === 0) return new Response("No tokens found", { status: 200 })
@@ -56,7 +71,7 @@ serve(async (req) => {
         const accessToken = await getAccessToken()
 
         // 3. Send to each token
-        const sendPromises = tokens.map(async ({ token }) => {
+        const sendPromises = tokens.map(async ({ token }: { token: string }) => {
             const body = {
                 message: {
                     token: token,
@@ -80,7 +95,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true, count: tokens.length }), {
             headers: { "Content-Type": "application/json" },
         })
-    } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+    } catch (error: any) {
+        return new Response(JSON.stringify({ error: error?.message || 'Unknown error' }), { status: 500 })
     }
 })

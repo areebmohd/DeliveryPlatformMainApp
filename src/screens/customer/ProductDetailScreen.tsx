@@ -230,13 +230,29 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
             </>
           )}
 
-          <Text style={styles.sectionTitle}>Description</Text>
           {(() => {
+            const hasDescription = product.description && product.description.trim().length > 0;
+            if (!hasDescription) return null;
+
+            let parsed: any[] = [];
+            let isStructured = false;
             try {
-              if (!product.description) return <Text style={styles.description}>No description available.</Text>;
-              const parsed = JSON.parse(product.description);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                return (
+              const data = JSON.parse(product.description);
+              if (Array.isArray(data)) {
+                parsed = data.filter((item: any) => item.title?.trim() || item.text?.trim());
+                isStructured = true;
+
+                // If structured but all items are empty, treat as no description
+                if (parsed.length === 0) return null;
+              }
+            } catch (e) {
+              isStructured = false;
+            }
+
+            return (
+              <>
+                <Text style={styles.sectionTitle}>Description</Text>
+                {isStructured ? (
                   <View style={styles.specList}>
                     {parsed.map((item: any, idx: number) => (
                       <View 
@@ -255,15 +271,13 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                       </View>
                     ))}
                   </View>
-                );
-              }
-              return <Text style={styles.description}>{product.description}</Text>;
-            } catch (e) {
-              return <Text style={styles.description}>{product.description}</Text>;
-            }
+                ) : (
+                  <Text style={styles.description}>{product.description}</Text>
+                )}
+                <View style={styles.divider} />
+              </>
+            );
           })()}
-
-          <View style={styles.divider} />
 
           <Text style={styles.sectionTitle}>Store</Text>
           {storeCount > 1 ? (

@@ -47,6 +47,8 @@
       <meta-data  android:name="com.dieam.reactnativepushnotification.notification_channel_name" android:value="Delivery Platform Notifications"/>
       <meta-data  android:name="com.dieam.reactnativepushnotification.notification_channel_description" android:value="Delivery Platform notifications for orders and updates"/>
       <meta-data  android:name="com.dieam.reactnativepushnotification.notification_color" android:resource="@android:color/white"/>
+      <meta-data  android:name="com.dieam.reactnativepushnotification.notification_icon" android:resource="@mipmap/ic_launcher" />
+      <meta-data  android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@mipmap/ic_launcher" />
 
       <receiver android:name="com.dieam.reactnativepushnotification.modules.RNPushNotificationActions" android:exported="true" />
       <receiver android:name="com.dieam.reactnativepushnotification.modules.RNPushNotificationPublisher" android:exported="true" />

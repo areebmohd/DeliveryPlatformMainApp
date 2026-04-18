@@ -20,13 +20,14 @@ import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { getItemTotals, getOfferDescription } from '../../utils/offerUtils';
+import { notificationService } from '../../utils/notificationService';
 
 export const OrdersScreen = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
-  const { activeStore: store } = useBusinessStore();
+  const { activeStore: store, loading: storeLoading } = useBusinessStore();
   const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
   const insets = useSafeAreaInsets();
   const [breakdownModal, setBreakdownModal] = useState<{ visible: boolean; order: any }>({ 
@@ -107,6 +108,19 @@ export const OrdersScreen = () => {
         .eq('id', orderId);
 
       if (error) throw error;
+
+      // Find order to get customer_id and order_number
+      const order = orders.find(o => o.id === orderId);
+      if (order && order.customer_id) {
+        notificationService.sendNotification({
+          userId: order.customer_id,
+          orderId: order.id,
+          title: 'Order Status Update',
+          description: `Your order #${order.order_number} is now ${newStatus.replace('_', ' ')}.`,
+          targetGroup: 'customer',
+        });
+      }
+
       showAlert({ 
         title: 'Status Updated', 
         message: `Order is now ${newStatus.replace('_', ' ')}`,
@@ -147,6 +161,17 @@ export const OrdersScreen = () => {
                 .update({ status: 'cancelled' })
                 .eq('id', order.id);
               if (orderError) throw orderError;
+
+              if (order.customer_id) {
+                notificationService.sendNotification({
+                  userId: order.customer_id,
+                  orderId: order.id,
+                  title: 'Order Cancelled',
+                  description: `Your order #${order.order_number} was cancelled by the store because all items were removed.`,
+                  targetGroup: 'customer',
+                });
+              }
+
               showAlert({ title: 'Order Cancelled', message: 'The order was cancelled because all items were removed.', type: 'info' });
             } else {
               const remainingItems = activeItems.filter((i: any) => i.id !== itemToRemove.id);
@@ -288,7 +313,7 @@ export const OrdersScreen = () => {
           <Text style={styles.itemsTitle}>ORDER ITEMS</Text>
           {activeItems.map((product: any, idx: number) => {
             const storeId = store?.id;
-            const storeOffer = item.applied_offers?.[storeId];
+            const storeOffer = storeId ? item.applied_offers?.[storeId] : null;
             
             const { original, discounted } = getItemTotals(product, activeItems, storeOffer);
 
@@ -379,7 +404,7 @@ export const OrdersScreen = () => {
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
             {(() => {
               const storeId = store?.id;
-              const storeOffer = item.applied_offers?.[storeId];
+              const storeOffer = storeId ? item.applied_offers?.[storeId] : null;
               const deliveryOffer = item.applied_offers?.[`${storeId}_delivery`];
               const hasDiscount = storeOffer || deliveryOffer;
               
@@ -505,19 +530,19 @@ export const OrdersScreen = () => {
 
                 <View style={styles.breakdownSection}>
                   <Text style={styles.breakdownSectionTitle}>Fees</Text>
-                  {breakdownModal.order.delivery_fee > 0 && (
+                  {breakdownModal.order.delivery_fee !== undefined && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Delivery Fee</Text>
                       <Text style={styles.breakdownValue}>₹{breakdownModal.order.delivery_fee}</Text>
                     </View>
                   )}
-                  {breakdownModal.order.platform_fee > 0 && (
+                  {breakdownModal.order.platform_fee !== undefined && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Platform Fee</Text>
                       <Text style={styles.breakdownValue}>₹{breakdownModal.order.platform_fee}</Text>
                     </View>
                   )}
-                  {breakdownModal.order.helper_fee > 0 && (
+                  {breakdownModal.order.transport_type === 'heavy' && breakdownModal.order.helper_fee !== undefined && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Helper Fee</Text>
                       <Text style={styles.breakdownValue}>₹{breakdownModal.order.helper_fee}</Text>
@@ -556,7 +581,7 @@ export const OrdersScreen = () => {
           <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>Past Orders</Text>
         </TouchableOpacity>
       </View>
-      {loading && !refreshing ? (
+      {((loading || storeLoading) && !refreshing) ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>

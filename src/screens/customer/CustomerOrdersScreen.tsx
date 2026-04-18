@@ -20,6 +20,7 @@ import { useAlert } from '../../context/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Button } from '../../components/ui/Button';
 import { getOfferDescription, getItemTotals } from '../../utils/offerUtils';
+import { notificationService } from '../../utils/notificationService';
 
 export const CustomerOrdersScreen = ({ navigation }: any) => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -163,6 +164,36 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
               .eq('id', orderId);
             
             if (error) throw error;
+
+            // Notify store(s)
+            const order = orders.find(o => o.id === orderId);
+            if (order) {
+              const storesToNotify = order.store_id 
+                ? [order.store_id] 
+                : [...new Set(order.order_items.map((oi: any) => oi.products?.stores?.id || oi.products?.store_id))].filter(Boolean);
+
+              // Get owner IDs for stores to send targeted notifications
+              const { data: storeOwners } = await supabase
+                .from('stores')
+                .select('id, owner_id')
+                .in('id', storesToNotify);
+
+              const ownerMap = storeOwners?.reduce((acc: any, s) => ({ ...acc, [s.id]: s.owner_id }), {}) || {};
+
+              storesToNotify.forEach((stId: any) => {
+                const ownerId = ownerMap[stId];
+                if (!ownerId) return;
+
+                notificationService.sendNotification({
+                  userId: ownerId,
+                  orderId: orderId,
+                  title: 'Order Cancelled',
+                  description: `Order #${order.order_number} has been cancelled by the customer.`,
+                  targetGroup: 'business',
+                });
+              });
+            }
+
             fetchOrders();
           } catch (error) {
             console.error('Error cancelling order:', error);
@@ -293,7 +324,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
         })()}
 
         <View style={styles.cardFooter}>
-          {item.has_helper && (
+          {item.transport_type === 'heavy' && item.has_helper && (
             <View style={styles.helperRow}>
               <Text style={styles.helperLabel}>Helper Service</Text>
               <Text style={styles.helperValue}>₹{item.helper_fee}</Text>
@@ -433,19 +464,19 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
 
                 <View style={styles.breakdownSection}>
                   <Text style={styles.breakdownSectionTitle}>Fees & Services</Text>
-                  {breakdownModal.order.delivery_fee > 0 && (
+                  {breakdownModal.order.delivery_fee !== undefined && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Delivery Fee</Text>
                       <Text style={styles.breakdownValue}>₹{breakdownModal.order.delivery_fee}</Text>
                     </View>
                   )}
-                  {breakdownModal.order.platform_fee > 0 && (
+                  {breakdownModal.order.platform_fee !== undefined && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Platform Fee</Text>
                       <Text style={styles.breakdownValue}>₹{breakdownModal.order.platform_fee}</Text>
                     </View>
                   )}
-                  {breakdownModal.order.helper_fee > 0 && (
+                  {breakdownModal.order.transport_type === 'heavy' && breakdownModal.order.helper_fee !== undefined && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Helper Fee</Text>
                       <Text style={styles.breakdownValue}>₹{breakdownModal.order.helper_fee}</Text>

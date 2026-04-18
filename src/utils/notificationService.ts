@@ -39,6 +39,18 @@ class NotificationService {
       this.handleNotificationTap(remoteMessage.data);
     });
 
+    // Handle foreground notifications (FCM)
+    messaging().onMessage(async remoteMessage => {
+      console.log('A new FCM message arrived!', remoteMessage);
+      if (remoteMessage.notification) {
+        this.showLocalNotification(
+          remoteMessage.notification.title || 'New Notification',
+          remoteMessage.notification.body || '',
+          remoteMessage.data
+        );
+      }
+    });
+
     // Handle killed state notification click (FCM)
     messaging()
       .getInitialNotification()
@@ -112,7 +124,7 @@ class NotificationService {
           target_group: targetGroup,
           updated_at: new Date().toISOString()
         },
-        { onConflict: 'user_id,token' }
+        { onConflict: 'token' }
       );
 
     if (error) console.error('Error saving FCM token to Supabase:', error);
@@ -128,6 +140,31 @@ class NotificationService {
       playSound: true,
       soundName: "default",
     });
+  }
+
+  async sendNotification(params: {
+    userId?: string;
+    orderId?: string;
+    title: string;
+    description: string;
+    targetGroup: 'customer' | 'business' | 'rider';
+  }) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: params.userId,
+          order_id: params.orderId,
+          title: params.title,
+          description: params.description,
+          target_group: params.targetGroup,
+        });
+
+      if (error) throw error;
+      console.log(`Notification sent to ${params.targetGroup}: ${params.title}`);
+    } catch (error) {
+      console.error('Error sending notification to database:', error);
+    }
   }
 
   private handleNotificationTap(data: any) {
