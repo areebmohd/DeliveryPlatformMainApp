@@ -335,13 +335,13 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
               <Text style={styles.totalLabel}>Grand Total</Text>
               <View style={[
                 styles.paymentStatusBadge,
-                { backgroundColor: item.payment_method === 'pay_online' ? Colors.success + '15' : Colors.warning + '15' }
+                { backgroundColor: Colors.warning + '15' }
               ]}>
                 <Text style={[
                   styles.paymentStatusText,
-                  { color: item.payment_method === 'pay_online' ? Colors.success : Colors.warning }
+                  { color: Colors.warning }
                 ]}>
-                  {item.payment_method === 'pay_online' ? 'Paid' : 'POD'}
+                  POD
                 </Text>
               </View>
             </View>
@@ -356,26 +356,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             </View>
           </View>
 
-          {item.payment_method === 'pay_online' && (
-            <View style={styles.paymentDetailsContainer}>
-              <View style={styles.paymentRow}>
-                <Text style={styles.paymentLabel}>Payment Method:</Text>
-                <Text style={styles.paymentValue}>Online (UPI)</Text>
-              </View>
-              {item.utr_number && (
-                <View style={styles.paymentRow}>
-                  <Text style={styles.paymentLabel}>UTR Number:</Text>
-                  <Text style={styles.paymentValue}>{item.utr_number}</Text>
-                </View>
-              )}
-              {item.payer_name && (
-                <View style={styles.paymentRow}>
-                  <Text style={styles.paymentLabel}>Payer Name:</Text>
-                  <Text style={styles.paymentValue}>{item.payer_name}</Text>
-                </View>
-              )}
-            </View>
-          )}
+
           
           {canCancel && (
             <TouchableOpacity 

@@ -22,7 +22,6 @@ import { Input } from '../../components/ui/Input';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
-import RNUpiPayment from 'react-native-upi-payment';
 import Geolocation from '@react-native-community/geolocation';
 import { notificationService } from '../../utils/notificationService';
 
@@ -43,8 +42,7 @@ export const CartScreen = ({ navigation }: any) => {
     content: ''
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<'pay_online' | 'pay_on_delivery'>('pay_on_delivery');
-  const [isOnlinePaymentEnabled, setIsOnlinePaymentEnabled] = useState(true);
+  const [paymentMethod] = useState<'pay_on_delivery'>('pay_on_delivery');
   const insets = useSafeAreaInsets();
 
   const { showAlert, showToast } = useAlert();
@@ -449,13 +447,11 @@ export const CartScreen = ({ navigation }: any) => {
   useEffect(() => {
     if (user) {
       fetchAddresses();
-      fetchPaymentSettings();
     }
     
     const unsubscribe = navigation.addListener('focus', () => {
       if (user) {
         fetchAddresses();
-        fetchPaymentSettings();
       }
     });
 
@@ -471,24 +467,6 @@ export const CartScreen = ({ navigation }: any) => {
     }
   }, [items.length, subtotal, appliedOffers]);
 
-  const fetchPaymentSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'pay_online_enabled')
-        .single();
-      
-      if (error) throw error;
-      setIsOnlinePaymentEnabled(data.value);
-      
-      if (!data.value) {
-        setPaymentMethod('pay_on_delivery');
-      }
-    } catch (e) {
-      console.error('Error fetching payment settings:', e);
-    }
-  };
 
   const fetchAddresses = async () => {
     try {
@@ -776,19 +754,15 @@ export const CartScreen = ({ navigation }: any) => {
         return;
       }
 
-      if (paymentMethod === 'pay_online') {
-        processOrder();
-      } else {
-        showAlert({
-          title: 'Place Order?',
-          message: `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
-          type: 'info',
-          primaryAction: {
-            text: 'Place',
-            onPress: () => processOrder(),
-          }
-        });
-      }
+      showAlert({
+        title: 'Place Order?',
+        message: `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
+        type: 'info',
+        primaryAction: {
+          text: 'Place',
+          onPress: () => processOrder(),
+        }
+      });
     } catch (e: any) {
       setLoading(false);
       showAlert({ title: 'Error', message: 'Unable to verify store availability. Please try again.', type: 'error' });
@@ -908,42 +882,7 @@ export const CartScreen = ({ navigation }: any) => {
 
   const processOrder = async () => {
     try {
-      if (paymentMethod === 'pay_online') {
-        setLoading(true);
-        // Reserve the real order number first
-        const { data: reservedOrderNumber, error: resError } = await supabase.rpc('get_next_order_number');
-        setLoading(false);
-
-        if (resError) throw resError;
-        
-        if (RNUpiPayment && RNUpiPayment.initializePayment) {
-          RNUpiPayment.initializePayment(
-            {
-              vpa: 'Q369351522@ybl',
-              payeeName: 'Mohd Areeb',
-              amount: grandTotal.toFixed(2),
-              transactionNote: `Order ${reservedOrderNumber}`,
-              transactionRef: `T${Date.now()}`,
-            },
-            (response: any) => {
-              const utr = (response && response.txnId) ? response.txnId : 'N/A';
-              finalizeOrderCreation('verified', utr, reservedOrderNumber);
-            },
-            () => {
-              showAlert({ 
-                title: 'Payment Failed', 
-                message: 'Payment was not completed. Please try again.', 
-                type: 'error' 
-              });
-            }
-          );
-        } else {
-          // Mock successful payment for development environment
-          finalizeOrderCreation('verified', 'MOCK_UTR_' + Math.floor(Math.random() * 1000000), reservedOrderNumber);
-        }
-      } else {
-        finalizeOrderCreation('pending');
-      }
+      finalizeOrderCreation('pending');
     } catch (e: any) {
       setLoading(false);
       showAlert({ title: 'Error', message: e.message, type: 'error' });
@@ -1322,65 +1261,31 @@ export const CartScreen = ({ navigation }: any) => {
         <View style={styles.paymentSection}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
           <View style={styles.paymentOptions}>
-            <TouchableOpacity 
+            <View 
               style={[
                 styles.paymentOption, 
-                paymentMethod === 'pay_online' && styles.paymentOptionSelected
+                styles.paymentOptionSelected
               ]}
-              onPress={() => {
-                if (isOnlinePaymentEnabled) {
-                  setPaymentMethod('pay_online');
-                } else {
-                  showAlert({ title: 'Unavailable', message: 'Pay Online is currently disabled. Please use Pay on Delivery.', type: 'info' });
-                }
-              }}
-            >
-              <View style={styles.paymentOptionHeader}>
-                <Icon 
-                  name="flash-outline" 
-                  size={24} 
-                  color={paymentMethod === 'pay_online' ? Colors.primary : Colors.textSecondary} 
-                />
-                <View style={[
-                  styles.radioOuter, 
-                  paymentMethod === 'pay_online' && styles.radioOuterSelected
-                ]}>
-                  {paymentMethod === 'pay_online' && <View style={styles.radioInner} />}
-                </View>
-              </View>
-              <Text style={[
-                styles.paymentOptionTitle,
-                paymentMethod === 'pay_online' && styles.paymentOptionTitleSelected
-              ]}>Pay Online</Text>
-              <Text style={styles.paymentOptionSub}>Pay instantly via UPI</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[
-                styles.paymentOption, 
-                paymentMethod === 'pay_on_delivery' && styles.paymentOptionSelected
-              ]}
-              onPress={() => setPaymentMethod('pay_on_delivery')}
             >
               <View style={styles.paymentOptionHeader}>
                 <Icon 
                   name="truck-delivery-outline" 
                   size={24} 
-                  color={paymentMethod === 'pay_on_delivery' ? Colors.primary : Colors.textSecondary} 
+                  color={Colors.primary} 
                 />
                 <View style={[
                   styles.radioOuter, 
-                  paymentMethod === 'pay_on_delivery' && styles.radioOuterSelected
+                  styles.radioOuterSelected
                 ]}>
-                  {paymentMethod === 'pay_on_delivery' && <View style={styles.radioInner} />}
+                  <View style={styles.radioInner} />
                 </View>
               </View>
               <Text style={[
                 styles.paymentOptionTitle,
-                paymentMethod === 'pay_on_delivery' && styles.paymentOptionTitleSelected
+                styles.paymentOptionTitleSelected
               ]}>Pay on Delivery</Text>
               <Text style={styles.paymentOptionSub}>Cash or UPI at your door</Text>
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -1394,11 +1299,6 @@ export const CartScreen = ({ navigation }: any) => {
             )}
           </View>
           <Text style={styles.checkoutLabel}>Total Payable</Text>
-          {paymentMethod === 'pay_online' && (
-            <Text style={{ fontSize: 10, color: Colors.primary, fontWeight: '700', marginTop: 2 }}>
-              Secure UPI Payment
-            </Text>
-          )}
         </View>
         <Button 
           title="Place Order" 

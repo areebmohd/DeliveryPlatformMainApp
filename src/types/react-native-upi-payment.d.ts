@@ -5,6 +5,8 @@ declare module 'react-native-upi-payment' {
     amount: string;
     transactionNote: string;
     transactionRef: string;
+    merchantCode?: string;
+    currency?: string;
   }
 
   function initializePayment(
