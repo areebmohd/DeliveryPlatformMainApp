@@ -118,8 +118,12 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
       if (data && data.eLocation) {
         const { latitude, longitude, placeName, placeAddress } = data.eLocation;
         const fullAddress = placeAddress || placeName;
+        
+        console.log('Search result selected:', { latitude, longitude, fullAddress });
+        
         setAddress(fullAddress);
         setMapCenter([longitude, latitude]);
+        
         cameraRef.current?.setCamera({
           centerCoordinate: [longitude, latitude],
           zoomLevel: 16,
@@ -128,9 +132,16 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
         
         // After search, also fetch granular details for that location
         fetchAddress(longitude, latitude);
+      } else if (data) {
+        console.log('Search widget closed or returned unexpected data:', data);
       }
     } catch (e) {
       console.error('Search Widget Error:', e);
+      showAlert({ 
+        title: 'Search Error', 
+        message: 'Something went wrong while searching. Please try again.', 
+        type: 'error' 
+      });
     }
   };
 

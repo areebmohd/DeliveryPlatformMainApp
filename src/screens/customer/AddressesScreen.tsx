@@ -339,14 +339,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    paddingTop: 16,
+    paddingTop: 12,
     gap: 16,
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 4,
   },
   actionBtnText: {

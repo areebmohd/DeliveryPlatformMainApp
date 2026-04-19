@@ -10,6 +10,7 @@ import {
   Platform,
   Dimensions,
   PermissionsAndroid,
+  StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -83,7 +84,6 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
           primaryAction: { text: 'Retry', onPress: getCurrentLocation },
           showCancel: true,
           cancelText: 'Back',
-          onClose: () => navigation.goBack(),
         });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
@@ -119,10 +119,9 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+      
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-left" size={24} color={Colors.text} />
@@ -130,82 +129,97 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
         <Text style={styles.headerTitle}>Add Live Location</Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        {/* Map Visualization */}
-        <View style={styles.mapContainer}>
-          {fetchingLocation ? (
-            <View style={styles.mapLoading}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.loadingText}>Fetching your location...</Text>
-            </View>
-          ) : (
-            <View style={styles.mapView}>
-              <MapView 
-                style={StyleSheet.absoluteFillObject}
-                key={location ? `${location.latitude}-${location.longitude}` : 'no-location'}
-              >
-                <Camera 
-                  centerCoordinate={location ? [location.longitude, location.latitude] : [77.2090, 28.6139]}
-                  zoomLevel={16}
-                />
-                {location && (
-                  <PointAnnotation
-                    id="currentLocation"
-                    coordinate={[location.longitude, location.latitude]}
-                  >
-                    <View style={styles.markerContainer}>
-                      <View style={styles.pulse} />
-                      <View style={styles.marker}>
-                        <Icon name="map-marker" size={24} color={Colors.white} />
-                      </View>
-                    </View>
-                  </PointAnnotation>
-                )}
-              </MapView>
+      <View style={styles.content}>
+        {fetchingLocation ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Fetching your location...</Text>
+          </View>
+        ) : (
+          <View style={styles.mapWrapper}>
+            <MapView 
+              style={StyleSheet.absoluteFillObject}
+              enableTraffic={false}
+              enableTrafficClosure={false}
+              enableTrafficFreeFlow={false}
+              enableTrafficNonFreeFlow={false}
+              enableTrafficStopIcon={false}
+            >
+              <Camera 
+                centerCoordinate={location ? [location.longitude, location.latitude] : [77.2090, 28.6139]}
+                zoomLevel={16}
+              />
+              {location && (
+                <PointAnnotation
+                  id="currentLocation"
+                  coordinate={[location.longitude, location.latitude]}
+                >
+                  <View style={styles.markerContainer}>
+                    <View style={styles.pulse} />
+                    <Icon name="map-marker" size={42} color={Colors.primary} />
+                  </View>
+                </PointAnnotation>
+              )}
+            </MapView>
 
+            {/* Repositioned Overlays */}
+            <View style={styles.pinNotification}>
               <View style={styles.locationBadge}>
                 <Icon name="check-circle" size={16} color={Colors.success} />
                 <Text style={styles.locationBadgeText}>Location Pinpointed</Text>
               </View>
-              
-              <Text style={styles.coordsText}>
-                Lat: {location?.latitude?.toFixed(6)}, Lng: {location?.longitude?.toFixed(6)}
-              </Text>
             </View>
-          )}
-        </View>
 
-        <View style={styles.form}>
-          <Button
-            title={loading ? "Saving..." : "Save Delivery Location"}
-            onPress={handleSave}
-            loading={loading}
-            disabled={fetchingLocation}
-            style={styles.saveBtn}
-          />
-          
-          {!fetchingLocation && (
-            <TouchableOpacity onPress={getCurrentLocation} style={styles.retryBtn}>
-              <Icon name="refresh" size={18} color={Colors.primary} />
-              <Text style={styles.retryText}>Refresh Location</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <View style={[styles.locationMetaContainer, { bottom: insets.bottom + 100 }]}>
+              <TouchableOpacity 
+                onPress={getCurrentLocation} 
+                style={styles.refreshTextBtn}
+              >
+                <Text style={styles.refreshBtnText}>Refresh</Text>
+              </TouchableOpacity>
+
+              {location && (
+                <View style={styles.coordinatesWrapper}>
+                  <Text style={styles.coordsText}>
+                    {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
+              <Button
+                title={loading ? "Saving..." : "Save Delivery Location"}
+                onPress={handleSave}
+                loading={loading}
+                disabled={fetchingLocation}
+                style={styles.saveBtn}
+              />
+            </View>
+          </View>
+        )}
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.white,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingBottom: Spacing.sm,
+    backgroundColor: Colors.white,
+    zIndex: 10,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   backBtn: {
     width: 40,
@@ -213,28 +227,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20,
-    backgroundColor: Colors.white,
-    marginRight: Spacing.md,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    backgroundColor: 'transparent',
+    marginRight: Spacing.sm,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: Colors.text,
   },
-  mapContainer: {
-    width: width,
-    height: 300,
-    backgroundColor: '#F3F4F6',
+  content: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  mapLoading: {
-    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
   },
   loadingText: {
     marginTop: 12,
@@ -242,95 +250,109 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: '600',
   },
-  mapView: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
+  mapWrapper: {
+    flex: 1,
   },
   markerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   marker: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.primary,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
     zIndex: 2,
   },
   pulse: {
     position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: Colors.primary,
     opacity: 0.2,
   },
-  locationBadge: {
+  pinNotification: {
     position: 'absolute',
-    bottom: 20,
+    top: 20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
     elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   locationBadgeText: {
     marginLeft: 6,
-    fontWeight: '700',
-    color: Colors.text,
-    fontSize: 14,
-  },
-  coordsText: {
-    position: 'absolute',
-    top: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    color: Colors.white,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  form: {
-    padding: Spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 22,
     fontWeight: '800',
     color: Colors.text,
-    marginBottom: 4,
+    fontSize: 13,
   },
-  subtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 24,
-  },
-  saveBtn: {
-    marginTop: 32,
-    height: 56,
-  },
-  retryBtn: {
+  locationMetaContainer: {
+    position: 'absolute',
+    left: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-    padding: 12,
+    gap: 12,
+    zIndex: 10,
   },
-  retryText: {
-    marginLeft: 8,
+  coordinatesWrapper: {
+    zIndex: 5,
+  },
+  coordsText: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    color: Colors.white,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontWeight: '800',
+  },
+  refreshTextBtn: {
+    paddingHorizontal: 16,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  refreshBtnText: {
     color: Colors.primary,
     fontWeight: '800',
     fontSize: 14,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    zIndex: 10,
+  },
+  saveBtn: {
+    height: 58,
+    borderRadius: 18,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
   },
 });

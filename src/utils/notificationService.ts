@@ -108,27 +108,40 @@ class NotificationService {
   }
 
   async saveToken(userId: string, role: string) {
-    const token = await this.getFcmToken();
-    if (!token) return;
+    try {
+      console.log(`[NotificationService] Registering token for user ${userId} (${role})...`);
+      const token = await this.getFcmToken();
+      if (!token) {
+        console.warn('[NotificationService] Failed to retrieve FCM token');
+        return;
+      }
 
-    let targetGroup = 'customer';
-    if (role === 'store') targetGroup = 'business';
-    else if (role === 'rider') targetGroup = 'rider';
+      let targetGroup = 'customer';
+      if (role === 'store') targetGroup = 'business';
+      else if (role === 'rider') targetGroup = 'rider';
 
-    const { error } = await supabase
-      .from('fcm_tokens')
-      .upsert(
-        { 
-          user_id: userId, 
-          token: token, 
-          target_group: targetGroup,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: 'token' }
-      );
+      console.log(`[NotificationService] Upserting token with target group: ${targetGroup}`);
 
-    if (error) console.error('Error saving FCM token to Supabase:', error);
-    else console.log('FCM Token saved successfully');
+      const { error } = await supabase
+        .from('fcm_tokens')
+        .upsert(
+          { 
+            user_id: userId, 
+            token: token, 
+            target_group: targetGroup,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'token' }
+        );
+
+      if (error) {
+        console.error('[NotificationService] Error saving FCM token to database:', error);
+      } else {
+        console.log('[NotificationService] FCM token saved/updated successfully');
+      }
+    } catch (error) {
+      console.error('[NotificationService] Error in saveToken:', error);
+    }
   }
 
   showLocalNotification(title: string, message: string, data: any = {}) {
@@ -149,6 +162,7 @@ class NotificationService {
     description: string;
     targetGroup: 'customer' | 'business' | 'rider';
   }) {
+    console.log(`[NotificationService] Sending notification: "${params.title}" to group: ${params.targetGroup}`);
     try {
       const { error } = await supabase
         .from('notifications')
@@ -160,10 +174,13 @@ class NotificationService {
           target_group: params.targetGroup,
         });
 
-      if (error) throw error;
-      console.log(`Notification sent to ${params.targetGroup}: ${params.title}`);
+      if (error) {
+        console.error('[NotificationService] Database insert failed:', error);
+        throw error;
+      }
+      console.log(`[NotificationService] Notification record created successfully`);
     } catch (error) {
-      console.error('Error sending notification to database:', error);
+      console.error('[NotificationService] sendNotification failed:', error);
     }
   }
 
