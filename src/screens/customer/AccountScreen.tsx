@@ -26,7 +26,6 @@ export const AccountScreen = ({ navigation }: any) => {
   // Edit states
   const [editName, setEditName] = useState(profile?.full_name || '');
   const [editPhone, setEditPhone] = useState(profile?.phone || '');
-  const [editUpiId, setEditUpiId] = useState(profile?.upi_id || '');
 
   const { showAlert, showToast } = useAlert();
 
@@ -45,16 +44,9 @@ export const AccountScreen = ({ navigation }: any) => {
   };
 
   const handleUpdateProfile = async () => {
-    if (!editName.trim() || !editPhone.trim() || !editUpiId.trim()) {
-      showAlert({ title: 'Required Fields', message: 'Please fill all mandatory fields (Name, Phone, UPI ID).', type: 'warning' });
-      return;
-    }
-
-    setLoading(true);
     const result = await updateProfile({
       full_name: editName,
       phone: editPhone,
-      upi_id: editUpiId,
     });
     setLoading(false);
 
@@ -92,7 +84,7 @@ export const AccountScreen = ({ navigation }: any) => {
 
         {/* Premium User Profile Box */}
         <View style={styles.profileCard}>
-          <View style={styles.profileHeader}>
+          <View style={[styles.profileHeader, !isEditing && { marginBottom: 0 }]}>
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarCircle}>
                 <Icon name="account" size={36} color={Colors.primary} />
@@ -103,8 +95,8 @@ export const AccountScreen = ({ navigation }: any) => {
                 {profile?.full_name || ''}
               </Text>
               <View style={styles.membershipBadge}>
-                <Icon name="shield-check" size={12} color={Colors.success} />
-                <Text style={styles.membershipText}>Verified Customer</Text>
+                <Icon name="phone-outline" size={12} color={Colors.success} />
+                <Text style={styles.membershipText}>{profile?.phone || 'No phone set'}</Text>
               </View>
             </View>
             <TouchableOpacity 
@@ -115,7 +107,7 @@ export const AccountScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
 
-          {isEditing ? (
+          {isEditing && (
             <View style={styles.enhancedEditForm}>
               <Input
                 label="Full Name"
@@ -132,15 +124,6 @@ export const AccountScreen = ({ navigation }: any) => {
                 keyboardType="phone-pad"
                 leftIcon="phone-outline"
               />
-              <Input
-                label="UPI ID"
-                value={editUpiId}
-                onChangeText={setEditUpiId}
-                placeholder="example@upi"
-                autoCapitalize="none"
-                leftIcon="wallet-outline"
-              />
-              <Text style={styles.formNote}>* UPI ID is used for secure refunds.</Text>
               <Button 
                 title="Save Profile" 
                 onPress={handleUpdateProfile} 
@@ -148,43 +131,11 @@ export const AccountScreen = ({ navigation }: any) => {
                 style={styles.saveProfileBtn}
               />
             </View>
-          ) : (
-            <View style={styles.profileDetailsGrid}>
-              <View style={styles.detailItem}>
-                <View style={styles.detailIconBox}>
-                  <Icon name="phone-outline" size={20} color={Colors.primary} />
-                </View>
-                <View>
-                  <Text style={styles.detailLabel}>Mobile</Text>
-                  <Text style={styles.detailValue}>{profile?.phone || 'Not set'}</Text>
-                </View>
-              </View>
-
-              <View style={styles.detailItem}>
-                <View style={styles.detailIconBox}>
-                  <Icon name="email-outline" size={20} color={Colors.primary} />
-                </View>
-                <View>
-                  <Text style={styles.detailLabel}>Email</Text>
-                  <Text style={styles.detailValue} numberOfLines={1}>{profile?.email}</Text>
-                </View>
-              </View>
-
-              <View style={styles.detailItem}>
-                <View style={styles.detailIconBox}>
-                  <Icon name="wallet-giftcard" size={20} color={Colors.primary} />
-                </View>
-                <View>
-                  <Text style={styles.detailLabel}>UPI ID</Text>
-                  <Text style={styles.detailValue}>{profile?.upi_id || 'Not set'}</Text>
-                </View>
-              </View>
-            </View>
           )}
         </View>
 
         {/* Options Box */}
-        <View style={styles.box}>
+        <View style={[styles.box, { paddingTop: 8, paddingBottom: 8 }]}>
           <OptionItem 
             icon="package-variant-closed" 
             label="Orders" 
@@ -210,7 +161,6 @@ export const AccountScreen = ({ navigation }: any) => {
             label="Premium" 
             onPress={() => navigation.navigate('Premium')} 
           />
-          <OptionItem icon="cash-refund" label="Refunds" onPress={() => navigation.navigate('Refunds')} />
           <OptionItem 
             icon="headset" 
             label="Customer Support" 
@@ -223,7 +173,7 @@ export const AccountScreen = ({ navigation }: any) => {
         </View>
 
         {/* Sign Out Box */}
-        <View style={styles.box}>
+        <View style={[styles.box, { paddingBottom: Spacing.lg }]}>
           <View style={styles.signOutHeader}>
             <View style={styles.userCircle}>
               <Icon name="account" size={30} color={Colors.primary} />
@@ -295,7 +245,7 @@ const styles = StyleSheet.create({
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.sm,
   },
   avatarWrapper: {
     position: 'relative',

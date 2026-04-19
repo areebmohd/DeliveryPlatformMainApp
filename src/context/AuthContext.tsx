@@ -11,7 +11,7 @@ interface AuthContextType {
   isResettingPassword: boolean;
   setIsResettingPassword: (val: boolean) => void;
   signOut: () => Promise<void>;
-  updateProfile: (updates: { full_name?: string; phone?: string; upi_id?: string }) => Promise<{ success: boolean; error?: any }>;
+  updateProfile: (updates: { full_name?: string; phone?: string }) => Promise<{ success: boolean; error?: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -107,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
-  const updateProfile = async (updates: { full_name?: string; phone?: string; upi_id?: string }) => {
+  const updateProfile = async (updates: { full_name?: string; phone?: string }) => {
     try {
       if (!user) throw new Error('No user logged in');
       

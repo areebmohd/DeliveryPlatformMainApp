@@ -448,6 +448,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
           <Input label="Instagram URL" value={instagramUrl} onChangeText={setInstagramUrl} placeholder="instagram.com/yourstore" autoCapitalize="none" />
           <Input label="Facebook URL" value={facebookUrl} onChangeText={setFacebookUrl} placeholder="facebook.com/yourstore" autoCapitalize="none" />
         </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payments</Text>
           <Input label="UPI ID *" value={upiId} onChangeText={setUpiId} placeholder="yourname@upi" />

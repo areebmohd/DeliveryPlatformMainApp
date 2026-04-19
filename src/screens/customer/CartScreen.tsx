@@ -733,11 +733,11 @@ export const CartScreen = ({ navigation }: any) => {
       
       setLoading(false);
 
-      if (!profile?.full_name || !profile?.phone || !profile?.upi_id) {
+      if (!profile?.full_name || !profile?.phone) {
         setLoading(false);
         showAlert({
           title: 'Profile Incomplete',
-          message: 'Please fill your User Info (Name, Phone, and UPI ID) in the Account page before placing an order.',
+          message: 'Please fill your User Info (Name and Phone) in the Account page before placing an order.',
           type: 'warning',
           primaryAction: {
             text: 'Go to Account',
@@ -1267,30 +1267,26 @@ export const CartScreen = ({ navigation }: any) => {
                 styles.paymentOptionSelected
               ]}
             >
-              <View style={styles.paymentOptionHeader}>
+              <View style={styles.paymentIconBox}>
                 <Icon 
-                  name="truck-delivery-outline" 
-                  size={24} 
+                  name="truck-fast" 
+                  size={30} 
                   color={Colors.primary} 
                 />
-                <View style={[
-                  styles.radioOuter, 
-                  styles.radioOuterSelected
-                ]}>
-                  <View style={styles.radioInner} />
-                </View>
               </View>
-              <Text style={[
-                styles.paymentOptionTitle,
-                styles.paymentOptionTitleSelected
-              ]}>Pay on Delivery</Text>
-              <Text style={styles.paymentOptionSub}>Cash or UPI at your door</Text>
+              <View style={styles.paymentTextContainer}>
+                <Text style={[
+                  styles.paymentOptionTitle,
+                  styles.paymentOptionTitleSelected
+                ]}>Pay on Delivery</Text>
+                <Text style={styles.paymentOptionSub}>Cash or UPI at your door</Text>
+              </View>
             </View>
           </View>
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.lg }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.sm }]}>
         <View style={styles.checkoutInfo}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={styles.checkoutTotal}>₹{grandTotal.toFixed(2)}</Text>
@@ -1741,7 +1737,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     alignItems: 'center',
@@ -1781,13 +1777,53 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.white,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   paymentOptionSelected: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight + '20', // Very subtle tint
+    backgroundColor: Colors.primaryLight + '15',
+  },
+  paymentTextContainer: {
+    flex: 1,
+  },
+  paymentIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paymentHighlight: {
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primary + '10',
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.success + '15',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    gap: 4,
+  },
+  trustBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.success,
+    textTransform: 'uppercase',
   },
   paymentOptionHeader: {
     flexDirection: 'row',
@@ -1814,7 +1850,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   paymentOptionTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     color: Colors.text,
   },
@@ -1822,9 +1858,10 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   paymentOptionSub: {
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
+    fontWeight: '500', // Reduced from 600
   },
   emptyContainer: {
     flex: 1,
@@ -2208,6 +2245,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     gap: 4,
+    marginLeft: Spacing.sm,
   },
   viewOffersText: {
     fontSize: 12,

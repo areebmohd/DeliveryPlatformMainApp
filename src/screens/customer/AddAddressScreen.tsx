@@ -178,7 +178,16 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
       }
       
       showToast(`Address ${addressId ? 'updated' : 'saved'} successfully`, 'success');
-      navigation.goBack();
+      
+      if (route.params?.fromCart) {
+        navigation.navigate('CartMain');
+      } else if (route.params?.fromAddresses) {
+        navigation.navigate('AccountMain');
+      } else if (route.params?.fromHome) {
+        navigation.navigate('HomeMain');
+      } else {
+        navigation.goBack();
+      }
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message || 'Failed to save address', type: 'error' });
     } finally {

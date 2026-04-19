@@ -45,7 +45,6 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const [storeOffers, setStoreOffers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [offersLoading, setOffersLoading] = useState(false);
-  const { addItem, updateQuantity, items, totalItems, subtotal } = useCart();
   const [activeTab, setActiveTab] = useState<'products' | 'offers' | 'info'>('products');
   const [isFavourite, setIsFavourite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
@@ -54,8 +53,8 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
     visible: false,
     offer: null
   });
-  const [storeProducts, setStoreProducts] = useState<any[]>([]);
   const [favouriteOfferIds, setFavouriteOfferIds] = useState<string[]>([]);
+  const { addItem, updateQuantity, items, subtotal, totalItems, appliedOffers, setAppliedOffers } = useCart();
   const { user, profile } = useAuth();
   const { showAlert } = useAlert();
   const { width } = Dimensions.get('window');
@@ -445,7 +444,6 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                 <View style={{ paddingHorizontal: Spacing.md }}>
                   {storeOffers.map((offer) => {
                     const theme = getTheme(offer.type);
-                    const { appliedOffers, setAppliedOffers } = useCart();
                     const offerKey = offer.type === 'free_delivery' ? `${offer.store_id}_delivery` : offer.store_id;
                     const isApplied = appliedOffers[offerKey]?.id === offer.id;
                     const conditionTexts = getOfferConditionList(offer);
@@ -776,7 +774,6 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
             
             <View>
               {(() => {
-                const { appliedOffers, setAppliedOffers } = useCart();
                 const off = conditionModal.offer;
                 const isApp = off && appliedOffers[off.type === 'free_delivery' ? `${off.store_id}_delivery` : off.store_id]?.id === off.id;
                 

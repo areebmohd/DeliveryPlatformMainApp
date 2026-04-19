@@ -103,6 +103,16 @@ export const SupportScreen = ({ navigation }: any) => {
           />
         </View>
 
+        <View style={styles.tipBox}>
+          <View style={styles.tipHeader}>
+            <Icon name="lightbulb-on" size={24} color={Colors.warning || '#F59E0B'} />
+            <Text style={styles.tipTitle}>Delivery Tip</Text>
+          </View>
+          <Text style={styles.tipContent}>
+            Check and verify all the products during delivery and do not accept a damaged product to avoid any problem.
+          </Text>
+        </View>
+
         <View style={styles.contactDetails}>
           <View style={styles.contactItem}>
             <Icon name="phone-outline" size={20} color={Colors.textSecondary} />
@@ -273,6 +283,36 @@ const styles = StyleSheet.create({
   contactText: {
     fontSize: 16,
     color: Colors.text,
+    fontWeight: '600',
+  },
+  tipBox: {
+    marginTop: Spacing.xl,
+    backgroundColor: '#FEF3C7',
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  tipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  tipTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  tipContent: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#B45309',
     fontWeight: '600',
   },
 });
