@@ -139,11 +139,7 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
           <View style={styles.mapWrapper}>
             <MapView 
               style={StyleSheet.absoluteFillObject}
-              enableTraffic={false}
-              enableTrafficClosure={false}
-              enableTrafficFreeFlow={false}
-              enableTrafficNonFreeFlow={false}
-              enableTrafficStopIcon={false}
+              key={location ? `${location.latitude}-${location.longitude}` : 'no-location'}
             >
               <Camera 
                 centerCoordinate={location ? [location.longitude, location.latitude] : [77.2090, 28.6139]}
