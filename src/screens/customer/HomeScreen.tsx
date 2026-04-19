@@ -12,6 +12,7 @@ import {
   Dimensions,
   Modal,
   Image,
+  Animated,
 } from 'react-native';
 const { width } = Dimensions.get('window');
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,6 +52,24 @@ export const HomeScreen = ({ navigation }: any) => {
   const activeBannerIndexRef = useRef(0);
   const bannerScrollViewRef = useRef<ScrollView>(null);
   const autoScrollTimer = useRef<any>(null);
+  const glowAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 2.2, // Increased scale to clearly cross boarders
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0.8, // Decreased scale for better contrast
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [glowAnim]);
 
   const getQuantity = (productId: string) => {
     const item = items.find(i => i.id === productId);
@@ -356,8 +375,21 @@ export const HomeScreen = ({ navigation }: any) => {
           style={styles.notificationButton}
           onPress={() => navigation.navigate('Notifications')}
         >
+          {hasNewNotifications && (
+            <Animated.View 
+              style={[
+                styles.notificationGlow, 
+                { 
+                  transform: [{ scale: glowAnim }],
+                  opacity: glowAnim.interpolate({
+                    inputRange: [0.8, 2.2],
+                    outputRange: [0, 0.6],
+                  })
+                }
+              ]} 
+            />
+          )}
           <Icon name="bell-outline" size={24} color={Colors.white} />
-          {hasNewNotifications && <View style={styles.notificationBadge} />}
         </TouchableOpacity>
       </View>
 
@@ -627,23 +659,19 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.8)',
     position: 'relative',
+    overflow: 'visible', // Ensure glow is visible if it scales out
   },
-  notificationBadge: {
+  notificationGlow: {
     position: 'absolute',
-    top: 5,
-    right: 5,
-    width: 7,
-    height: 7,
-    borderRadius: 5,
-    backgroundColor: '#FF0000',
-    borderWidth: 1,
-    borderColor: Colors.white,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
   searchContainer: {
     paddingHorizontal: Spacing.md,
