@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   searchContainer: {
     paddingHorizontal: Spacing.md,

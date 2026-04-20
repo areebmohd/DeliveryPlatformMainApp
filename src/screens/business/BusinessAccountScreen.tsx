@@ -101,7 +101,7 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
         </View>
 
         {/* Options Box */}
-        <View style={styles.box}>
+        <View style={[styles.box, { paddingVertical: Spacing.sm }]}>
           <OptionItem 
             icon="credit-card-outline" 
             label="Payments" 
