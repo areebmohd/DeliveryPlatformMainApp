@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-const { width } = Dimensions.get('window');
 const SUPPORT_EMAIL = 'zorodeliveryapp@gmail.com';
 const SUPPORT_PHONE = '+91 7534846938';
 
@@ -51,13 +50,13 @@ const SupportActionCard = ({
 export const SupportScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
 
-  const handleEmailSupport = () => {
+  const handleEmailSupport = useCallback(() => {
     Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Customer%20Support%20Request`);
-  };
+  }, []);
 
-  const handleCallSupport = () => {
+  const handleCallSupport = useCallback(() => {
     Linking.openURL(`tel:${SUPPORT_PHONE}`);
-  };
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -70,7 +69,7 @@ export const SupportScreen = ({ navigation }: any) => {
             <Icon name="arrow-left" size={24} color={Colors.white} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Customer Support</Text>
-          <View style={{ width: 44 }} />
+          <View style={styles.headerRightSpacer} />
         </View>
         <View style={styles.headerContent}>
           <Text style={styles.heroText}>How can we help you today?</Text>
@@ -314,5 +313,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: '#B45309',
     fontWeight: '600',
+  },
+  headerRightSpacer: {
+    width: 44,
   },
 });

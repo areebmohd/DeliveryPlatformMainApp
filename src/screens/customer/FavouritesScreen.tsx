@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -47,7 +47,7 @@ export const FavouritesScreen = ({ navigation }: any) => {
     fetchFavourites();
   }, [user]);
 
-  const fetchFavourites = async () => {
+  const fetchFavourites = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -136,13 +136,17 @@ export const FavouritesScreen = ({ navigation }: any) => {
       }
 
     } catch (error) {
-      console.error('Error fetching favourites:', error);
+      // Error handled silently
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const toggleOfferFavourite = async (offerId: string) => {
+  useEffect(() => {
+    fetchFavourites();
+  }, [fetchFavourites]);
+
+  const toggleOfferFavourite = useCallback(async (offerId: string) => {
     if (!user) return;
     const isFav = favouriteOfferIds.includes(offerId);
     try {
@@ -156,11 +160,11 @@ export const FavouritesScreen = ({ navigation }: any) => {
         fetchFavourites();
       }
     } catch (e) {
-      console.error('Error toggling offer favorite:', e);
+      // Silent in production
     }
-  };
+  }, [user, favouriteOfferIds, fetchFavourites]);
 
-  const handleApplyOffer = async (offer: any) => {
+  const handleApplyOffer = useCallback(async (offer: any) => {
     if (!user) {
         showAlert({ title: 'Login Required', message: 'Please login to use offers.', type: 'info' });
         return;
@@ -210,12 +214,12 @@ export const FavouritesScreen = ({ navigation }: any) => {
     setAppliedOffers({ ...appliedOffers, [offerKey]: offer });
     showAlert({ title: 'Offer Applied!', message: 'The offer has been applied to your cart.', type: 'success' });
     navigation.navigate('Cart');
-  };
+  }, [user, items, appliedOffers, setAppliedOffers, profile?.order_count, navigation, showAlert]);
 
-  const getQuantity = (productId: string) => {
+  const getQuantity = useCallback((productId: string) => {
     const item = items.find((i: any) => i.id === productId);
     return item ? item.quantity : 0;
-  };
+  }, [items]);
 
   const getGroupedOffers = (offers: any[]) => {
     const groups: any = {};
@@ -338,7 +342,7 @@ export const FavouritesScreen = ({ navigation }: any) => {
     </View>
   );
 
-  const renderProductItem = ({ item }: { item: any }) => (
+  const renderProductItem = useCallback(({ item }: { item: any }) => (
     <CustomerProductCard
       product={item}
       onAdd={() => addItem(item, item.stores)}
@@ -348,14 +352,14 @@ export const FavouritesScreen = ({ navigation }: any) => {
       onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
       width="48.5%"
     />
-  );
+  ), [addItem, getQuantity, updateQuantity, navigation]);
 
-  const renderStoreItem = ({ item }: { item: any }) => (
+  const renderStoreItem = useCallback(({ item }: { item: any }) => (
     <StoreCard 
       store={item}
       onPress={() => navigation.navigate('StoreDetails', { store: item })}
     />
-  );
+  ), [navigation]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

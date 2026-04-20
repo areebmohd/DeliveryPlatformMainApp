@@ -34,45 +34,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
     order: null 
   });
 
-  useEffect(() => {
-    fetchOrders();
-
-    // Subscribe to real-time order updates for this customer
-    const channel = supabase
-      .channel(`customer-orders-${user?.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-          filter: `customer_id=eq.${user?.id}`,
-        },
-        () => {
-          fetchOrders();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      const onBackPress = () => {
-        navigation.navigate('AccountMain');
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-      return () => subscription.remove();
-    }, [navigation])
-  );
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       if (!user?.id) return;
       
@@ -100,11 +62,49 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
       if (error) throw error;
       setOrders(data || []);
     } catch (e) {
-      console.error('Error fetching customer orders:', e);
+      // Silent in production
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchOrders();
+
+    // Subscribe to real-time order updates for this customer
+    const channel = supabase
+      .channel(`customer-orders-${user?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `customer_id=eq.${user?.id}`,
+        },
+        () => {
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchOrders, user?.id]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        navigation.navigate('AccountMain');
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
+    }, [navigation])
+  );
 
   const groupedOrders = React.useMemo(() => {
     return orders.reduce((groups: any, order: any) => {
@@ -148,7 +148,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleCancelOrder = (orderId: string, orderNumber: string) => {
+  const handleCancelOrder = useCallback((orderId: string, orderNumber: string) => {
     showAlert({
       title: 'Cancel Order',
       message: `Are you sure you want to cancel order #${orderNumber}?`,
@@ -196,7 +196,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
 
             fetchOrders();
           } catch (error) {
-            console.error('Error cancelling order:', error);
+            // Silent error
             showAlert({ title: 'Error', message: 'Failed to cancel order. Please try again.', type: 'error' });
           }
         },
@@ -204,16 +204,14 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
       },
       cancelText: 'No',
     });
-  };
+  }, [orders, fetchOrders, showAlert]);
 
-  const renderOrderItem = ({ item }: { item: any }) => {
+  const renderOrderItem = useCallback(({ item }: { item: any }) => {
     const statusInfo = getStatusInfo(item.status);
     const date = new Date(item.created_at);
-    const formattedDate = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-    const formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    
     // Can cancel if status is one of the "waiting" statuses
     const canCancel = item.status === 'waiting_for_pickup';
+    const formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     return (
       <View style={styles.orderCard}>
@@ -355,8 +353,6 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
           </View>
-
-
           
           {canCancel && (
             <TouchableOpacity 
@@ -380,7 +376,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
         </View>
       </View>
     );
-  };
+  }, [handleCancelOrder]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

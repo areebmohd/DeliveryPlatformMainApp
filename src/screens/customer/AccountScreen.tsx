@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -29,7 +29,7 @@ export const AccountScreen = ({ navigation }: any) => {
 
   const { showAlert, showToast } = useAlert();
 
-  const handleSignOut = () => {
+  const handleSignOut = useCallback(() => {
     showAlert({
       title: 'Sign Out',
       message: 'Are you sure you want to sign out?',
@@ -41,9 +41,9 @@ export const AccountScreen = ({ navigation }: any) => {
       },
       showCancel: true
     });
-  };
+  }, [signOut, showAlert]);
 
-  const handleUpdateProfile = async () => {
+  const handleUpdateProfile = useCallback(async () => {
     const result = await updateProfile({
       full_name: editName,
       phone: editPhone,
@@ -56,9 +56,9 @@ export const AccountScreen = ({ navigation }: any) => {
     } else {
       showAlert({ title: 'Error', message: 'Failed to update profile. Please try again.', type: 'error' });
     }
-  };
+  }, [editName, editPhone, updateProfile, showAlert, showToast]);
 
-  const OptionItem = ({ icon, label, onPress, isLast }: { icon: string; label: string; onPress?: () => void; isLast?: boolean }) => (
+  const OptionItem = useCallback(({ icon, label, onPress, isLast }: { icon: string; label: string; onPress?: () => void; isLast?: boolean }) => (
     <TouchableOpacity 
       style={[styles.optionItem, isLast && styles.noBorder]} 
       onPress={onPress}
@@ -70,7 +70,7 @@ export const AccountScreen = ({ navigation }: any) => {
       </View>
       <Icon name="chevron-right" size={20} color={Colors.textSecondary} />
     </TouchableOpacity>
-  );
+  ), []);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -84,7 +84,7 @@ export const AccountScreen = ({ navigation }: any) => {
 
         {/* Premium User Profile Box */}
         <View style={styles.profileCard}>
-          <View style={[styles.profileHeader, !isEditing && { marginBottom: 0 }]}>
+          <View style={[styles.profileHeader, !isEditing && styles.noBottomMargin]}>
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarCircle}>
                 <Icon name="account" size={36} color={Colors.primary} />
@@ -135,7 +135,7 @@ export const AccountScreen = ({ navigation }: any) => {
         </View>
 
         {/* Options Box */}
-        <View style={[styles.box, { paddingTop: 8, paddingBottom: 8 }]}>
+        <View style={[styles.box, styles.paddingVertical8]}>
           <OptionItem 
             icon="package-variant-closed" 
             label="Orders" 
@@ -173,7 +173,7 @@ export const AccountScreen = ({ navigation }: any) => {
         </View>
 
         {/* Sign Out Box */}
-        <View style={[styles.box, { paddingBottom: Spacing.lg }]}>
+        <View style={[styles.box, styles.paddingBottomLg]}>
           <View style={styles.signOutHeader}>
             <View style={styles.userCircle}>
               <Icon name="account" size={30} color={Colors.primary} />
@@ -447,5 +447,15 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: Colors.error,
+  },
+  noBottomMargin: {
+    marginBottom: 0,
+  },
+  paddingVertical8: {
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  paddingBottomLg: {
+    paddingBottom: Spacing.lg,
   },
 });

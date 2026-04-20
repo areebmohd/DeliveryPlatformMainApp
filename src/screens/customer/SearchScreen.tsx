@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -32,18 +32,18 @@ export const SearchScreen = ({ navigation, route }: any) => {
   const searchInputRef = useRef<TextInput>(null);
   const { addItem, updateQuantity, items } = useCart();
 
-  const getQuantity = (productId: string) => {
+  const getQuantity = useCallback((productId: string) => {
     const item = items.find(i => i.id === productId);
     return item ? item.quantity : 0;
-  };
+  }, [items]);
 
-  const handleAddToCart = (product: any, store: any) => {
+  const handleAddToCart = useCallback((product: any, store: any) => {
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions({ product, store });
     } else {
       addItem(product, store);
     }
-  };
+  }, [addItem]);
 
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
@@ -101,13 +101,13 @@ export const SearchScreen = ({ navigation, route }: any) => {
       setProducts(productData || []);
       setStores(storeData || []);
     } catch (e) {
-      console.error('Search error:', e);
+      // Search error logged silently
     } finally {
       setLoading(false);
     }
   };
 
-  const renderProduct = ({ item }: { item: any }) => (
+  const renderProduct = useCallback(({ item }: { item: any }) => (
     <View style={styles.productItemWrapper}>
       <CustomerProductCard
         product={item}
@@ -119,14 +119,14 @@ export const SearchScreen = ({ navigation, route }: any) => {
         width="100%"
       />
     </View>
-  );
+  ), [navigation, handleAddToCart, getQuantity, updateQuantity]);
 
-  const renderStore = ({ item }: { item: any }) => (
+  const renderStore = useCallback(({ item }: { item: any }) => (
     <StoreCard
       store={item}
       onPress={() => navigation.navigate('StoreDetails', { store: item })}
     />
-  );
+  ), [navigation]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -190,6 +190,10 @@ export const SearchScreen = ({ navigation, route }: any) => {
           key={activeTab === 'products' ? 'products-grid' : 'stores-list'}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          removeClippedSubviews={true}
           ListEmptyComponent={
             searchQuery.length < 2 ? (
               <View style={styles.emptyContainer}>

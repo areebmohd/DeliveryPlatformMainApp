@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,11 +23,7 @@ export const AddressesScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const { showAlert, showToast } = useAlert();
 
-  useEffect(() => {
-    fetchAddresses();
-  }, []);
-
-  const fetchAddresses = async () => {
+  const fetchAddresses = useCallback(async () => {
     try {
       if (!user?.id) return;
       const { data, error } = await supabase
@@ -40,11 +36,15 @@ export const AddressesScreen = ({ navigation }: any) => {
       if (error) throw error;
       setAddresses(data || []);
     } catch (e) {
-      console.error('Error fetching addresses:', e);
+      // Silent in production
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchAddresses();
+  }, [fetchAddresses]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -104,7 +104,7 @@ export const AddressesScreen = ({ navigation }: any) => {
     });
   };
 
-  const renderAddressItem = ({ item }: { item: any }) => (
+  const renderAddressItem = useCallback(({ item }: { item: any }) => (
     <View style={styles.addressCard}>
       <View style={styles.addressContent}>
         <View style={styles.cardHeaderRow}>
@@ -136,7 +136,7 @@ export const AddressesScreen = ({ navigation }: any) => {
             onPress={() => handleDeleteAddress(item.id)}
           >
             <Icon name="delete-outline" size={18} color={Colors.error} />
-            <Text style={[styles.actionBtnText, { color: Colors.error }]}>Delete</Text>
+            <Text style={styles.deleteBtnText}>Delete</Text>
           </TouchableOpacity>
 
           {!item.is_default && (
@@ -150,7 +150,7 @@ export const AddressesScreen = ({ navigation }: any) => {
         </View>
       </View>
     </View>
-  );
+  ), [navigation, handleSetDefault, handleDeleteAddress]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -389,5 +389,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 8,
+  },
+  deleteBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.error,
   },
 });

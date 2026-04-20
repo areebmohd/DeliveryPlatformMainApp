@@ -115,8 +115,8 @@ export const validateOffer = (offer: any, subtotal: number, distance: number = 0
     const parseTime = (time: string) => {
       const parts = time.split(':');
       if (parts.length < 2) return 0;
-      let h = parseInt(parts[0]);
-      const m = parseInt(parts[1].split(' ')[0]);
+      let h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1].split(' ')[0], 10);
       if (time.includes('PM') && h < 12) h += 12;
       if (time.includes('AM') && h === 12) h = 0;
       return h * 60 + m;

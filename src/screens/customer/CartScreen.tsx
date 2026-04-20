@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -103,10 +103,8 @@ export const CartScreen = ({ navigation }: any) => {
       }
     };
 
-    if (Object.keys(appliedOffers).length > 0) {
-      fetchRewardDetails();
-    }
-  }, [appliedOffers]);
+    fetchRewardDetails();
+  }, [appliedOffers, setAppliedOffers]);
 
   // Sync manuallyRemovedStores with cart items
   useEffect(() => {
@@ -115,7 +113,7 @@ export const CartScreen = ({ navigation }: any) => {
     if (stillInCart.length !== manuallyRemovedStores.length) {
       setManuallyRemovedStores(stillInCart);
     }
-  }, [items.length]);
+  }, [items, manuallyRemovedStores, setManuallyRemovedStores]);
 
   // Distance helper
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -142,7 +140,7 @@ export const CartScreen = ({ navigation }: any) => {
     return null;
   };
 
-  const fetchStoreOffers = async (storeId: string) => {
+  const fetchStoreOffers = useCallback(async (storeId: string) => {
     try {
       setModalLoading(true);
       setSelectedStoreId(storeId);
@@ -193,14 +191,14 @@ export const CartScreen = ({ navigation }: any) => {
         }
       }
     } catch (e) {
-      console.error('Error fetching store offers:', e);
+      // Error handled silently
       showAlert({ title: 'Error', message: 'Unable to load offers for this store.', type: 'error' });
     } finally {
       setModalLoading(false);
     }
-  };
+  }, [offerProductNames, showAlert]);
 
-  const navigateToStore = async (storeId: string) => {
+  const navigateToStore = useCallback(async (storeId: string) => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -214,14 +212,14 @@ export const CartScreen = ({ navigation }: any) => {
         navigation.navigate('StoreDetails', { store: data });
       }
     } catch (e) {
-      console.error('Error navigating to store:', e);
+      // Error handled silently
       showAlert({ title: 'Error', message: 'Unable to open store details.', type: 'error' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigation, showAlert]);
 
-  const checkOfferConditions = (offer: any) => {
+  const checkOfferConditions = useCallback((offer: any) => {
     const { conditions } = offer;
     const errors: string[] = [];
 
@@ -284,7 +282,7 @@ export const CartScreen = ({ navigation }: any) => {
     }
 
     return errors;
-  };
+  }, [items, profile, offerProductNames]);
 
   const autoApplyBestOffer = async () => {
     if (isAutoApplyInProgress || items.length === 0) return;
@@ -375,13 +373,13 @@ export const CartScreen = ({ navigation }: any) => {
         showToast(`${appliedCount} offer(s) applied automatically!`, 'success');
       }
     } catch (e) {
-      console.error('Auto-apply error:', e);
+      // Silent in production
     } finally {
       setIsAutoApplyInProgress(false);
     }
   };
 
-  const handleApplyOffer = (offer: any) => {
+  const handleApplyOffer = useCallback((offer: any) => {
     const errors = checkOfferConditions(offer);
     if (errors.length > 0) {
       showAlert({
@@ -399,7 +397,7 @@ export const CartScreen = ({ navigation }: any) => {
     });
     setIsOffersModalVisible(false);
     showToast('Offer applied successfully!', 'success');
-  };
+  }, [appliedOffers, setAppliedOffers, showAlert, showToast]);
 
   const renderConditionLine = (offer: any) => {
     const list = getOfferConditionList(offer);
@@ -468,7 +466,7 @@ export const CartScreen = ({ navigation }: any) => {
   }, [items.length, subtotal, appliedOffers]);
 
 
-  const fetchAddresses = async () => {
+  const fetchAddresses = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('addresses_view')
@@ -483,11 +481,11 @@ export const CartScreen = ({ navigation }: any) => {
         setSelectedAddress(data[0]);
       }
     } catch (e) {
-      console.error('Error fetching addresses:', e);
+      // Silent in production
     }
-  };
+  }, [user?.id, selectedAddress]);
 
-  const calculateFees = async () => {
+  const calculateFees = useCallback(async () => {
     if (items.length === 0 || (!selectedAddress && !sessionAddress)) {
       setDistance(0);
       setIsLargeVehicle(false);
@@ -530,9 +528,9 @@ export const CartScreen = ({ navigation }: any) => {
 
       const storesWithUserDist = uniqueStores.map(([id, loc]) => ({
         id,
-        lat: loc.lat,
-        lng: loc.lng,
-        distToUser: calculateDistance(loc.lat, loc.lng, uLat, uLng)
+        lat: (loc as any).lat,
+        lng: (loc as any).lng,
+        distToUser: calculateDistance((loc as any).lat, (loc as any).lng, uLat, uLng)
       }));
 
       storesWithUserDist.sort((a, b) => b.distToUser - a.distToUser);
@@ -558,9 +556,9 @@ export const CartScreen = ({ navigation }: any) => {
       setDistance(totalRouteDist);
 
     } catch (e) {
-      console.error('Error calculating fees:', e);
+      // Silent in production
     }
-  };
+  }, [items, selectedAddress, sessionAddress]);
 
   useEffect(() => {
     calculateFees();

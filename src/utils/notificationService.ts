@@ -11,17 +11,14 @@ class NotificationService {
   }
 
   private configure() {
-    const self = this;
     PushNotification.configure({
-      onRegister: function (token) {
-        console.log('TOKEN:', token);
+      onRegister: (token) => {
+        // Silent
       },
-      onNotification: function (notification) {
-        console.log('NOTIFICATION:', notification);
-        
+      onNotification: (notification) => {
         // Handle notification tap
         if (notification.userInteraction) {
-          self.handleNotificationTap(notification.data);
+          this.handleNotificationTap(notification.data);
         }
       },
       permissions: {
@@ -35,13 +32,11 @@ class NotificationService {
 
     // Handle background notification click (FCM)
     messaging().onNotificationOpenedApp(remoteMessage => {
-      console.log('Notification caused app to open from background state:', remoteMessage);
       this.handleNotificationTap(remoteMessage.data);
     });
 
     // Handle foreground notifications (FCM)
     messaging().onMessage(async remoteMessage => {
-      console.log('A new FCM message arrived!', remoteMessage);
       if (remoteMessage.notification) {
         this.showLocalNotification(
           remoteMessage.notification.title || 'New Notification',
@@ -56,7 +51,6 @@ class NotificationService {
       .getInitialNotification()
       .then(remoteMessage => {
         if (remoteMessage) {
-          console.log('Notification caused app to open from quit state:', remoteMessage);
           this.handleNotificationTap(remoteMessage.data);
         }
       });
@@ -73,7 +67,7 @@ class NotificationService {
         importance: Importance.HIGH,
         vibrate: true,
       },
-      (created) => console.log(`createChannel returned '${created}'`)
+      (created) => { /* Silent */ }
     );
   }
 
@@ -135,12 +129,12 @@ class NotificationService {
         );
 
       if (error) {
-        console.error('[NotificationService] Error saving FCM token to database:', error);
+        // Silent error
       } else {
-        console.log('[NotificationService] FCM token saved/updated successfully');
+        // Success
       }
     } catch (error) {
-      console.error('[NotificationService] Error in saveToken:', error);
+      // Silent error
     }
   }
 
@@ -175,10 +169,8 @@ class NotificationService {
         });
 
       if (error) {
-        console.error('[NotificationService] Database insert failed:', error);
         throw error;
       }
-      console.log(`[NotificationService] Notification record created successfully`);
     } catch (error) {
       console.error('[NotificationService] sendNotification failed:', error);
     }

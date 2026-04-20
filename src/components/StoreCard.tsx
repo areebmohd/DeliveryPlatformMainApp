@@ -27,7 +27,7 @@ interface StoreCardProps {
   horizontal?: boolean;
 }
 
-export const StoreCard = ({ store, onPress, width, horizontal }: StoreCardProps) => {
+export const StoreCard = React.memo(({ store, onPress, width, horizontal }: StoreCardProps) => {
   return (
     <TouchableOpacity
       style={[
@@ -66,7 +66,7 @@ export const StoreCard = ({ store, onPress, width, horizontal }: StoreCardProps)
       </View>
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

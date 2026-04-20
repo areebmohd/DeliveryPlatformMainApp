@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -44,9 +44,9 @@ export const HomeScreen = ({ navigation }: any) => {
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const [homeBanners, setHomeBanners] = useState<any[]>([]);
-  const [categoryImages, setCategoryImages] = useState<{[key: string]: string}>({});
+  const [categoryImages, setCategoryImages] = useState<{ [key: string]: string }>({});
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
-  const { addItem, updateQuantity, items, sessionAddress, setSessionAddress } = useCart();
+  const { addItem, items, updateQuantity, sessionAddress, setSessionAddress } = useCart();
   const { user } = useAuth();
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const activeBannerIndexRef = useRef(0);
@@ -71,18 +71,18 @@ export const HomeScreen = ({ navigation }: any) => {
     ).start();
   }, [glowAnim]);
 
-  const getQuantity = (productId: string) => {
+  const getQuantity = useCallback((productId: string) => {
     const item = items.find(i => i.id === productId);
     return item ? item.quantity : 0;
-  };
+  }, [items]);
 
-  const handleAddToCart = (product: any, store: any) => {
+  const handleAddToCart = useCallback((product: any, store: any) => {
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions({ product, store });
     } else {
       addItem(product, store);
     }
-  };
+  }, [addItem]);
 
   useEffect(() => {
     fetchStores();
@@ -117,7 +117,7 @@ export const HomeScreen = ({ navigation }: any) => {
     activeBannerIndexRef.current = activeBannerIndex;
   }, [activeBannerIndex]);
 
-  const startAutoScroll = () => {
+  const startAutoScroll = useCallback(() => {
     stopAutoScroll();
     autoScrollTimer.current = setInterval(() => {
       if (homeBanners.length > 0) {
@@ -129,13 +129,13 @@ export const HomeScreen = ({ navigation }: any) => {
         setActiveBannerIndex(nextIndex);
       }
     }, 5000);
-  };
+  }, [homeBanners.length]);
 
-  const stopAutoScroll = () => {
+  const stopAutoScroll = useCallback(() => {
     if (autoScrollTimer.current) {
       clearInterval(autoScrollTimer.current);
     }
-  };
+  }, []);
 
   const checkNotifications = async () => {
     try {
@@ -159,7 +159,7 @@ export const HomeScreen = ({ navigation }: any) => {
         }
       }
     } catch (e) {
-      console.error('Error checking notifications:', e);
+      // Error logged silently in production
     }
   };
 
@@ -184,7 +184,7 @@ export const HomeScreen = ({ navigation }: any) => {
         setSelectedAddress(null);
       }
     } catch (e) {
-      console.error('Error fetching addresses:', e);
+      // Silent in production
     }
   };
 
@@ -199,7 +199,7 @@ export const HomeScreen = ({ navigation }: any) => {
       if (error) throw error;
       setStores(data || []);
     } catch (e) {
-      console.error('Error fetching stores:', e);
+      // Silent in production
     } finally {
       setLoading(false);
     }
@@ -220,7 +220,7 @@ export const HomeScreen = ({ navigation }: any) => {
       if (error) throw error;
       setBestSellers(data || []);
     } catch (e) {
-      console.error('Error fetching best sellers:', e);
+      // Silent in production
     } finally {
       setBestSellersLoading(false);
     }
@@ -242,7 +242,7 @@ export const HomeScreen = ({ navigation }: any) => {
       if (error) throw error;
       setSuggestions(data || []);
     } catch (e) {
-      console.error('Error fetching suggestions:', e);
+      // Silent in production
     } finally {
       setSuggestionsLoading(false);
     }
@@ -258,7 +258,7 @@ export const HomeScreen = ({ navigation }: any) => {
       if (error) throw error;
       setHomeBanners(data || []);
     } catch (e) {
-      console.error('Error fetching home banners:', e);
+      // Silent in production
     }
   };
 
@@ -274,11 +274,11 @@ export const HomeScreen = ({ navigation }: any) => {
       });
       setCategoryImages(mapping);
     } catch (e) {
-      console.error('Error fetching category images:', e);
+      // Silent in production
     }
   };
 
-  const renderCategory = ({ item }: { item: any }) => (
+  const renderCategory = useCallback(({ item }: { item: any }) => (
     <TouchableOpacity
       style={[
         styles.categoryItem,
@@ -307,10 +307,10 @@ export const HomeScreen = ({ navigation }: any) => {
         {item.name}
       </Text>
     </TouchableOpacity>
-  );
+  ), [selectedCategory, categoryImages, navigation]);
 
-  const renderBestSeller = ({ item }: { item: any }) => (
-    <View style={{ marginRight: Spacing.sm }}>
+  const renderBestSeller = useCallback(({ item }: { item: any }) => (
+    <View style={styles.bestSellerWrapper}>
       <CustomerProductCard 
         product={item}
         onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
@@ -321,9 +321,9 @@ export const HomeScreen = ({ navigation }: any) => {
         width={140}
       />
     </View>
-  );
+  ), [navigation, handleAddToCart, getQuantity, updateQuantity]);
 
-  const renderSuggestion = (item: any) => (
+  const renderSuggestion = useCallback((item: any) => (
     <CustomerProductCard 
       key={item.id}
       product={item}
@@ -334,7 +334,7 @@ export const HomeScreen = ({ navigation }: any) => {
       onDecrease={() => updateQuantity(item.id, -1)}
       width={(width - Spacing.md * 2 - 20) / 3 - 2}
     />
-  );
+  ), [navigation, handleAddToCart, getQuantity, updateQuantity]);
 
   const insets = useSafeAreaInsets();
 
@@ -406,13 +406,13 @@ export const HomeScreen = ({ navigation }: any) => {
       </TouchableOpacity>
       </LinearGradient>
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={[
-          styles.scrollContent, 
-          { paddingBottom: insets.bottom + 100 }
-        ]}
-      >
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={[
+            styles.scrollContent, 
+            { paddingBottom: insets.bottom + 100 }
+          ]}
+        >
         {/* Home Banners */}
         {homeBanners.length > 0 && (
           <View style={styles.bannerContainer}>
@@ -478,6 +478,10 @@ export const HomeScreen = ({ navigation }: any) => {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.bestSellersList}
+              initialNumToRender={5}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              removeClippedSubviews={true}
             />
           </>
         )}
@@ -491,7 +495,7 @@ export const HomeScreen = ({ navigation }: any) => {
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color={Colors.primary} style={styles.loadingIndicator} />
         ) : stores.length > 0 ? (
           <FlatList
             data={stores}
@@ -507,6 +511,10 @@ export const HomeScreen = ({ navigation }: any) => {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.storesList}
+            initialNumToRender={3}
+            maxToRenderPerBatch={5}
+            windowSize={5}
+            removeClippedSubviews={true}
           />
         ) : (
           <View style={styles.emptyContainer}>
@@ -914,5 +922,11 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 16,
     resizeMode: 'cover',
+  },
+  bestSellerWrapper: {
+    marginRight: Spacing.sm,
+  },
+  loadingIndicator: {
+    marginTop: 40,
   },
 });

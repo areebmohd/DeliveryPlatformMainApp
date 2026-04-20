@@ -31,7 +31,7 @@ interface CustomerProductCardProps {
   width?: any;
 }
 
-export const CustomerProductCard = ({ 
+export const CustomerProductCard = React.memo(({ 
   product, 
   onAdd,
   quantity = 0,
@@ -96,7 +96,7 @@ export const CustomerProductCard = ({
       </View>
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
