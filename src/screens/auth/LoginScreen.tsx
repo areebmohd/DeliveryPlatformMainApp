@@ -90,7 +90,6 @@ export const LoginScreen = ({ navigation }: any) => {
         } else {
           throw error;
         }
-        setLoading(false);
         return;
       }
       // Navigation handled by auth state listener in App.tsx

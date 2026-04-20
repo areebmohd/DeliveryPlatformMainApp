@@ -71,7 +71,8 @@ export const RegisterScreen = ({ navigation }: any) => {
           'Email Already Registered',
           `This email is already registered as a ${roleLabel}. One email can only be used for one account type. Please sign in or use a different email.`,
           'warning',
-          { text: 'OK', onPress: () => navigation.navigate('Login') }
+          { text: 'OK', onPress: () => navigation.navigate('Login') },
+          false
         );
         setLoading(false);
         return;
@@ -102,14 +103,16 @@ export const RegisterScreen = ({ navigation }: any) => {
                 'Account Exists',
                 'An account with this email already exists. Please sign in instead.',
                 'warning',
-                { text: 'Go to Login', onPress: () => navigation.navigate('Login') }
+                { text: 'Go to Login', onPress: () => navigation.navigate('Login') },
+                false
               );
             } else {
               showAlert(
                 'Welcome Back',
                 'Your account exists but is not verified. A new verification code has been sent.',
                 'info',
-                { text: 'OK', onPress: () => navigation.navigate('VerifyEmailOTP', { email: email.toLowerCase().trim() }) }
+                { text: 'OK', onPress: () => navigation.navigate('VerifyEmailOTP', { email: email.toLowerCase().trim() }) },
+                false
               );
             }
           } catch (resendError: any) {
@@ -117,7 +120,8 @@ export const RegisterScreen = ({ navigation }: any) => {
               'Account Exists',
               'An account with this email already exists. Please sign in instead.',
               'warning',
-              { text: 'Go to Login', onPress: () => navigation.navigate('Login') }
+              { text: 'Go to Login', onPress: () => navigation.navigate('Login') },
+              false
             );
           }
           return;
@@ -154,7 +158,8 @@ export const RegisterScreen = ({ navigation }: any) => {
                 'Email Already Registered',
                 'This email is already registered for a rider account. Please use a different email or log in to the Rider app.',
                 'warning',
-                { text: 'OK', onPress: () => navigation.navigate('Login') }
+                { text: 'OK', onPress: () => navigation.navigate('Login') },
+                false
               );
               await GoogleSignin.signOut();
               setLoading(false);
@@ -170,7 +175,8 @@ export const RegisterScreen = ({ navigation }: any) => {
                 'Email Already Registered',
                 `This email is already registered as a ${roleLabel}. One email can only be used for one account type. Please sign in or use a different email.`,
                 'warning',
-                { text: 'OK', onPress: () => navigation.navigate('Login') }
+                { text: 'OK', onPress: () => navigation.navigate('Login') },
+                false
               );
               await GoogleSignin.signOut();
               setLoading(false);

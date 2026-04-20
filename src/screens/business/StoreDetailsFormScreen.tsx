@@ -140,7 +140,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     const asset = result.assets[0];
     const base64 = asset.base64;
     if (!base64) return;
-    if (!user?.id) return; // Assuming 'unsubscribe' is not defined here, changed to 'return'
+    if (!user?.id) return;
 
     try {
       setIsUploadingBanner(true);
@@ -220,7 +220,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     if (!ownerNumber) missingFields.push('Owner Number');
 
     // Only check verification images if store is NOT active (OR if it's a new store)
-    if ((!store || store.is_active === false) && verificationImages.length === 0) {
+    if ((!store || !store.is_active) && verificationImages.length === 0) {
       missingFields.push('Store Images');
     }
 
@@ -273,7 +273,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
       if (store && store.is_active) {
         // Check standard fields
         for (const field of sensitiveFields) {
-          if (store[field] !== storeData[field]) {
+          if ((store[field] || '') !== (storeData[field] || '')) {
             sensitiveChanged = true;
             break;
           }
@@ -292,7 +292,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
       if (store && store.is_active) {
         if (sensitiveChanged) {
           storeData.has_pending_changes = true;
-        } else if (store.banner_url !== bannerUrl) {
+        } else if ((store.banner_url || '') !== (bannerUrl || '')) {
           // If ONLY banner changed, keep has_pending_changes as is (false or current)
           // and update approved_details to stay in sync with the new banner
           const updatedApproved = { ...(store.approved_details || {}) };
@@ -468,7 +468,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
           <Input label="Owner Number *" value={ownerNumber} onChangeText={setOwnerNumber} placeholder="Personal contact number" keyboardType="phone-pad" />
         </View>
 
-        {(!store || store.is_active === false) && (
+        {(!store || !store.is_active) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Store Verification Images *</Text>
             <Text style={styles.subtitle}>Upload clear images of your store front and interior for verification.</Text>

@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Colors, Spacing } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
@@ -62,7 +63,7 @@ export const VerifyResetOTPScreen = ({ navigation, route }: any) => {
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(email);
         if (error) throw error;
-        // Optional: show a toast or message
+        Alert.alert('Code Resent', 'A new verification code has been sent to your email.');
       } catch (e: any) {
         setError(e.message || 'Failed to resend code');
       } finally {
