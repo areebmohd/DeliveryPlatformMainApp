@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { supabase } from '../../api/supabase';
+import { useAlert } from '../../context/AlertContext';
 import { StoreCard } from '../../components/StoreCard';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
@@ -27,6 +28,7 @@ export const CategoryScreen = ({ navigation, route }: any) => {
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const insets = useSafeAreaInsets();
   const { addItem, updateQuantity, items, sessionAddress } = useCart();
+  const { showAlert } = useAlert();
 
   const getQuantity = useCallback((productId: string) => {
     const item = items.find(i => i.id === productId);
@@ -34,12 +36,26 @@ export const CategoryScreen = ({ navigation, route }: any) => {
   }, [items]);
 
   const handleAddToCart = useCallback((product: any, store: any) => {
+    if (!sessionAddress) {
+      // In this screen, we'll prompt them to go back to home or show an alert
+      showAlert({
+        title: 'Select Location',
+        message: 'Please select a delivery location first to add products to your cart.',
+        type: 'info',
+        primaryAction: {
+          text: 'Go Home',
+          onPress: () => navigation.navigate('Home')
+        }
+      });
+      return;
+    }
+
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions({ product, store });
     } else {
       addItem(product, store);
     }
-  }, [addItem]);
+  }, [addItem, sessionAddress, showAlert, navigation]);
 
   useEffect(() => {
     fetchResults();

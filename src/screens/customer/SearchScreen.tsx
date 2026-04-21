@@ -18,6 +18,7 @@ import { StoreCard } from '../../components/StoreCard';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
 import { useCart } from '../../context/CartContext';
+import { useAlert } from '../../context/AlertContext';
 import { deduplicateProducts, parseWKT } from '../../utils/productUtils';
 
 const { width } = Dimensions.get('window');
@@ -32,6 +33,7 @@ export const SearchScreen = ({ navigation, route }: any) => {
   const insets = useSafeAreaInsets();
   const searchInputRef = useRef<TextInput>(null);
   const { addItem, updateQuantity, items, sessionAddress } = useCart();
+  const { showAlert } = useAlert();
 
   const getQuantity = useCallback((productId: string) => {
     const item = items.find(i => i.id === productId);
@@ -39,12 +41,25 @@ export const SearchScreen = ({ navigation, route }: any) => {
   }, [items]);
 
   const handleAddToCart = useCallback((product: any, store: any) => {
+    if (!sessionAddress) {
+      showAlert({
+        title: 'Select Location',
+        message: 'Please select a delivery location first to add products to your cart.',
+        type: 'info',
+        primaryAction: {
+          text: 'Go Home',
+          onPress: () => navigation.navigate('Home')
+        }
+      });
+      return;
+    }
+
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions({ product, store });
     } else {
       addItem(product, store);
     }
-  }, [addItem]);
+  }, [addItem, sessionAddress, showAlert, navigation]);
 
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();

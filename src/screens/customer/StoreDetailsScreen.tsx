@@ -54,7 +54,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
     offer: null
   });
   const [favouriteOfferIds, setFavouriteOfferIds] = useState<string[]>([]);
-  const { addItem, updateQuantity, items, subtotal, totalItems, appliedOffers, setAppliedOffers } = useCart();
+  const { addItem, updateQuantity, items, subtotal, totalItems, appliedOffers, setAppliedOffers, sessionAddress } = useCart();
   const { user, profile } = useAuth();
   const { showAlert } = useAlert();
   const { width } = Dimensions.get('window');
@@ -201,6 +201,19 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   };
 
   const handleAddToCart = (product: any) => {
+    if (!sessionAddress) {
+      showAlert({
+        title: 'Select Location',
+        message: 'Please select a delivery location first to add products to your cart.',
+        type: 'info',
+        primaryAction: {
+          text: 'Go Home',
+          onPress: () => navigation.navigate('Home')
+        }
+      });
+      return;
+    }
+
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions(product);
     } else {

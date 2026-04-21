@@ -352,14 +352,28 @@ export const FavouritesScreen = ({ navigation }: any) => {
   const renderProductItem = useCallback(({ item }: { item: any }) => (
     <CustomerProductCard
       product={item}
-      onAdd={() => addItem(item, item.stores)}
+      onAdd={() => {
+        if (!sessionAddress) {
+          showAlert({
+            title: 'Select Location',
+            message: 'Please select a delivery location first to add products to your cart.',
+            type: 'info',
+            primaryAction: {
+              text: 'Go Home',
+              onPress: () => navigation.navigate('Home')
+            }
+          });
+          return;
+        }
+        addItem(item, item.stores);
+      }}
       quantity={getQuantity(item.id)}
       onIncrease={() => updateQuantity(item.id, 1)}
       onDecrease={() => updateQuantity(item.id, -1)}
       onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
       width="48.5%"
     />
-  ), [addItem, getQuantity, updateQuantity, navigation]);
+  ), [addItem, getQuantity, updateQuantity, navigation, sessionAddress, showAlert]);
 
   const renderStoreItem = useCallback(({ item }: { item: any }) => (
     <StoreCard 

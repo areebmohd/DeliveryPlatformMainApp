@@ -26,6 +26,7 @@ import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
 import { supabase } from '../../api/supabase';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
 import { deduplicateProducts, parseWKT } from '../../utils/productUtils';
 
@@ -49,6 +50,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const { addItem, items, updateQuantity, sessionAddress, setSessionAddress } = useCart();
   const { user } = useAuth();
+  const { showAlert } = useAlert();
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const activeBannerIndexRef = useRef(0);
   const bannerScrollViewRef = useRef<ScrollView>(null);
@@ -78,12 +80,25 @@ export const HomeScreen = ({ navigation }: any) => {
   }, [items]);
 
   const handleAddToCart = useCallback((product: any, store: any) => {
+    if (!sessionAddress) {
+      showAlert({
+        title: 'Select Location',
+        message: 'Please select a delivery location first to add products to your cart.',
+        type: 'info',
+        primaryAction: {
+          text: 'Select Location',
+          onPress: () => setAddressModalVisible(true)
+        }
+      });
+      return;
+    }
+
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions({ product, store });
     } else {
       addItem(product, store);
     }
-  }, [addItem]);
+  }, [addItem, sessionAddress, showAlert]);
 
   useEffect(() => {
     fetchStores();
@@ -370,13 +385,11 @@ export const HomeScreen = ({ navigation }: any) => {
           <View style={styles.addressRow}>
             <Text style={styles.locationTitle} numberOfLines={1}>
               {sessionAddress 
-                ? (sessionAddress.label.length > 25 ? `${sessionAddress.label.substring(0, 30)}...` : sessionAddress.label)
-                : selectedAddress 
-                  ? (() => {
-                      const fullAddress = `${selectedAddress.address_line}${selectedAddress.city ? `, ${selectedAddress.city}` : ''}`;
-                      return fullAddress.length > 25 ? `${fullAddress.substring(0, 30)}...` : fullAddress;
-                    })()
-                  : 'Select Address'}
+                ? (() => {
+                    const fullAddress = `${sessionAddress.address_line}${sessionAddress.city ? `, ${sessionAddress.city}` : ''}`;
+                    return fullAddress.length > 25 ? `${fullAddress.substring(0, 30)}...` : fullAddress;
+                  })()
+                : 'Select Address'}
             </Text>
             <Icon name="chevron-down" size={20} color={Colors.white} />
           </View>
@@ -571,11 +584,11 @@ export const HomeScreen = ({ navigation }: any) => {
                   navigation.navigate('AddLiveLocation');
                 }}
               >
-                <Icon name="crosshairs-gps" size={24} color={sessionAddress ? Colors.primary : Colors.primary} />
-                <Text style={[styles.modalOptionText, sessionAddress && { color: Colors.primary, fontWeight: '900' }]}>
-                  {sessionAddress ? "Live Location Active" : "Use Live Location"}
+                <Icon name="crosshairs-gps" size={24} color={sessionAddress && !sessionAddress.id ? Colors.primary : Colors.primary} />
+                <Text style={[styles.modalOptionText, sessionAddress && !sessionAddress.id && { color: Colors.primary, fontWeight: '900' }]}>
+                  {sessionAddress && !sessionAddress.id ? "Live Location Active" : "Use Live Location"}
                 </Text>
-                {sessionAddress && <Icon name="check-circle" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
+                {sessionAddress && !sessionAddress.id && <Icon name="check-circle" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -596,7 +609,7 @@ export const HomeScreen = ({ navigation }: any) => {
               {savedAddresses.map((addr) => (
                 <TouchableOpacity 
                   key={addr.id} 
-                  style={[styles.savedAddressItem, !sessionAddress && selectedAddress?.id === addr.id && styles.selectedAddressItem]}
+                  style={[styles.savedAddressItem, sessionAddress?.id === addr.id && styles.selectedAddressItem]}
                   onPress={() => {
                     setSelectedAddress(addr);
                     setSessionAddress(addr); // Sync with context for other screens
@@ -606,13 +619,13 @@ export const HomeScreen = ({ navigation }: any) => {
                   <Icon 
                     name={addr.label.toLowerCase().includes('home') ? 'home-outline' : addr.label.toLowerCase().includes('work') ? 'briefcase-outline' : 'map-marker-outline'} 
                     size={20} 
-                    color={!sessionAddress && selectedAddress?.id === addr.id ? Colors.primary : Colors.textSecondary} 
+                    color={sessionAddress?.id === addr.id ? Colors.primary : Colors.textSecondary} 
                   />
                   <View style={styles.savedAddressInfo}>
                     <Text style={styles.savedAddressLabel}>{addr.label}</Text>
                     <Text style={styles.savedAddressText} numberOfLines={1}>{addr.address_line}</Text>
                   </View>
-                  {!sessionAddress && selectedAddress?.id === addr.id && (
+                  {sessionAddress?.id === addr.id && (
                     <Icon name="check-circle" size={20} color={Colors.primary} />
                   )}
                 </TouchableOpacity>
