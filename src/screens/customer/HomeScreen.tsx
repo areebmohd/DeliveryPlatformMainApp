@@ -194,7 +194,8 @@ export const HomeScreen = ({ navigation }: any) => {
       const { data, error } = await supabase
         .from('stores_view')
         .select('*')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_approved', true);
 
       if (error) throw error;
       setStores(data || []);
@@ -212,6 +213,7 @@ export const HomeScreen = ({ navigation }: any) => {
         .from('products')
         .select('*, stores:stores_view!inner(*)')
         .eq('stores.is_active', true)
+        .eq('stores.is_approved', true)
         .eq('is_deleted', false)
         .eq('is_info_complete', true)
         .eq('in_stock', true)
@@ -233,6 +235,7 @@ export const HomeScreen = ({ navigation }: any) => {
         .from('products')
         .select('*, stores:stores_view!inner(*)')
         .eq('stores.is_active', true)
+        .eq('stores.is_approved', true)
         .eq('is_deleted', false)
         .eq('is_info_complete', true)
         .eq('in_stock', true)

@@ -44,7 +44,7 @@ import { useBusinessStore } from '../../context/BusinessStoreContext';
 
 export const StoreScreen = ({ navigation }: any) => {
   const { user, profile } = useAuth();
-  const { activeStore: store, loading: storeLoading } = useBusinessStore();
+  const { activeStore: store, loading: storeLoading, refreshStores, setActiveStore: setStore } = useBusinessStore();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('products');
   const insets = useSafeAreaInsets();
@@ -57,6 +57,7 @@ export const StoreScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
+      refreshStores();
       fetchProducts();
     });
     return unsubscribe;
@@ -92,7 +93,15 @@ export const StoreScreen = ({ navigation }: any) => {
   }, [store?.id, activeTab]);
 
   const onRefresh = async () => {
-    await fetchProducts();
+    try {
+      setLoading(true);
+      await Promise.all([
+        refreshStores(),
+        fetchProducts()
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleToggleAvailability = async () => {
@@ -626,20 +635,36 @@ export const StoreScreen = ({ navigation }: any) => {
                     <View style={styles.infoSection}>
                       <Text style={styles.infoLabel}>Social Media</Text>
                       {store?.instagram_url && (
-                        <View style={styles.hoursRow}>
+                        <TouchableOpacity 
+                          style={styles.hoursRow}
+                          onPress={() => {
+                            const url = store.instagram_url.startsWith('http') 
+                              ? store.instagram_url 
+                              : `https://${store.instagram_url}`;
+                            Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+                          }}
+                        >
                           <Icon name="instagram" size={18} color="#E4405F" />
-                          <Text style={styles.infoValue}>
-                            {store.instagram_url}
+                          <Text style={[styles.infoValue, { color: Colors.primary, textDecorationLine: 'underline' }]}>
+                            Instagram
                           </Text>
-                        </View>
+                        </TouchableOpacity>
                       )}
                       {store?.facebook_url && (
-                        <View style={[styles.hoursRow, { marginTop: 8 }]}>
+                        <TouchableOpacity 
+                          style={[styles.hoursRow, { marginTop: 8 }]}
+                          onPress={() => {
+                            const url = store.facebook_url.startsWith('http') 
+                              ? store.facebook_url 
+                              : `https://${store.facebook_url}`;
+                            Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+                          }}
+                        >
                           <Icon name="facebook" size={18} color="#1877F2" />
-                          <Text style={styles.infoValue}>
-                            {store.facebook_url}
+                          <Text style={[styles.infoValue, { color: Colors.primary, textDecorationLine: 'underline' }]}>
+                            Facebook
                           </Text>
-                        </View>
+                        </TouchableOpacity>
                       )}
                     </View>
                   </>

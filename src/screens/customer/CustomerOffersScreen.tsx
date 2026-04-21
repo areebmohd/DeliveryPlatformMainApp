@@ -133,9 +133,11 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
         .from('offers')
         .select(`
           *,
-          store:stores(*)
+          store:stores_view!inner(*)
         `)
         .eq('status', 'active')
+        .eq('store.is_approved', true)
+        .eq('store.is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -890,7 +892,8 @@ const styles = StyleSheet.create({
   },
   offerTabDesc: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    fontWeight: '600',
+    color: Colors.primary,
     marginBottom: 8,
     lineHeight: 20,
   },
@@ -978,9 +981,10 @@ const styles = StyleSheet.create({
   },
   modalDesc: {
     fontSize: 14,
-    color: Colors.textSecondary,
-    lineHeight: 20,
+    fontWeight: '600',
+    color: Colors.primary,
     marginBottom: 24,
+    lineHeight: 20,
   },
   modalSection: {
     backgroundColor: '#F8FAFC',

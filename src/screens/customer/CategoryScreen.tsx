@@ -54,6 +54,7 @@ export const CategoryScreen = ({ navigation, route }: any) => {
         .select('*, stores:stores_view!inner(*)')
         .ilike('category', `%${categoryName}%`)
         .eq('stores.is_active', true)
+        .eq('stores.is_approved', true)
         .eq('is_deleted', false)
         .eq('is_info_complete', true)
         .eq('in_stock', true);
@@ -63,7 +64,8 @@ export const CategoryScreen = ({ navigation, route }: any) => {
         .from('stores_view')
         .select('*')
         .ilike('category', `%${categoryName}%`)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_approved', true);
 
       if (productError) throw productError;
       if (storeError) throw storeError;

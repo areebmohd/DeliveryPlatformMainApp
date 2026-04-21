@@ -122,7 +122,7 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
@@ -139,24 +139,40 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
           <View style={styles.mapWrapper}>
             <MapView 
               style={StyleSheet.absoluteFillObject}
-              key={location ? `${location.latitude}-${location.longitude}` : 'no-location'}
+              onCameraChanged={(e: any) => {
+                // Mappls v2 / Mapbox based structure
+                const center = e.geometry?.coordinates || e.properties?.center || e.nativeEvent?.payload?.center;
+                if (center && Array.isArray(center)) {
+                  setLocation({
+                    latitude: center[1],
+                    longitude: center[0]
+                  });
+                }
+              }}
+              onRegionDidChange={(e: any) => {
+                // Fallback for some versions
+                const center = e.geometry?.coordinates || e.properties?.center || e.nativeEvent?.payload?.center;
+                if (center && Array.isArray(center)) {
+                  setLocation({
+                    latitude: center[1],
+                    longitude: center[0]
+                  });
+                }
+              }}
             >
               <Camera 
                 centerCoordinate={location ? [location.longitude, location.latitude] : [77.2090, 28.6139]}
                 zoomLevel={16}
               />
-              {location && (
-                <PointAnnotation
-                  id="currentLocation"
-                  coordinate={[location.longitude, location.latitude]}
-                >
-                  <View style={styles.markerContainer}>
-                    <View style={styles.pulse} />
-                    <Icon name="map-marker" size={42} color={Colors.primary} />
-                  </View>
-                </PointAnnotation>
-              )}
             </MapView>
+
+            {/* Static Center Marker Overlay */}
+            <View style={styles.centerMarkerOverlay} pointerEvents="none">
+              <View style={styles.markerContainer}>
+                <View style={styles.pulse} />
+                <Icon name="map-marker" size={42} color={Colors.primary} />
+              </View>
+            </View>
 
             {/* Repositioned Overlays */}
             <View style={styles.pinNotification}>
@@ -248,10 +264,18 @@ const styles = StyleSheet.create({
   },
   mapWrapper: {
     flex: 1,
+    position: 'relative',
+  },
+  centerMarkerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   markerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: -21, // Shift up so the tip (bottom) of the marker is at the center
   },
   marker: {
     width: 50,

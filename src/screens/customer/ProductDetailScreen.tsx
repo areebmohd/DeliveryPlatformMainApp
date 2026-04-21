@@ -59,6 +59,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           .from('stores')
           .select('*')
           .eq('id', product.store_id)
+          .eq('is_approved', true)
           .single();
         if (!stErr) setCurrentStore(st);
       }

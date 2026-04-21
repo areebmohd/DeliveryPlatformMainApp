@@ -27,11 +27,13 @@ import { MapPickerView } from '../../components/address/MapPickerView';
 import { useAlert } from '../../context/AlertContext';
 import { TimeSlotPicker } from '../../components/ui/TimeSlotPicker';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
+import { useBusinessStore } from '../../context/BusinessStoreContext';
 
 const { width } = Dimensions.get('window');
 
 export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const { user } = useAuth();
+  const { refreshStores } = useBusinessStore();
   const [store, setStore] = useState<any>(route.params?.store || route.params?.selectedLocation?.preservedFormData?.store || null);
   const insets = useSafeAreaInsets();
 
@@ -335,6 +337,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         : 'Store profile updated successfully!';
 
       showToast(successMsg, 'success');
+      await refreshStores();
       navigation.navigate('StoreDashboard');
     } catch (e: any) {
       showAlert({ title: 'Error', message: e.message, type: 'error' });
