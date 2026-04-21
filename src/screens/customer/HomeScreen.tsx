@@ -27,6 +27,7 @@ import { supabase } from '../../api/supabase';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
+import { deduplicateProducts, parseWKT } from '../../utils/productUtils';
 
 const CATEGORIES = PRODUCT_CATEGORIES;
 
@@ -139,10 +140,11 @@ export const HomeScreen = ({ navigation }: any) => {
 
   const checkNotifications = async () => {
     try {
+      if (!user) return;
       const { data, error } = await supabase
         .from('notifications')
         .select('created_at')
-        .eq('target_group', 'customer')
+        .or(`user_id.eq.${user.id},target_group.eq.customer`)
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -167,7 +169,7 @@ export const HomeScreen = ({ navigation }: any) => {
     try {
       if (!user?.id) return;
       const { data, error } = await supabase
-        .from('addresses')
+        .from('addresses_view')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_deleted', false)
@@ -180,6 +182,9 @@ export const HomeScreen = ({ navigation }: any) => {
       if (data && data.length > 0) {
         const defaultAddr = data.find((a: any) => a.is_default) || data[0];
         setSelectedAddress(defaultAddr);
+        if (!sessionAddress) {
+          setSessionAddress(defaultAddr); // Set default if none active
+        }
       } else {
         setSelectedAddress(null);
       }
@@ -220,7 +225,8 @@ export const HomeScreen = ({ navigation }: any) => {
         .limit(10);
 
       if (error) throw error;
-      setBestSellers(data || []);
+      const userCoords = sessionAddress ? parseWKT(sessionAddress.location) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
+      setBestSellers(deduplicateProducts(data || [], userCoords));
     } catch (e) {
       // Silent in production
     } finally {
@@ -243,7 +249,8 @@ export const HomeScreen = ({ navigation }: any) => {
         .limit(12);
 
       if (error) throw error;
-      setSuggestions(data || []);
+      const userCoords = sessionAddress ? parseWKT(sessionAddress.location) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
+      setSuggestions(deduplicateProducts(data || [], userCoords));
     } catch (e) {
       // Silent in production
     } finally {
@@ -592,7 +599,7 @@ export const HomeScreen = ({ navigation }: any) => {
                   style={[styles.savedAddressItem, !sessionAddress && selectedAddress?.id === addr.id && styles.selectedAddressItem]}
                   onPress={() => {
                     setSelectedAddress(addr);
-                    setSessionAddress(null); // Clear session address if saved one is selected
+                    setSessionAddress(addr); // Sync with context for other screens
                     setAddressModalVisible(false);
                   }}
                 >

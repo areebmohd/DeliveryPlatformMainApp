@@ -148,18 +148,38 @@ export const LoginScreen = ({ navigation }: any) => {
       const { data, error } = await supabase.auth.signInWithIdToken({
         provider: 'google',
         token: idToken,
+        options: {
+          data: {
+            role: role,
+            full_name: userInfo.data?.user?.name || 'New User'
+          }
+        }
       });
 
       if (error) throw error;
       
-      // Update metadata so the DB trigger knows the role
+      // Update metadata and profile to be absolutely sure everything is in sync
       if (data.user) {
+        // Update Auth Metadata
         await supabase.auth.updateUser({
           data: { 
             role: role,
             full_name: userInfo.data?.user?.name || 'New User'
           }
         });
+
+        // Explicitly update public.profiles to fix any race condition with the trigger
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ 
+            role: role,
+            full_name: userInfo.data?.user?.name || 'New User'
+          })
+          .eq('id', data.user.id);
+        
+        if (profileError) {
+          console.error('Error syncing profile role:', profileError);
+        }
       }
       
     } catch (e: any) {

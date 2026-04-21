@@ -18,6 +18,7 @@ import { StoreCard } from '../../components/StoreCard';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
 import { useCart } from '../../context/CartContext';
+import { deduplicateProducts, parseWKT } from '../../utils/productUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -30,7 +31,7 @@ export const SearchScreen = ({ navigation, route }: any) => {
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const insets = useSafeAreaInsets();
   const searchInputRef = useRef<TextInput>(null);
-  const { addItem, updateQuantity, items } = useCart();
+  const { addItem, updateQuantity, items, sessionAddress } = useCart();
 
   const getQuantity = useCallback((productId: string) => {
     const item = items.find(i => i.id === productId);
@@ -100,7 +101,8 @@ export const SearchScreen = ({ navigation, route }: any) => {
       if (productError) throw productError;
       if (storeError) throw storeError;
 
-      setProducts(productData || []);
+      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
+      setProducts(deduplicateProducts(productData || [], userCoords));
       setStores(storeData || []);
     } catch (e) {
       // Search error logged silently

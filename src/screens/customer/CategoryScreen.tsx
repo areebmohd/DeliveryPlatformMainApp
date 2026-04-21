@@ -16,6 +16,7 @@ import { StoreCard } from '../../components/StoreCard';
 import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
 import { useCart } from '../../context/CartContext';
+import { deduplicateProducts, parseWKT } from '../../utils/productUtils';
 
 export const CategoryScreen = ({ navigation, route }: any) => {
   const { categoryName } = route.params;
@@ -25,7 +26,7 @@ export const CategoryScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(true);
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const insets = useSafeAreaInsets();
-  const { addItem, updateQuantity, items } = useCart();
+  const { addItem, updateQuantity, items, sessionAddress } = useCart();
 
   const getQuantity = useCallback((productId: string) => {
     const item = items.find(i => i.id === productId);
@@ -70,7 +71,8 @@ export const CategoryScreen = ({ navigation, route }: any) => {
       if (productError) throw productError;
       if (storeError) throw storeError;
 
-      setProducts(productData || []);
+      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
+      setProducts(deduplicateProducts(productData || [], userCoords));
       setStores(storeData || []);
     } catch (e) {
       // Error handled silently

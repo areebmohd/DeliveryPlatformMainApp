@@ -23,6 +23,7 @@ import { StoreCard } from '../../components/StoreCard';
 import { Button } from '../../components/ui/Button';
 import { useAlert } from '../../context/AlertContext';
 import { getOfferDescription, getOfferConditionList, validateOffer, getTheme } from '../../utils/offerUtils';
+import { deduplicateProducts, parseWKT } from '../../utils/productUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -40,7 +41,7 @@ export const FavouritesScreen = ({ navigation }: any) => {
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
-  const { addItem, updateQuantity, items, setAppliedOffers, appliedOffers } = useCart();
+  const { addItem, updateQuantity, items, setAppliedOffers, appliedOffers, sessionAddress } = useCart();
   const { showAlert } = useAlert();
 
   useEffect(() => {
@@ -87,9 +88,13 @@ export const FavouritesScreen = ({ navigation }: any) => {
             description,
             weight_kg,
             store_id,
-            stores (
+            barcode,
+            product_type,
+            options,
+            stores:stores_view (
               id,
-              name
+              name,
+              location_wkt
             )
           )
         `)
@@ -98,7 +103,9 @@ export const FavouritesScreen = ({ navigation }: any) => {
         .eq('products.is_info_complete', true);
 
       if (productsError) throw productsError;
-      setFavProducts(productsData?.map(item => ({ ...item.products, stores: (item.products as any).stores })) || []);
+      const rawProducts = productsData?.map(item => ({ ...item.products, stores: (item.products as any).stores })) || [];
+      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
+      setFavProducts(deduplicateProducts(rawProducts, userCoords));
 
       // Fetch favourite offers
       const { data: offersData, error: offersError } = await supabase

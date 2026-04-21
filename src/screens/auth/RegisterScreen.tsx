@@ -188,15 +188,38 @@ export const RegisterScreen = ({ navigation }: any) => {
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'google',
           token: userInfo.data.idToken,
+          options: {
+            data: {
+              role: role,
+              full_name: userInfo.data?.user?.name || 'New User'
+            }
+          }
         });
 
         if (error) throw error;
         
         // If login is successful, we should ensure the role is set
         if (data.user) {
+          // Update Auth Metadata
           await supabase.auth.updateUser({
-            data: { role: role }
+            data: { 
+              role: role,
+              full_name: userInfo.data?.user?.name || 'New User'
+            }
           });
+
+          // Explicitly update public.profiles to fix any race condition with the trigger
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ 
+              role: role,
+              full_name: userInfo.data?.user?.name || 'New User'
+            })
+            .eq('id', data.user.id);
+          
+          if (profileError) {
+            console.error('Error syncing profile role:', profileError);
+          }
         }
       } else {
         throw new Error('No ID token present!');

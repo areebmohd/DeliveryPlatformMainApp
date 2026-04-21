@@ -13,24 +13,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import { supabase } from '../../api/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export const NotificationsScreen = ({ navigation }: any) => {
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    if (user) {
+      fetchNotifications();
+    }
+  }, [user]);
 
   const fetchNotifications = async () => {
     try {
+      if (!user) return;
       setLoading(true);
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('target_group', 'customer')
+        .or(`user_id.eq.${user.id},target_group.eq.customer`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
