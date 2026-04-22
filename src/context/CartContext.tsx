@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAlert } from './AlertContext';
+import { useAuth } from './AuthContext';
 
 const STORAGE_KEYS = {
   CART_ITEMS: '@cart_items',
@@ -65,6 +66,7 @@ interface CartContextType {
   setSessionAddress: (address: any | null) => void;
   appliedOffers: Record<string, Offer>;
   setAppliedOffers: (offers: Record<string, Offer>) => void;
+  clearSessionAddress: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -75,6 +77,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [appliedOffers, setAppliedOffers] = useState<Record<string, Offer>>({});
   const [isLoaded, setIsLoaded] = useState(false);
   const { showAlert } = useAlert();
+  const { user } = useAuth();
+
+  // Clear data on logout
+  useEffect(() => {
+    if (isLoaded && !user) {
+      clearCart();
+      setSessionAddress(null);
+    }
+  }, [user, isLoaded]);
 
   // Load cart data from storage on mount
   useEffect(() => {
@@ -171,6 +182,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // 3. Normal Add Logic (Differentiate by ID + Selected Options)
       const existingIdx = prev.findIndex(item => 
         item.id === product.id && 
+        item.store_id === store.id &&
         JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions)
       );
 
@@ -207,10 +219,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setItems(prev => prev.filter(item => item.id !== productId));
   };
 
-  const updateQuantity = (productId: string, delta: number, selectedOptions?: Record<string, string>) => {
+  const updateQuantity = (productId: string, delta: number, selectedOptions?: Record<string, string>, storeId?: string) => {
     setItems(prev => {
       return prev.map(item => {
         const isMatch = item.id === productId && 
+          (!storeId || item.store_id === storeId) &&
           (!selectedOptions || JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions));
         
         if (isMatch) {
@@ -225,13 +238,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearCart = async () => {
     setItems([]);
     setAppliedOffers({});
-    // We don't necessarily clear the session address here 
-    // but the cart items are the most critical.
     try {
       await AsyncStorage.removeItem(STORAGE_KEYS.CART_ITEMS);
       await AsyncStorage.removeItem(STORAGE_KEYS.CART_OFFERS);
     } catch (e) {
       console.error('Error clearing cart storage:', e);
+    }
+  };
+
+  const clearSessionAddress = async () => {
+    setSessionAddress(null);
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEYS.CART_ADDRESS);
+    } catch (e) {
+      console.error('Error clearing address storage:', e);
     }
   };
 
@@ -250,7 +270,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       sessionAddress,
       setSessionAddress,
       appliedOffers,
-      setAppliedOffers
+      setAppliedOffers,
+      clearSessionAddress
     }}>
       {children}
     </CartContext.Provider>

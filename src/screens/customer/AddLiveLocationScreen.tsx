@@ -102,9 +102,9 @@ export const AddLiveLocationScreen = ({ navigation }: any) => {
       // Store in session instead of database
       setSessionAddress({
         address_line: 'Live GPS Location',
-        city: 'Live Location Area',
-        state: 'Haryana',
-        pincode: '',
+        city: 'null',
+        state: 'null',
+        pincode: 'null',
         location: `SRID=4326;POINT(${location.longitude} ${location.latitude})`,
         label: `${profile?.full_name || 'My'}'s Live Location`
       });

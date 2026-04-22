@@ -222,11 +222,11 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   };
 
   const getQuantity = (productId: string) => {
-    const item = items.find(i => i.id === productId);
+    const item = items.find(i => i.id === productId && i.store_id === store.id);
     return item ? item.quantity : 0;
   };
 
-  const handleContact = (type: string, value: string) => {
+  const handleContact = async (type: string, value: string) => {
     let url = '';
     switch (type) {
       case 'tel':
@@ -246,17 +246,27 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
     }
     
     if (url) {
-      Linking.canOpenURL(url).then(supported => {
-        if (supported) {
-          Linking.openURL(url);
-        } else {
-          console.warn('Cannot open URL:', url);
-          // Fallback for WhatsApp if the protocol isn't supported (e.g. web fallback)
-          if (type === 'whatsapp') {
-             Linking.openURL(`https://wa.me/${value.replace(/\D/g, '')}`);
+      try {
+        if (type === 'whatsapp') {
+          // Special handling for WhatsApp to ensure it falls back to web if app is not installed
+          const canOpen = await Linking.canOpenURL(url);
+          if (canOpen) {
+            await Linking.openURL(url);
+          } else {
+            await Linking.openURL(`https://wa.me/${value.replace(/\D/g, '')}`);
           }
+        } else {
+          // For other links, just try to open them directly
+          await Linking.openURL(url);
         }
-      });
+      } catch (error) {
+        console.warn('Error opening URL:', url, error);
+        showAlert({
+          title: 'Cannot Open Link',
+          message: 'This link could not be opened on your device.',
+          type: 'error'
+        });
+      }
     }
   };
 
@@ -430,16 +440,16 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
               ) : products.length > 0 ? (
               <View style={styles.productsGrid}>
                 {products.map((product) => (
-                  <CustomerProductCard
-                    key={product.id}
-                    product={product}
-                    onAdd={() => handleAddToCart(product)}
-                    quantity={getQuantity(product.id)}
-                    onIncrease={() => updateQuantity(product.id, 1)}
-                    onDecrease={() => updateQuantity(product.id, -1)}
-                    onPress={() => navigation.navigate('ProductDetail', { product, store })}
-                    width="48.5%"
-                  />
+                    <CustomerProductCard
+                      key={product.id}
+                      product={product}
+                      onAdd={() => handleAddToCart(product)}
+                      quantity={getQuantity(product.id)}
+                      onIncrease={() => updateQuantity(product.id, 1, undefined, store.id)}
+                      onDecrease={() => updateQuantity(product.id, -1, undefined, store.id)}
+                      onPress={() => navigation.navigate('ProductDetail', { product, store })}
+                      width="48.5%"
+                    />
                 ))}
               </View>
               ) : (

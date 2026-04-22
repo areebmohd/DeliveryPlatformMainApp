@@ -120,6 +120,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
   const cartItem = items.find(item => 
     item.id === product.id && 
+    item.store_id === (currentStore?.id || store?.id) &&
     JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions)
   );
   const quantity = cartItem ? cartItem.quantity : 0;
@@ -302,14 +303,14 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.cartControls}>
             <TouchableOpacity 
               style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product.id, -1, selectedOptions)}
+              onPress={() => updateQuantity(product.id, -1, selectedOptions, currentStore?.id || store?.id)}
             >
               <Icon name="minus" size={20} color={Colors.white} />
             </TouchableOpacity>
             <Text style={styles.quantityText}>{quantity}</Text>
             <TouchableOpacity 
               style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product.id, 1, selectedOptions)}
+              onPress={() => updateQuantity(product.id, 1, selectedOptions, currentStore?.id || store?.id)}
             >
               <Icon name="plus" size={20} color={Colors.white} />
             </TouchableOpacity>

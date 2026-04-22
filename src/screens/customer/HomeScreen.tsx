@@ -28,6 +28,7 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
+import Geolocation from '@react-native-community/geolocation';
 import { deduplicateProducts, parseWKT } from '../../utils/productUtils';
 
 const CATEGORIES = PRODUCT_CATEGORIES;
@@ -48,6 +49,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const [homeBanners, setHomeBanners] = useState<any[]>([]);
   const [categoryImages, setCategoryImages] = useState<{ [key: string]: string }>({});
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
+  const [isGPSEnabled, setIsGPSEnabled] = useState(true);
   const { addItem, items, updateQuantity, sessionAddress, setSessionAddress } = useCart();
   const { user } = useAuth();
   const { showAlert } = useAlert();
@@ -74,8 +76,8 @@ export const HomeScreen = ({ navigation }: any) => {
     ).start();
   }, [glowAnim]);
 
-  const getQuantity = useCallback((productId: string) => {
-    const item = items.find(i => i.id === productId);
+  const getQuantity = useCallback((productId: string, storeId: string) => {
+    const item = items.find(i => i.id === productId && i.store_id === storeId);
     return item ? item.quantity : 0;
   }, [items]);
 
@@ -121,6 +123,38 @@ export const HomeScreen = ({ navigation }: any) => {
 
     return unsubscribe;
   }, [user, navigation]);
+
+  // Check GPS status when using live location
+  useEffect(() => {
+    let interval: any;
+    
+    const checkGPS = () => {
+      if (sessionAddress && !sessionAddress.id) {
+        Geolocation.getCurrentPosition(
+          () => setIsGPSEnabled(true),
+          (error) => {
+            if (error.code === 2 || error.code === 1) { // 2: Location provider not available, 1: Permission denied
+              setIsGPSEnabled(false);
+            }
+          },
+          { enableHighAccuracy: false, timeout: 5000, maximumAge: 10000 }
+        );
+      } else {
+        setIsGPSEnabled(true);
+      }
+    };
+
+    if (sessionAddress && !sessionAddress.id) {
+      checkGPS();
+      interval = setInterval(checkGPS, 10000); // Check every 10 seconds
+    } else {
+      setIsGPSEnabled(true);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [sessionAddress]);
 
   useEffect(() => {
     if (homeBanners.length > 1) {
@@ -340,9 +374,9 @@ export const HomeScreen = ({ navigation }: any) => {
         product={item}
         onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
         onAdd={() => handleAddToCart(item, item.stores)}
-        quantity={getQuantity(item.id)}
-        onIncrease={() => updateQuantity(item.id, 1)}
-        onDecrease={() => updateQuantity(item.id, -1)}
+        quantity={getQuantity(item.id, item.store_id)}
+        onIncrease={() => updateQuantity(item.id, 1, undefined, item.store_id)}
+        onDecrease={() => updateQuantity(item.id, -1, undefined, item.store_id)}
         width={140}
       />
     </View>
@@ -354,9 +388,9 @@ export const HomeScreen = ({ navigation }: any) => {
       product={item}
       onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
       onAdd={() => handleAddToCart(item, item.stores)}
-      quantity={getQuantity(item.id)}
-      onIncrease={() => updateQuantity(item.id, 1)}
-      onDecrease={() => updateQuantity(item.id, -1)}
+      quantity={getQuantity(item.id, item.store_id)}
+      onIncrease={() => updateQuantity(item.id, 1, undefined, item.store_id)}
+      onDecrease={() => updateQuantity(item.id, -1, undefined, item.store_id)}
       width={(width - Spacing.md * 2 - 20) / 3 - 2}
     />
   ), [navigation, handleAddToCart, getQuantity, updateQuantity]);
@@ -386,6 +420,9 @@ export const HomeScreen = ({ navigation }: any) => {
             <Text style={styles.locationTitle} numberOfLines={1}>
               {sessionAddress 
                 ? (() => {
+                    if (!sessionAddress.id && sessionAddress.label) {
+                      return isGPSEnabled ? sessionAddress.label : "GPS Disabled";
+                    }
                     const fullAddress = `${sessionAddress.address_line}${sessionAddress.city ? `, ${sessionAddress.city}` : ''}`;
                     return fullAddress.length > 25 ? `${fullAddress.substring(0, 30)}...` : fullAddress;
                   })()
