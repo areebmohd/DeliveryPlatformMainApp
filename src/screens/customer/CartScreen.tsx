@@ -28,7 +28,7 @@ import { notificationService } from '../../utils/notificationService';
 const { width, height } = Dimensions.get('window');
 
 export const CartScreen = ({ navigation }: any) => {
-  const { items, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress, appliedOffers, setAppliedOffers } = useCart();
+  const { items, setItems, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress, appliedOffers, setAppliedOffers } = useCart();
   const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -59,7 +59,7 @@ export const CartScreen = ({ navigation }: any) => {
   const [manuallyRemovedStores, setManuallyRemovedStores] = useState<string[]>([]);
   const [storeDeliveryFees, setStoreDeliveryFees] = useState<Record<string, number>>({});
   const [totalStoreFees, setTotalStoreFees] = useState(0);
-  const [offerProductNames, setOfferProductNames] = useState<Record<string, string>>({});
+  const [offerProductDetails, setOfferProductDetails] = useState<Record<string, any>>({});
   const [isGPSEnabled, setIsGPSEnabled] = useState(true);
 
   // Background fetch for reward product details (if missing)
@@ -106,6 +106,48 @@ export const CartScreen = ({ navigation }: any) => {
 
     fetchRewardDetails();
   }, [appliedOffers, setAppliedOffers]);
+
+  // Fetch product details for all applied offers (for identity matching)
+  useEffect(() => {
+    const fetchAllOfferProductDetails = async () => {
+      const productIds = new Set<string>();
+      
+      // Collect IDs from applied offers
+      Object.values(appliedOffers).forEach((o: any) => {
+        if (o.conditions?.product_ids) {
+          o.conditions.product_ids.forEach((id: string) => productIds.add(id));
+        }
+        if (o.reward_data?.product_ids) {
+          o.reward_data.product_ids.forEach((id: string) => productIds.add(id));
+        }
+      });
+
+      if (productIds.size > 0) {
+        try {
+          const { data: pData, error: pError } = await supabase
+            .from('products')
+            .select('id, name, price, weight_kg, barcode, product_type')
+            .in('id', Array.from(productIds));
+          
+          if (!pError && pData) {
+            setOfferProductDetails(prev => {
+              const mapping = { ...prev };
+              pData.forEach(p => {
+                mapping[p.id] = p;
+              });
+              return mapping;
+            });
+          }
+        } catch (e) {
+          console.error('Error fetching applied offer product details:', e);
+        }
+      }
+    };
+
+    if (Object.keys(appliedOffers).length > 0) {
+      fetchAllOfferProductDetails();
+    }
+  }, [appliedOffers]);
 
   // Check GPS status when using live location
   useEffect(() => {
@@ -212,15 +254,15 @@ export const CartScreen = ({ navigation }: any) => {
       if (productIds.size > 0) {
         const { data: pData, error: pError } = await supabase
           .from('products')
-          .select('id, name')
+          .select('id, name, price, weight_kg, barcode, product_type')
           .in('id', Array.from(productIds));
         
         if (!pError && pData) {
-          const mapping = { ...offerProductNames };
+          const mapping = { ...offerProductDetails };
           pData.forEach(p => {
-            mapping[p.id] = p.name;
+            mapping[p.id] = p;
           });
-          setOfferProductNames(mapping);
+          setOfferProductDetails(mapping);
         }
       }
     } catch (e) {
@@ -229,7 +271,7 @@ export const CartScreen = ({ navigation }: any) => {
     } finally {
       setModalLoading(false);
     }
-  }, [offerProductNames, showAlert]);
+  }, [offerProductDetails, showAlert]);
 
   const navigateToStore = useCallback(async (storeId: string) => {
     try {
@@ -256,9 +298,33 @@ export const CartScreen = ({ navigation }: any) => {
     const { conditions } = offer;
     const errors: string[] = [];
 
-    // Store specific subtotal check
-    const storeItems = items.filter(i => i.store_id === offer.store_id);
-    const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+    // Identity-aware items for this store
+    // We count items that are ALREADY in this store OR are equivalent fluid items
+    const equivalentStoreItems = items.map(cartItem => {
+      // If exact store match, keep as is
+      if (cartItem.store_id === offer.store_id) return cartItem;
+      
+      // If fluid, check if it's equivalent to any product that Store A could provide
+      // For now, we'll just check if it's fluid (is_store_specific = false)
+      // and if we apply the offer, it WOULD become a Store A item.
+      if (!cartItem.is_store_specific) return cartItem;
+      
+      return null;
+    }).filter(Boolean) as any[];
+
+    const storeSubtotal = equivalentStoreItems.reduce((sum, i) => {
+      // Use the price from the offer store if we have it (identity-aware)
+      let priceToUse = i.price;
+      const productIds = offer.conditions?.product_ids || offer.reward_data?.product_ids || [];
+      const matchingDetail = Object.values(offerProductDetails).find(op => {
+        if (op.product_type === 'barcode' && op.barcode && i.barcode === op.barcode) return true;
+        return op.name === i.name && op.weight_kg === i.weight_kg;
+      });
+      if (matchingDetail) {
+        priceToUse = matchingDetail.price;
+      }
+      return sum + (priceToUse * i.quantity);
+    }, 0);
 
     if (conditions.min_price && storeSubtotal < conditions.min_price) {
       errors.push(`Minimum order ₹${conditions.min_price} required from ${offer.store_name || 'this store'}. (Current subtotal: ₹${storeSubtotal.toFixed(2)})`);
@@ -296,11 +362,29 @@ export const CartScreen = ({ navigation }: any) => {
     }
 
     if (conditions.product_ids && conditions.product_ids.length > 0) {
-      const missingIds = conditions.product_ids.filter((pid: string) => 
-        !items.some(item => item.id === pid)
-      );
+      const missingIds = conditions.product_ids.filter((pid: string) => {
+        const requiredProduct = offerProductDetails[pid];
+        if (!requiredProduct) return !items.some(item => item.id === pid); // Fallback to exact ID
+
+        // Identity check against cart items
+        return !items.some(item => {
+          // Exact ID
+          if (item.id === pid) return true;
+          
+          // Fluid identity match
+          if (item.is_store_specific || item.product_type === 'personal') return false;
+          
+          if (requiredProduct.product_type === 'barcode' && requiredProduct.barcode && item.barcode === requiredProduct.barcode) {
+            return true;
+          }
+
+          return item.name === requiredProduct.name && 
+                 item.weight_kg === requiredProduct.weight_kg;
+        });
+      });
+
       if (missingIds.length > 0) {
-        const missingNames = missingIds.map((id: string) => offerProductNames[id] || 'Unknown Product').join(', ');
+        const missingNames = missingIds.map((id: string) => offerProductDetails[id]?.name || 'Unknown Product').join(', ');
         errors.push(`Required products missing from cart: ${missingNames}`);
       }
     }
@@ -315,7 +399,7 @@ export const CartScreen = ({ navigation }: any) => {
     }
 
     return errors;
-  }, [items, profile, offerProductNames]);
+  }, [items, profile, offerProductDetails]);
 
   const autoApplyBestOffer = async () => {
     if (isAutoApplyInProgress || items.length === 0) return;
@@ -345,6 +429,30 @@ export const CartScreen = ({ navigation }: any) => {
 
         if (error || !data || data.length === 0) continue;
 
+        // Pre-fetch product details for all potential offers to support identity matching
+        const allProductIds = new Set<string>();
+        data.forEach(o => {
+          if (o.conditions?.product_ids) o.conditions.product_ids.forEach((id: string) => allProductIds.add(id));
+          if (o.reward_data?.product_ids) o.reward_data.product_ids.forEach((id: string) => allProductIds.add(id));
+        });
+
+        if (allProductIds.size > 0) {
+          const { data: pData } = await supabase
+            .from('products')
+            .select('id, name, price, weight_kg, barcode, product_type')
+            .in('id', Array.from(allProductIds));
+          
+          if (pData) {
+            setOfferProductDetails(prev => {
+              const mapping = { ...prev };
+              pData.forEach(p => {
+                mapping[p.id] = p;
+              });
+              return mapping;
+            });
+          }
+        }
+
         const validOffers = data.filter(o => {
           const formattedOffer = {
             ...o,
@@ -363,7 +471,7 @@ export const CartScreen = ({ navigation }: any) => {
 
         // Separate and Rank
         const standardOffers = validOffers.filter(o => o.type !== 'free_delivery').sort((a, b) => {
-          const typeOrder = { free_cash: 0, discount: 1 };
+          const typeOrder = { free_cash: 0, discount: 1, cheap_product: 2, combo: 3, fixed_price: 4 };
           const aOrder = (typeOrder as any)[a.type] ?? 99;
           const bOrder = (typeOrder as any)[b.type] ?? 99;
           if (aOrder !== bOrder) return aOrder - bOrder;
@@ -424,6 +532,28 @@ export const CartScreen = ({ navigation }: any) => {
     }
 
     const offerKey = offer.type === 'free_delivery' ? `${offer.store_id}_delivery` : offer.store_id;
+    
+    // Identity-aware reassignment
+    // If user applies an offer from Store A, any fluid equivalent items in cart should switch to Store A
+    setItems(prev => prev.map(item => {
+      // If already this store, keep as is
+      if (item.store_id === offer.store_id) return item;
+      
+      // If store specific (e.g. user visited a specific store), don't switch it automatically?
+      if (item.is_store_specific) return item;
+
+      const storeCoords = getCoordinates(offer.store_location);
+
+      return {
+        ...item,
+        store_id: offer.store_id,
+        store_name: offer.store_name || item.store_name,
+        store_lat: storeCoords?.lat || item.store_lat,
+        store_lng: storeCoords?.lng || item.store_lng,
+        is_store_specific: true // Pin it to this store now that an offer is applied
+      };
+    }));
+
     setAppliedOffers({
       ...appliedOffers,
       [offerKey]: offer
@@ -607,13 +737,26 @@ export const CartScreen = ({ navigation }: any) => {
     Object.entries(newOffers).forEach(([offerKey, offer]) => {
       const storeId = offer.store_id;
       // 1. Min Price check (on store specific subtotal)
-      const storeItems = items.filter(i => i.store_id === storeId);
-      const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      const storeItems = items.filter(i => {
+        if (i.store_id === storeId) return true;
+        if (!i.is_store_specific) return true;
+        return false;
+      });
+
+      const storeSubtotal = storeItems.reduce((sum, i) => {
+        let priceToUse = i.price;
+        const matchingDetail = Object.values(offerProductDetails).find(op => {
+          if (op.product_type === 'barcode' && op.barcode && i.barcode === op.barcode) return true;
+          return op.name === i.name && op.weight_kg === i.weight_kg;
+        });
+        if (matchingDetail) priceToUse = matchingDetail.price;
+        return sum + (priceToUse * i.quantity);
+      }, 0);
 
       if (offer.conditions.min_price && storeSubtotal < offer.conditions.min_price) {
         delete newOffers[offerKey];
         changed = true;
-        showToast(`Offer for ${offer.store_name} removed: Subtotal too low.`, 'info');
+        showToast(`Offer for ${offer.store_name} removed: Subtotal (₹${storeSubtotal.toFixed(2)}) too low.`, 'info');
         return;
       }
 
@@ -626,9 +769,15 @@ export const CartScreen = ({ navigation }: any) => {
 
       // 3. Product check
       if (offer.conditions.product_ids && offer.conditions.product_ids.length > 0) {
-        const allPresent = offer.conditions.product_ids.every((pid: string) => 
-          items.some(item => item.id === pid)
-        );
+        const allPresent = offer.conditions.product_ids.every((pid: string) => {
+          const rp = offerProductDetails[pid];
+          return items.some(item => {
+            if (item.id === pid) return true;
+            if (item.is_store_specific || item.product_type === 'personal' || !rp) return false;
+            if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+            return item.name === rp.name && item.weight_kg === rp.weight_kg;
+          });
+        });
         if (!allPresent) {
           delete newOffers[offerKey];
           changed = true;
@@ -669,19 +818,59 @@ export const CartScreen = ({ navigation }: any) => {
     } else if (offer.type === 'free_cash') {
       offerDiscount = offer.amount;
     } else if (offer.type === 'discount') {
-      const storeItems = items.filter(i => i.store_id === offer.store_id);
-      const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      // Identity-aware subtotal for this store
+      const eligibleItems = items.filter(i => {
+        if (i.store_id === offer.store_id) return true;
+        if (!i.is_store_specific) return true; // Could be switched
+        return false;
+      });
+      const storeSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
       offerDiscount = (storeSubtotal * offer.amount) / 100;
     } else if (offer.type === 'cheap_product') {
-      const eligibleItems = items.filter(item => offer.conditions.product_ids?.includes(item.id));
+      const eligibleItems = items.filter(item => {
+        const productIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
+        if (productIds.includes(item.id)) return true;
+        
+        // Identity check
+        const hasEquivalent = productIds.some((pid: string) => {
+          const rp = offerProductDetails[pid];
+          if (!rp) return false;
+          if (item.is_store_specific || item.product_type === 'personal') return false;
+          if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+          return item.name === rp.name && item.weight_kg === rp.weight_kg;
+        });
+        return hasEquivalent;
+      });
       const eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
       offerDiscount = (eligibleSubtotal * offer.amount) / 100;
     } else if (offer.type === 'combo') {
-      const comboItems = items.filter(item => offer.reward_data?.product_ids?.includes(item.id));
+      const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
+      const comboItems = items.filter(item => {
+        if (rewardIds.includes(item.id)) return true;
+        const hasEquivalent = rewardIds.some((pid: string) => {
+          const rp = offerProductDetails[pid];
+          if (!rp) return false;
+          if (item.is_store_specific || item.product_type === 'personal') return false;
+          if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+          return item.name === rp.name && item.weight_kg === rp.weight_kg;
+        });
+        return hasEquivalent;
+      });
       const comboSubtotal = comboItems.reduce((sum, i) => sum + i.price, 0);
       offerDiscount = Math.max(0, comboSubtotal - offer.amount);
     } else if (offer.type === 'fixed_price') {
-      const eligibleItems = items.filter(item => offer.reward_data?.product_ids?.includes(item.id));
+      const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
+      const eligibleItems = items.filter(item => {
+        if (rewardIds.includes(item.id)) return true;
+        const hasEquivalent = rewardIds.some((pid: string) => {
+          const rp = offerProductDetails[pid];
+          if (!rp) return false;
+          if (item.is_store_specific || item.product_type === 'personal') return false;
+          if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+          return item.name === rp.name && item.weight_kg === rp.weight_kg;
+        });
+        return hasEquivalent;
+      });
       offerDiscount = eligibleItems.reduce((sum, item) => {
         const diff = item.price - offer.amount;
         return sum + (diff > 0 ? diff * item.quantity : 0);
@@ -997,27 +1186,59 @@ export const CartScreen = ({ navigation }: any) => {
                 let hasDiscount = false;
 
                 if (standardOffer && checkOfferConditions(standardOffer).length === 0) {
-                  const storeItems = items.filter(i => i.store_id === storeId);
-                  const storeSubtotal = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                  // Identity-aware subtotal for this store
+                  const eligibleStoreItems = items.filter(i => {
+                    if (i.store_id === storeId) return true;
+                    if (!i.is_store_specific) return true;
+                    return false;
+                  });
+                  const storeSubtotal = eligibleStoreItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
                   if (standardOffer.type === 'free_cash') {
-                    const discountPercent = standardOffer.amount / storeSubtotal;
+                    const discountPercent = standardOffer.amount / (storeSubtotal || 1);
                     discountedPrice = item.price * (1 - discountPercent);
                     hasDiscount = true;
                   } else if (standardOffer.type === 'discount') {
                     discountedPrice = item.price * (1 - standardOffer.amount / 100);
                     hasDiscount = true;
                   } else if (standardOffer.type === 'cheap_product') {
-                    if (standardOffer.conditions.product_ids?.includes(item.id)) {
+                    const productIds = [...(standardOffer.conditions?.product_ids || []), ...(standardOffer.reward_data?.product_ids || [])];
+                    const isEligible = productIds.some((pid: string) => {
+                      if (item.id === pid) return true;
+                      const rp = offerProductDetails[pid];
+                      if (!rp) return false;
+                      if (item.is_store_specific || item.product_type === 'personal') return false;
+                      if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+                      return item.name === rp.name && item.weight_kg === rp.weight_kg;
+                    });
+                    if (isEligible) {
                       discountedPrice = item.price * (1 - standardOffer.amount / 100);
                       hasDiscount = true;
                     }
                   } else if (standardOffer.type === 'combo') {
-                    if (standardOffer.reward_data?.product_ids?.includes(item.id)) {
+                    const productIds = standardOffer.reward_data?.product_ids || [];
+                    const isEligible = productIds.some((pid: string) => {
+                      if (item.id === pid) return true;
+                      const rp = offerProductDetails[pid];
+                      if (!rp) return false;
+                      if (item.is_store_specific || item.product_type === 'personal') return false;
+                      if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+                      return item.name === rp.name && item.weight_kg === rp.weight_kg;
+                    });
+                    if (isEligible) {
                       hasDiscount = true;
                     }
                   } else if (standardOffer.type === 'fixed_price') {
-                    if (standardOffer.reward_data?.product_ids?.includes(item.id)) {
+                    const productIds = standardOffer.reward_data?.product_ids || [];
+                    const isEligible = productIds.some((pid: string) => {
+                      if (item.id === pid) return true;
+                      const rp = offerProductDetails[pid];
+                      if (!rp) return false;
+                      if (item.is_store_specific || item.product_type === 'personal') return false;
+                      if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+                      return item.name === rp.name && item.weight_kg === rp.weight_kg;
+                    });
+                    if (isEligible) {
                       discountedPrice = standardOffer.amount;
                       hasDiscount = true;
                     }
@@ -1048,11 +1269,11 @@ export const CartScreen = ({ navigation }: any) => {
                         </View>
                       </View>
                       <View style={styles.quantityControls}>
-                        <TouchableOpacity onPress={() => updateQuantity(item.id, -1)} style={styles.qtyBtn}>
+                        <TouchableOpacity onPress={() => updateQuantity(item, -1)} style={styles.qtyBtn}>
                           <Icon name="minus" size={18} color={Colors.primary} />
                         </TouchableOpacity>
                         <Text style={styles.quantity}>{item.quantity}</Text>
-                        <TouchableOpacity onPress={() => updateQuantity(item.id, 1)} style={styles.qtyBtn}>
+                        <TouchableOpacity onPress={() => updateQuantity(item, 1)} style={styles.qtyBtn}>
                           <Icon name="plus" size={18} color={Colors.primary} />
                         </TouchableOpacity>
                       </View>
@@ -1125,7 +1346,7 @@ export const CartScreen = ({ navigation }: any) => {
                           {(() => {
                             const getNames = (ids?: string[]) => {
                               if (!ids || ids.length === 0) return '';
-                              const names = ids.map(id => offerProductNames[id]).filter(Boolean);
+                              const names = ids.map(id => offerProductDetails[id]?.name).filter(Boolean);
                               return names.join(', ');
                             };
                             const resolvedName = getNames(offer.reward_data?.product_ids || offer.conditions?.product_ids);
@@ -1189,25 +1410,7 @@ export const CartScreen = ({ navigation }: any) => {
           <View style={styles.billRow}>
             <Text style={styles.billLabel}>Item Total</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={styles.billValue}>₹{(subtotal - (Object.values(appliedOffers).reduce((sum, o: any) => {
-                if (o.type === 'free_delivery') return sum;
-                let d = 0;
-                if (o.type === 'free_cash') d = o.amount;
-                else if (o.type === 'discount') {
-                  const sItems = items.filter(i => i.store_id === o.store_id);
-                  d = (sItems.reduce((s, i) => s + (i.price * i.quantity), 0) * o.amount) / 100;
-                } else if (o.type === 'cheap_product') {
-                  const eItems = items.filter(i => o.conditions.product_ids?.includes(i.id));
-                  d = (eItems.reduce((s, i) => s + (i.price * i.quantity), 0) * o.amount) / 100;
-                } else if (o.type === 'combo') {
-                  const cItems = items.filter(i => o.reward_data?.product_ids?.includes(i.id));
-                  d = Math.max(0, cItems.reduce((s, i) => s + i.price, 0) - o.amount);
-                } else if (o.type === 'fixed_price') {
-                  const fItems = items.filter(i => o.reward_data?.product_ids?.includes(i.id));
-                  d = fItems.reduce((s, i) => s + (Math.max(0, i.price - o.amount) * i.quantity), 0);
-                }
-                return sum + d;
-              }, 0))).toFixed(2)}</Text>
+              <Text style={styles.billValue}>₹{(subtotal - totalOfferDiscount).toFixed(2)}</Text>
               {totalOfferDiscount > 0 && (
                 <Text style={styles.originalTotalText}>₹{subtotal.toFixed(2)}</Text>
               )}
@@ -1465,7 +1668,7 @@ export const CartScreen = ({ navigation }: any) => {
                         {(() => {
                           const getNames = (ids?: string[]) => {
                             if (!ids || ids.length === 0) return '';
-                            const names = ids.map(id => offerProductNames[id]).filter(Boolean);
+                            const names = ids.map(id => offerProductDetails[id]?.name).filter(Boolean);
                             if (names.length === 0) return '';
                             return names.join(', ');
                           };

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAlert } from './AlertContext';
 import { useAuth } from './AuthContext';
+import { parseWKT, getHaversineDistance } from '../utils/productUtils';
 
 const STORAGE_KEYS = {
   CART_ITEMS: '@cart_items',
@@ -25,6 +26,9 @@ interface CartItem {
   store_lng: number;
   selected_options: Record<string, string>;
   preparation_time: number;
+  barcode?: string;
+  product_type?: string;
+  is_store_specific?: boolean;
 }
 
 export type OfferType = 'free_cash' | 'discount' | 'free_delivery' | 'free_product' | 'cheap_product' | 'combo' | 'fixed_price';
@@ -56,9 +60,10 @@ export interface Offer {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: any, store: any) => void;
+  addItem: (item: any, store: any, isStoreSpecific?: boolean) => void;
   removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, delta: number, selectedOptions?: Record<string, string>) => void;
+  updateQuantity: (product: any, delta: number, selectedOptions?: Record<string, string>, storeId?: string) => void;
+  getQuantity: (product: any, storeId?: string) => number;
   clearCart: () => void;
   totalItems: number;
   subtotal: number;
@@ -66,6 +71,7 @@ interface CartContextType {
   setSessionAddress: (address: any | null) => void;
   appliedOffers: Record<string, Offer>;
   setAppliedOffers: (offers: Record<string, Offer>) => void;
+  setItems: (items: CartItem[] | ((prev: CartItem[]) => CartItem[])) => void;
   clearSessionAddress: () => Promise<void>;
 }
 
@@ -127,12 +133,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveData();
   }, [items, appliedOffers, sessionAddress, isLoaded]);
 
-  const addItem = (product: any, store: any) => {
-    // 1. Parse store location from WKT
+  const addItem = (product: any, store: any, isStoreSpecific: boolean = false) => {
+    // 1. Parse store location
     let storeLat = 0;
     let storeLng = 0;
-    if (store.location_wkt) {
-      const match = store.location_wkt.match(/POINT\(([-\d.]+) ([-\d.]+)\)/i);
+    
+    const storeWKT = store.location_wkt || (typeof store.location === 'string' ? store.location : null);
+    if (storeWKT) {
+      const match = storeWKT.match(/POINT\(([-\d.]+) ([-\d.]+)\)/i);
       if (match) {
         storeLng = parseFloat(match[1]);
         storeLat = parseFloat(match[2]);
@@ -167,7 +175,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 store_lat: storeLat,
                 store_lng: storeLng,
                 selected_options: product.selectedOptions || {},
-                preparation_time: product.preparation_time || 0
+                preparation_time: product.preparation_time || 0,
+                barcode: product.barcode,
+                product_type: product.product_type,
+                is_store_specific: isStoreSpecific
               }]);
             }
           }
@@ -179,19 +190,79 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const selectedOptions = product.selectedOptions || {};
 
     setItems(prev => {
-      // 3. Normal Add Logic (Differentiate by ID + Selected Options)
-      const existingIdx = prev.findIndex(item => 
-        item.id === product.id && 
-        item.store_id === store.id &&
-        JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions)
-      );
+      // 3. Identification of "Equivalent" product
+      const findEquivalentIdx = () => {
+        return prev.findIndex(item => {
+          // Check for exact match (ID + Store + Options)
+          const isExactMatch = item.id === product.id && 
+            item.store_id === store.id &&
+            JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions);
+          
+          if (isExactMatch) return true;
+
+          // Check for identity match (Barcode or Common)
+          if (product.product_type === 'personal') return false;
+
+          const optionsMatch = JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions);
+          if (!optionsMatch) return false;
+
+          if (product.product_type === 'barcode' && product.barcode && item.barcode === product.barcode) {
+            return true;
+          }
+
+          if (item.name === product.name && 
+              item.weight_kg === product.weight_kg && 
+              item.product_type !== 'personal') {
+            return true;
+          }
+
+          return false;
+        });
+      };
+
+      const existingIdx = findEquivalentIdx();
 
       if (existingIdx > -1) {
+        const existing = prev[existingIdx];
         const newItems = [...prev];
-        newItems[existingIdx] = { 
-          ...newItems[existingIdx], 
-          quantity: newItems[existingIdx].quantity + 1 
-        };
+
+        // LOGIC: Nearest store should win for fluid items
+        let shouldUpdateStore = false;
+        if (isStoreSpecific) {
+          shouldUpdateStore = true;
+        } else if (!existing.is_store_specific) {
+          // Compare distances
+          const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
+          
+          if (userCoords && storeLat !== 0 && storeLng !== 0) {
+            const distExisting = getHaversineDistance(userCoords.lat, userCoords.lng, existing.store_lat, existing.store_lng);
+            const distCurrent = getHaversineDistance(userCoords.lat, userCoords.lng, storeLat, storeLng);
+            
+            // Update if significantly closer or if current store in cart has no location
+            if (distCurrent < distExisting || (existing.store_lat === 0 && storeLat !== 0)) {
+              shouldUpdateStore = true;
+            }
+          }
+        }
+
+        if (shouldUpdateStore) {
+          newItems[existingIdx] = {
+            ...existing,
+            id: product.id, 
+            price: product.price, // Price might differ by store
+            store_id: store.id,
+            store_name: store.name,
+            store_lat: storeLat,
+            store_lng: storeLng,
+            is_store_specific: isStoreSpecific || existing.is_store_specific,
+            quantity: existing.quantity + 1
+          };
+        } else {
+          newItems[existingIdx] = { 
+            ...existing, 
+            quantity: existing.quantity + 1 
+          };
+        }
         return newItems;
       }
 
@@ -210,7 +281,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         store_lat: storeLat,
         store_lng: storeLng,
         selected_options: selectedOptions,
-        preparation_time: product.preparation_time || 0
+        preparation_time: product.preparation_time || 0,
+        barcode: product.barcode,
+        product_type: product.product_type,
+        is_store_specific: isStoreSpecific
       }];
     });
   };
@@ -219,19 +293,89 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setItems(prev => prev.filter(item => item.id !== productId));
   };
 
-  const updateQuantity = (productId: string, delta: number, selectedOptions?: Record<string, string>, storeId?: string) => {
+  const getQuantity = (product: any, storeId?: string) => {
+    // 1. Exact match (ID + Store + Options)
+    const exact = items.find(i => 
+      i.id === product.id && 
+      (!storeId || i.store_id === storeId)
+    );
+    if (exact) return exact.quantity;
+
+    // 2. Identity match for fluid items
+    if (product.product_type === 'personal') return 0;
+
+    const equivalent = items.find(i => {
+      if (i.is_store_specific) return false;
+      
+      // Check for identity match (Barcode or Common)
+      if (product.product_type === 'barcode' && product.barcode && i.barcode === product.barcode) {
+        return true;
+      }
+      
+      return i.name === product.name && 
+             i.weight_kg === product.weight_kg && 
+             i.product_type !== 'personal';
+    });
+
+    return equivalent ? equivalent.quantity : 0;
+  };
+
+  const updateQuantity = (productOrId: any, delta: number, selectedOptions?: Record<string, string>, storeId?: string) => {
     setItems(prev => {
-      return prev.map(item => {
-        const isMatch = item.id === productId && 
-          (!storeId || item.store_id === storeId) &&
-          (!selectedOptions || JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions));
-        
-        if (isMatch) {
-          const newQty = item.quantity + delta;
-          return newQty > 0 ? { ...item, quantity: newQty } : null;
+      const productId = typeof productOrId === 'string' ? productOrId : productOrId.id;
+      const targetStoreId = storeId || (typeof productOrId === 'object' ? productOrId.store_id : undefined);
+
+      // 1. Try to find an exact match first
+      const exactIdx = prev.findIndex(item => 
+        item.id === productId && 
+        (!targetStoreId || item.store_id === targetStoreId) &&
+        (!selectedOptions || JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions))
+      );
+
+      if (exactIdx > -1) {
+        const newItems = [...prev];
+        const item = newItems[exactIdx];
+        const newQty = item.quantity + delta;
+        if (newQty > 0) {
+          newItems[exactIdx] = { ...item, quantity: newQty };
+        } else {
+          newItems.splice(exactIdx, 1);
         }
-        return item;
-      }).filter((item): item is CartItem => item !== null);
+        return newItems;
+      }
+
+      // 2. If no exact match, try to find an equivalent fluid item to update
+      if (typeof productOrId === 'object' && productOrId.product_type !== 'personal') {
+        const equivalentIdx = prev.findIndex(item => {
+          if (item.is_store_specific) return false;
+          
+          const optionsMatch = !selectedOptions || JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions);
+          if (!optionsMatch) return false;
+
+          // Identity match
+          if (productOrId.product_type === 'barcode' && productOrId.barcode && item.barcode === productOrId.barcode) {
+            return true;
+          }
+
+          return item.name === productOrId.name && 
+                 item.weight_kg === productOrId.weight_kg && 
+                 item.product_type !== 'personal';
+        });
+
+        if (equivalentIdx > -1) {
+          const newItems = [...prev];
+          const item = newItems[equivalentIdx];
+          const newQty = item.quantity + delta;
+          if (newQty > 0) {
+            newItems[equivalentIdx] = { ...item, quantity: newQty };
+          } else {
+            newItems.splice(equivalentIdx, 1);
+          }
+          return newItems;
+        }
+      }
+
+      return prev;
     });
   };
 
@@ -264,6 +408,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addItem, 
       removeItem, 
       updateQuantity, 
+      getQuantity,
       clearCart,
       totalItems,
       subtotal,
@@ -271,6 +416,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSessionAddress,
       appliedOffers,
       setAppliedOffers,
+      setItems,
       clearSessionAddress
     }}>
       {children}

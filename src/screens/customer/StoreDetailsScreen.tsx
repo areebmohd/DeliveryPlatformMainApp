@@ -217,7 +217,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions(product);
     } else {
-      addItem(product, store);
+      addItem(product, store, true);
     }
   };
 
@@ -447,7 +447,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                       quantity={getQuantity(product.id)}
                       onIncrease={() => updateQuantity(product.id, 1, undefined, store.id)}
                       onDecrease={() => updateQuantity(product.id, -1, undefined, store.id)}
-                      onPress={() => navigation.navigate('ProductDetail', { product, store })}
+                      onPress={() => navigation.navigate('ProductDetail', { product, store, isFromStore: true })}
                       width="48.5%"
                     />
                 ))}
@@ -684,7 +684,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         visible={!!selectedProductOptions}
         product={selectedProductOptions}
         onClose={() => setSelectedProductOptions(null)}
-        onConfirm={(options) => addItem({ ...selectedProductOptions, selectedOptions: options }, store)}
+        onConfirm={(options) => addItem({ ...selectedProductOptions, selectedOptions: options }, store, true)}
       />
 
       {/* Detailed View Modal */}

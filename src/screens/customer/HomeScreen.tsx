@@ -50,7 +50,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const [categoryImages, setCategoryImages] = useState<{ [key: string]: string }>({});
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const [isGPSEnabled, setIsGPSEnabled] = useState(true);
-  const { addItem, items, updateQuantity, sessionAddress, setSessionAddress } = useCart();
+  const { addItem, items, updateQuantity, sessionAddress, setSessionAddress, getQuantity } = useCart();
   const { user } = useAuth();
   const { showAlert } = useAlert();
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
@@ -76,10 +76,7 @@ export const HomeScreen = ({ navigation }: any) => {
     ).start();
   }, [glowAnim]);
 
-  const getQuantity = useCallback((productId: string, storeId: string) => {
-    const item = items.find(i => i.id === productId && i.store_id === storeId);
-    return item ? item.quantity : 0;
-  }, [items]);
+
 
   const handleAddToCart = useCallback((product: any, store: any) => {
     if (!sessionAddress) {
@@ -274,7 +271,7 @@ export const HomeScreen = ({ navigation }: any) => {
         .limit(10);
 
       if (error) throw error;
-      const userCoords = sessionAddress ? parseWKT(sessionAddress.location) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
+      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
       setBestSellers(deduplicateProducts(data || [], userCoords));
     } catch (e) {
       // Silent in production
@@ -295,10 +292,10 @@ export const HomeScreen = ({ navigation }: any) => {
         .eq('is_info_complete', true)
         .eq('in_stock', true)
         .order('id', { ascending: false })
-        .limit(12);
+        .limit(40);
 
       if (error) throw error;
-      const userCoords = sessionAddress ? parseWKT(sessionAddress.location) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
+      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
       setSuggestions(deduplicateProducts(data || [], userCoords));
     } catch (e) {
       // Silent in production
@@ -372,11 +369,11 @@ export const HomeScreen = ({ navigation }: any) => {
     <View style={styles.bestSellerWrapper}>
       <CustomerProductCard 
         product={item}
-        onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
+        onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores, isFromStore: false })}
         onAdd={() => handleAddToCart(item, item.stores)}
-        quantity={getQuantity(item.id, item.store_id)}
-        onIncrease={() => updateQuantity(item.id, 1, undefined, item.store_id)}
-        onDecrease={() => updateQuantity(item.id, -1, undefined, item.store_id)}
+        quantity={getQuantity(item, item.store_id)}
+        onIncrease={() => updateQuantity(item, 1, undefined, item.store_id)}
+        onDecrease={() => updateQuantity(item, -1, undefined, item.store_id)}
         width={140}
       />
     </View>
@@ -386,11 +383,11 @@ export const HomeScreen = ({ navigation }: any) => {
     <CustomerProductCard 
       key={item.id}
       product={item}
-      onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
+      onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores, isFromStore: false })}
       onAdd={() => handleAddToCart(item, item.stores)}
-      quantity={getQuantity(item.id, item.store_id)}
-      onIncrease={() => updateQuantity(item.id, 1, undefined, item.store_id)}
-      onDecrease={() => updateQuantity(item.id, -1, undefined, item.store_id)}
+      quantity={getQuantity(item, item.store_id)}
+      onIncrease={() => updateQuantity(item, 1, undefined, item.store_id)}
+      onDecrease={() => updateQuantity(item, -1, undefined, item.store_id)}
       width={(width - Spacing.md * 2 - 20) / 3 - 2}
     />
   ), [navigation, handleAddToCart, getQuantity, updateQuantity]);

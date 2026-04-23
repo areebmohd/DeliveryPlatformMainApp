@@ -2,8 +2,24 @@
  * Parses WKT (Well-Known Text) Point string into lat/lng coordinates.
  * Expected format: "POINT(lng lat)"
  */
-export const parseWKT = (wkt: string | null): { lat: number, lng: number } | null => {
+export const parseWKT = (wkt: any): { lat: number, lng: number } | null => {
   if (!wkt) return null;
+  
+  // Handle object (GeoJSON)
+  if (typeof wkt === 'object') {
+    if (wkt.coordinates && wkt.coordinates.length >= 2) {
+      return {
+        lng: wkt.coordinates[0],
+        lat: wkt.coordinates[1]
+      };
+    }
+    if (wkt.lat !== undefined && wkt.lng !== undefined) {
+      return { lat: wkt.lat, lng: wkt.lng };
+    }
+    return null;
+  }
+
+  // Handle string (WKT)
   const match = wkt.match(/POINT\(([-\d.]+) ([-\d.]+)\)/i);
   if (!match) return null;
   return {

@@ -37,6 +37,12 @@ export const LoginScreen = ({ navigation }: any) => {
     setLoading(true);
     setError('');
     
+    if (email.toLowerCase().trim() === 'zorodeliveryapp@gmail.com') {
+      setError('This email is registered for admin only. Please use the Admin Web Portal to log in.');
+      setLoading(false);
+      return;
+    }
+    
     try {
       // Pre-login role validation
       const { data: existingRole, error: checkError } = await supabase.rpc('check_email_exists', {
@@ -107,8 +113,16 @@ export const LoginScreen = ({ navigation }: any) => {
       
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken;
       const emailAddress = userInfo.data?.user?.email;
+
+      if (emailAddress?.toLowerCase().trim() === 'zorodeliveryapp@gmail.com') {
+        setError('This email is registered for admin only. Please use the Admin Web Portal to log in.');
+        await GoogleSignin.signOut();
+        setLoading(false);
+        return;
+      }
+
+      const idToken = userInfo.data?.idToken;
 
       if (!idToken) {
         throw new Error('No ID token present');

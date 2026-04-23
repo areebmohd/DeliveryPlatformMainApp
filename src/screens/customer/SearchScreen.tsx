@@ -32,13 +32,10 @@ export const SearchScreen = ({ navigation, route }: any) => {
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const insets = useSafeAreaInsets();
   const searchInputRef = useRef<TextInput>(null);
-  const { addItem, updateQuantity, items, sessionAddress } = useCart();
+  const { addItem, updateQuantity, items, sessionAddress, getQuantity } = useCart();
   const { showAlert } = useAlert();
 
-  const getQuantity = useCallback((productId: string, storeId: string) => {
-    const item = items.find(i => i.id === productId && i.store_id === storeId);
-    return item ? item.quantity : 0;
-  }, [items]);
+
 
   const handleAddToCart = useCallback((product: any, store: any) => {
     if (!sessionAddress) {
@@ -130,11 +127,11 @@ export const SearchScreen = ({ navigation, route }: any) => {
     <View style={styles.productItemWrapper}>
       <CustomerProductCard
         product={item}
-        onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
+        onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores, isFromStore: false })}
         onAdd={() => handleAddToCart(item, item.stores)}
-        quantity={getQuantity(item.id, item.store_id)}
-        onIncrease={() => updateQuantity(item.id, 1, undefined, item.store_id)}
-        onDecrease={() => updateQuantity(item.id, -1, undefined, item.store_id)}
+        quantity={getQuantity(item, item.store_id)}
+        onIncrease={() => updateQuantity(item, 1, undefined, item.store_id)}
+        onDecrease={() => updateQuantity(item, -1, undefined, item.store_id)}
         width="100%"
       />
     </View>

@@ -57,6 +57,18 @@ export const RegisterScreen = ({ navigation }: any) => {
     setLoading(true);
     setError('');
 
+    if (email.toLowerCase().trim() === 'zorodeliveryapp@gmail.com') {
+      showAlert(
+        'Admin Email',
+        'This email is registered for admin only. Please use the Admin Web Portal to log in.',
+        'info',
+        { text: 'OK', onPress: () => navigation.navigate('Login') },
+        false
+      );
+      setLoading(false);
+      return;
+    }
+
     try {
       // Check if email already exists in any role
       const { data: existingRole, error: checkError } = await supabase.rpc('check_email_exists', {
@@ -143,6 +155,19 @@ export const RegisterScreen = ({ navigation }: any) => {
       const userInfo = await GoogleSignin.signIn();
       const emailAddress = userInfo.data?.user?.email;
       
+      if (emailAddress?.toLowerCase().trim() === 'zorodeliveryapp@gmail.com') {
+        showAlert(
+          'Admin Email',
+          'This email is registered for admin only. Please use the Admin Web Portal to log in.',
+          'info',
+          { text: 'OK', onPress: () => navigation.navigate('Login') },
+          false
+        );
+        await GoogleSignin.signOut();
+        setLoading(false);
+        return;
+      }
+
       if (userInfo.data?.idToken) {
         // Check if email already exists with a different role
         if (emailAddress) {

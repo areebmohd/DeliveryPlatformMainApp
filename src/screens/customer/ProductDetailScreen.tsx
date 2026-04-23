@@ -22,7 +22,7 @@ const { width } = Dimensions.get('window');
 import { formatPriceFull } from '../../utils/format';
 
 export const ProductDetailScreen = ({ route, navigation }: any) => {
-  const { product, store } = route.params;
+  const { product, store, isFromStore = false } = route.params;
   const insets = useSafeAreaInsets();
   const { addItem, updateQuantity, items } = useCart();
   const [isFavourite, setIsFavourite] = React.useState(false);
@@ -303,14 +303,14 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.cartControls}>
             <TouchableOpacity 
               style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product.id, -1, selectedOptions, currentStore?.id || store?.id)}
+              onPress={() => updateQuantity(product, -1, selectedOptions, currentStore?.id || store?.id)}
             >
               <Icon name="minus" size={20} color={Colors.white} />
             </TouchableOpacity>
             <Text style={styles.quantityText}>{quantity}</Text>
             <TouchableOpacity 
               style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product.id, 1, selectedOptions, currentStore?.id || store?.id)}
+              onPress={() => updateQuantity(product, 1, selectedOptions, currentStore?.id || store?.id)}
             >
               <Icon name="plus" size={20} color={Colors.white} />
             </TouchableOpacity>
@@ -332,7 +332,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                     }
                   });
                 }
-              addItem({ ...product, selectedOptions }, store);
+              addItem({ ...product, selectedOptions }, store, isFromStore);
             }}
           >
             <Icon name="cart-plus" size={20} color={Colors.white} style={{ marginRight: 8 }} />

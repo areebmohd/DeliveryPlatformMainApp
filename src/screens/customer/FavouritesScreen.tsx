@@ -41,7 +41,7 @@ export const FavouritesScreen = ({ navigation }: any) => {
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
-  const { addItem, updateQuantity, items, setAppliedOffers, appliedOffers, sessionAddress } = useCart();
+  const { addItem, updateQuantity, items, setAppliedOffers, appliedOffers, sessionAddress, getQuantity } = useCart();
   const { showAlert } = useAlert();
 
   useEffect(() => {
@@ -223,10 +223,7 @@ export const FavouritesScreen = ({ navigation }: any) => {
     navigation.navigate('Cart');
   }, [user, items, appliedOffers, setAppliedOffers, profile?.order_count, navigation, showAlert]);
 
-  const getQuantity = useCallback((productId: string, storeId: string) => {
-    const item = items.find((i: any) => i.id === productId && i.store_id === storeId);
-    return item ? item.quantity : 0;
-  }, [items]);
+
 
   const getGroupedOffers = (offers: any[]) => {
     const groups: any = {};
@@ -367,10 +364,10 @@ export const FavouritesScreen = ({ navigation }: any) => {
         }
         addItem(item, item.stores);
       }}
-      quantity={getQuantity(item.id, item.store_id)}
-      onIncrease={() => updateQuantity(item.id, 1, undefined, item.store_id)}
-      onDecrease={() => updateQuantity(item.id, -1, undefined, item.store_id)}
-      onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores })}
+      quantity={getQuantity(item, item.store_id)}
+      onIncrease={() => updateQuantity(item, 1, undefined, item.store_id)}
+      onDecrease={() => updateQuantity(item, -1, undefined, item.store_id)}
+      onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores, isFromStore: false })}
       width="48.5%"
     />
   ), [addItem, getQuantity, updateQuantity, navigation, sessionAddress, showAlert]);
