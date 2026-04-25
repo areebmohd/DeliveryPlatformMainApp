@@ -62,6 +62,10 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [isUploadingVerification, setIsUploadingVerification] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
+  const [bankAccountNumber, setBankAccountNumber] = useState(store?.bank_account_number || '');
+  const [bankIfscCode, setBankIfscCode] = useState(store?.bank_ifsc_code || '');
+  const [bankAccountHolderName, setBankAccountHolderName] = useState(store?.bank_account_holder_name || '');
+
   const { showAlert, showToast } = useAlert();
 
   useEffect(() => {
@@ -113,6 +117,9 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         setOwnerName(preservedFormData.ownerName);
         setOwnerNumber(preservedFormData.ownerNumber);
         setVerificationImages(preservedFormData.verificationImages);
+        setBankAccountNumber(preservedFormData.bankAccountNumber);
+        setBankIfscCode(preservedFormData.bankIfscCode);
+        setBankAccountHolderName(preservedFormData.bankAccountHolderName);
         if (preservedFormData.store) setStore(preservedFormData.store);
       }
 
@@ -220,6 +227,9 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     if (!upiId) missingFields.push('UPI ID');
     if (!ownerName) missingFields.push('Owner Name');
     if (!ownerNumber) missingFields.push('Owner Number');
+    if (!bankAccountNumber) missingFields.push('Bank Account Number');
+    if (!bankIfscCode) missingFields.push('Bank IFSC Code');
+    if (!bankAccountHolderName) missingFields.push('Bank Account Holder Name');
 
     // Only check verification images if store is NOT active (OR if it's a new store)
     if ((!store || !store.is_active) && verificationImages.length === 0) {
@@ -257,6 +267,9 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         whatsapp_number: whatsappNumber,
         owner_name: ownerName,
         owner_number: ownerNumber,
+        bank_account_number: bankAccountNumber,
+        bank_ifsc_code: bankIfscCode,
+        bank_account_holder_name: bankAccountHolderName,
       };
 
       // Only update verification images if provided (hidden for active stores anyway)
@@ -268,7 +281,8 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
       const sensitiveFields = [
         'name', 'description', 'category', 'upi_id', 'phone', 'email', 
         'whatsapp_number', 'address_line_1', 'city', 'state', 'pincode',
-        'owner_name', 'owner_number', 'opening_hours'
+        'owner_name', 'owner_number', 'opening_hours',
+        'bank_account_number', 'bank_ifsc_code', 'bank_account_holder_name'
       ];
       
       let sensitiveChanged = false;
@@ -414,6 +428,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
                 phone, email, instagramUrl, facebookUrl, whatsappNumber, 
                 addressLine1, pincode, city, state, 
                 ownerName, ownerNumber, verificationImages,
+                bankAccountNumber, bankIfscCode, bankAccountHolderName,
                 store
               }
             })}
@@ -456,6 +471,31 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
           <Text style={styles.sectionTitle}>Payments</Text>
           <Input label="UPI ID *" value={upiId} onChangeText={setUpiId} placeholder="yourname@upi" />
           <Text style={styles.helperText}>Your payments will be credited to this UPI ID.</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>Bank Info</Text>
+          <Text style={[styles.helperText, { marginTop: 0, marginBottom: Spacing.md }]}>Your payments will be credited to this bank account when upi is not available.</Text>
+          <Input 
+            label="Bank Account Holder Name *" 
+            value={bankAccountHolderName} 
+            onChangeText={setBankAccountHolderName} 
+            placeholder="Name as per bank records" 
+          />
+          <Input 
+            label="Bank Account Number *" 
+            value={bankAccountNumber} 
+            onChangeText={setBankAccountNumber} 
+            placeholder="Enter account number" 
+            keyboardType="numeric"
+          />
+          <Input 
+            label="Bank IFSC Code *" 
+            value={bankIfscCode} 
+            onChangeText={setBankIfscCode} 
+            placeholder="e.g. SBIN0001234" 
+            autoCapitalize="characters"
+          />
         </View>
 
         <View style={styles.section}>
@@ -584,7 +624,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.md,
-    paddingBottom: 40,
+    paddingBottom: 60,
   },
   section: {
     backgroundColor: Colors.white,

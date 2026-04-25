@@ -67,14 +67,17 @@ export const deduplicateProducts = (products: any[], userLocation?: { lat: numbe
     // 2. Identify the group key
     let uniqueKey = '';
     let groupMap: Map<string, any> | null = null;
+    const optionsStr = product.options ? JSON.stringify(product.options) : '[]';
+    const baseKey = `${product.name}_${product.price}_${product.weight_kg}_${product.description}_${optionsStr}`;
 
     if (product.product_type === 'barcode' && product.barcode && product.barcode.trim().length > 0) {
-      uniqueKey = `barcode_${product.barcode.trim()}`;
+      // For barcode products, we still want to match primarily on barcode, 
+      // but also ensure the other criteria match to be considered "the same" per user requirement
+      uniqueKey = `barcode_${product.barcode.trim()}_${baseKey}`;
       groupMap = barcodeGroups;
     } else {
       // Treat everything else (even if marked as barcode but missing one) as common or use common logic
-      const optionsStr = product.options ? JSON.stringify(product.options) : 'null';
-      uniqueKey = `common_${product.name}_${product.price}_${product.weight_kg}_${product.description}_${optionsStr}`;
+      uniqueKey = `common_${baseKey}`;
       groupMap = commonGroups;
     }
 

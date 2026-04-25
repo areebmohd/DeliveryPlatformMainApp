@@ -42,12 +42,15 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
       let query = supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
-        .neq('is_deleted', true);
+        .neq('is_deleted', true)
+        .eq('name', product.name)
+        .eq('price', product.price)
+        .eq('weight_kg', product.weight_kg)
+        .eq('description', product.description)
+        .eq('options', product.options || []);
 
       if (product.barcode) {
         query = query.eq('barcode', product.barcode);
-      } else {
-        query = query.eq('name', product.name);
       }
 
       const { count, error } = await query;

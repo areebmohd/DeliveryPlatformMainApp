@@ -153,6 +153,9 @@ export const StoreScreen = ({ navigation }: any) => {
       (!!s.location_wkt || !!s.location) && 
       !!s.phone && 
       !!s.upi_id && 
+      !!s.bank_account_number && 
+      !!s.bank_ifsc_code && 
+      !!s.bank_account_holder_name && 
       !!s.owner_name && 
       !!s.owner_number && 
       (s.verification_images?.length > 0) &&
@@ -399,7 +402,7 @@ export const StoreScreen = ({ navigation }: any) => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       <View style={{ height: insets.top, backgroundColor: Colors.background }} />
       <ScrollView
-        stickyHeaderIndices={[store && !store.is_active ? 5 : 4]}
+        stickyHeaderIndices={[4]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -408,44 +411,47 @@ export const StoreScreen = ({ navigation }: any) => {
       >
         {renderHeader()}
         {renderBanner()}
-        {renderVerificationAlert()}
         
-        {store && store.is_active && store.has_pending_changes && (
-          <View style={[styles.inactiveAlert, styles.pendingAlert]}>
-            <View style={[styles.alertIconBg, styles.pendingIconBg]}>
-              <Icon name="information-outline" size={24} color={Colors.primary} />
+        <View>
+          {renderVerificationAlert()}
+          
+          {store && store.is_active && store.has_pending_changes && (
+            <View style={[styles.inactiveAlert, styles.pendingAlert]}>
+              <View style={[styles.alertIconBg, styles.pendingIconBg]}>
+                <Icon name="information-outline" size={24} color={Colors.primary} />
+              </View>
+              <View style={styles.alertTextContainer}>
+                <Text style={[styles.alertTitle, styles.pendingTitle]}>
+                  Changes Under Review
+                </Text>
+                <Text style={[styles.alertSubtitle, styles.pendingSubtitle]}>
+                  You have changed details in store which will be verified by admin but the store will still be active.
+                </Text>
+              </View>
             </View>
-            <View style={styles.alertTextContainer}>
-              <Text style={[styles.alertTitle, styles.pendingTitle]}>
-                Changes Under Review
-              </Text>
-              <Text style={[styles.alertSubtitle, styles.pendingSubtitle]}>
-                You have changed details in store which will be verified by admin but the store will still be active.
-              </Text>
-            </View>
-          </View>
-        )}
+          )}
 
-        {store && store.is_active && !store.is_currently_open && (
-          <TouchableOpacity 
-            style={[styles.inactiveAlert, { backgroundColor: '#FFF4F4', borderColor: '#FFE2E2' }]} 
-            onPress={handleToggleAvailability}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.alertIconBg, { backgroundColor: '#FFE2E2' }]}>
-              <Icon name="store-off-outline" size={24} color={Colors.error} />
-            </View>
-            <View style={styles.alertTextContainer}>
-              <Text style={[styles.alertTitle, { color: Colors.error }]}>
-                Store is Offline
-              </Text>
-              <Text style={[styles.alertSubtitle, { color: '#666' }]}>
-                Your store is manually closed for online orders. Customers cannot see your products or place orders.
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={20} color={Colors.error} />
-          </TouchableOpacity>
-        )}
+          {store && store.is_active && !store.is_currently_open && (
+            <TouchableOpacity 
+              style={[styles.inactiveAlert, { backgroundColor: '#FFF4F4', borderColor: '#FFE2E2' }]} 
+              onPress={handleToggleAvailability}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.alertIconBg, { backgroundColor: '#FFE2E2' }]}>
+                <Icon name="store-off-outline" size={24} color={Colors.error} />
+              </View>
+              <View style={styles.alertTextContainer}>
+                <Text style={[styles.alertTitle, { color: Colors.error }]}>
+                  Store is Offline
+                </Text>
+                <Text style={[styles.alertSubtitle, { color: '#666' }]}>
+                  Your store is manually closed for online orders. Customers cannot see your products or place orders.
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={20} color={Colors.error} />
+            </TouchableOpacity>
+          )}
+        </View>
 
         <View style={{ height: 10 }} />
 
@@ -537,6 +543,35 @@ export const StoreScreen = ({ navigation }: any) => {
                 </View>
 
                 <View style={styles.infoDivider} />
+
+                {(store?.upi_id || store?.bank_account_number) && (
+                  <>
+                    <View style={styles.infoSection}>
+                      <Text style={styles.infoLabel}>Payment Information</Text>
+                      {store?.upi_id && (
+                        <View style={styles.hoursRow}>
+                          <Icon name="qrcode-scan" size={18} color={Colors.primary} />
+                          <Text style={styles.infoValue}>{store.upi_id}</Text>
+                        </View>
+                      )}
+                      {store?.bank_account_number && (
+                        <View style={{ marginTop: 8 }}>
+                          <View style={styles.hoursRow}>
+                            <Icon name="bank-outline" size={18} color={Colors.primary} />
+                            <Text style={styles.infoValue}>{store.bank_account_holder_name}</Text>
+                          </View>
+                          <View style={[styles.hoursRow, { marginLeft: 26, marginTop: 4 }]}>
+                            <Text style={styles.infoValue}>{store.bank_account_number}</Text>
+                          </View>
+                          <View style={[styles.hoursRow, { marginLeft: 26, marginTop: 4 }]}>
+                            <Text style={styles.infoValue}>{store.bank_ifsc_code}</Text>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.infoDivider} />
+                  </>
+                )}
 
                 <View style={styles.infoSection}>
                   <Text style={styles.infoLabel}>Pickup Address</Text>
@@ -669,12 +704,13 @@ export const StoreScreen = ({ navigation }: any) => {
                     </View>
                   </>
                 )}
+
               </View>
             </View>
           )}
         </View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       <TouchableOpacity
@@ -913,7 +949,6 @@ const styles = StyleSheet.create({
     width: '80%',
   },
   infoContainer: {
-    flex: 1,
     paddingHorizontal: Spacing.xs,
   },
   infoCard: {

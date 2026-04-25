@@ -29,6 +29,7 @@ interface CartItem {
   barcode?: string;
   product_type?: string;
   is_store_specific?: boolean;
+  description?: string;
 }
 
 export type OfferType = 'free_cash' | 'discount' | 'free_delivery' | 'free_product' | 'cheap_product' | 'combo' | 'fixed_price';
@@ -178,7 +179,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 preparation_time: product.preparation_time || 0,
                 barcode: product.barcode,
                 product_type: product.product_type,
-                is_store_specific: isStoreSpecific
+                is_store_specific: isStoreSpecific,
+                description: product.description
               }]);
             }
           }
@@ -191,78 +193,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setItems(prev => {
       // 3. Identification of "Equivalent" product
-      const findEquivalentIdx = () => {
+      const findExistingIdx = () => {
         return prev.findIndex(item => {
-          // Check for exact match (ID + Store + Options)
-          const isExactMatch = item.id === product.id && 
+          // Exact match (ID + Store + Options)
+          return item.id === product.id && 
             item.store_id === store.id &&
             JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions);
-          
-          if (isExactMatch) return true;
-
-          // Check for identity match (Barcode or Common)
-          if (product.product_type === 'personal') return false;
-
-          const optionsMatch = JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions);
-          if (!optionsMatch) return false;
-
-          if (product.product_type === 'barcode' && product.barcode && item.barcode === product.barcode) {
-            return true;
-          }
-
-          if (item.name === product.name && 
-              item.weight_kg === product.weight_kg && 
-              item.product_type !== 'personal') {
-            return true;
-          }
-
-          return false;
         });
       };
 
-      const existingIdx = findEquivalentIdx();
+      const existingIdx = findExistingIdx();
 
       if (existingIdx > -1) {
         const existing = prev[existingIdx];
         const newItems = [...prev];
-
-        // LOGIC: Nearest store should win for fluid items
-        let shouldUpdateStore = false;
-        if (isStoreSpecific) {
-          shouldUpdateStore = true;
-        } else if (!existing.is_store_specific) {
-          // Compare distances
-          const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
-          
-          if (userCoords && storeLat !== 0 && storeLng !== 0) {
-            const distExisting = getHaversineDistance(userCoords.lat, userCoords.lng, existing.store_lat, existing.store_lng);
-            const distCurrent = getHaversineDistance(userCoords.lat, userCoords.lng, storeLat, storeLng);
-            
-            // Update if significantly closer or if current store in cart has no location
-            if (distCurrent < distExisting || (existing.store_lat === 0 && storeLat !== 0)) {
-              shouldUpdateStore = true;
-            }
-          }
-        }
-
-        if (shouldUpdateStore) {
-          newItems[existingIdx] = {
-            ...existing,
-            id: product.id, 
-            price: product.price, // Price might differ by store
-            store_id: store.id,
-            store_name: store.name,
-            store_lat: storeLat,
-            store_lng: storeLng,
-            is_store_specific: isStoreSpecific || existing.is_store_specific,
-            quantity: existing.quantity + 1
-          };
-        } else {
-          newItems[existingIdx] = { 
-            ...existing, 
-            quantity: existing.quantity + 1 
-          };
-        }
+        newItems[existingIdx] = { 
+          ...existing, 
+          quantity: existing.quantity + 1 
+        };
         return newItems;
       }
 
@@ -284,7 +232,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         preparation_time: product.preparation_time || 0,
         barcode: product.barcode,
         product_type: product.product_type,
-        is_store_specific: isStoreSpecific
+        is_store_specific: isStoreSpecific,
+        description: product.description
       }];
     });
   };
@@ -301,23 +250,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
     if (exact) return exact.quantity;
 
-    // 2. Identity match for fluid items
-    if (product.product_type === 'personal') return 0;
-
-    const equivalent = items.find(i => {
-      if (i.is_store_specific) return false;
-      
-      // Check for identity match (Barcode or Common)
-      if (product.product_type === 'barcode' && product.barcode && i.barcode === product.barcode) {
-        return true;
-      }
-      
-      return i.name === product.name && 
-             i.weight_kg === product.weight_kg && 
-             i.product_type !== 'personal';
-    });
-
-    return equivalent ? equivalent.quantity : 0;
+    return 0;
   };
 
   const updateQuantity = (productOrId: any, delta: number, selectedOptions?: Record<string, string>, storeId?: string) => {
@@ -342,37 +275,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           newItems.splice(exactIdx, 1);
         }
         return newItems;
-      }
-
-      // 2. If no exact match, try to find an equivalent fluid item to update
-      if (typeof productOrId === 'object' && productOrId.product_type !== 'personal') {
-        const equivalentIdx = prev.findIndex(item => {
-          if (item.is_store_specific) return false;
-          
-          const optionsMatch = !selectedOptions || JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions);
-          if (!optionsMatch) return false;
-
-          // Identity match
-          if (productOrId.product_type === 'barcode' && productOrId.barcode && item.barcode === productOrId.barcode) {
-            return true;
-          }
-
-          return item.name === productOrId.name && 
-                 item.weight_kg === productOrId.weight_kg && 
-                 item.product_type !== 'personal';
-        });
-
-        if (equivalentIdx > -1) {
-          const newItems = [...prev];
-          const item = newItems[equivalentIdx];
-          const newQty = item.quantity + delta;
-          if (newQty > 0) {
-            newItems[equivalentIdx] = { ...item, quantity: newQty };
-          } else {
-            newItems.splice(equivalentIdx, 1);
-          }
-          return newItems;
-        }
       }
 
       return prev;

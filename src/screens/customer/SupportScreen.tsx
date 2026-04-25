@@ -105,10 +105,20 @@ export const SupportScreen = ({ navigation }: any) => {
         <View style={styles.tipBox}>
           <View style={styles.tipHeader}>
             <Icon name="lightbulb-on" size={24} color={Colors.warning || '#F59E0B'} />
-            <Text style={styles.tipTitle}>Delivery Tip</Text>
+            <Text style={styles.tipTitle}>Delivery Policy</Text>
           </View>
           <Text style={styles.tipContent}>
             Check and verify all the products during delivery and do not accept a damaged product to avoid any problem.
+          </Text>
+        </View>
+
+        <View style={[styles.tipBox, { marginTop: 16, backgroundColor: '#DBEAFE', borderColor: '#BFDBFE' }]}>
+          <View style={styles.tipHeader}>
+            <Icon name="information" size={24} color="#2563EB" />
+            <Text style={[styles.tipTitle, { color: '#1E40AF' }]}>Store Policy</Text>
+          </View>
+          <Text style={[styles.tipContent, { color: '#1E40AF' }]}>
+            If you find any problem in the product after delivery then contact the store from their store info.
           </Text>
         </View>
 
