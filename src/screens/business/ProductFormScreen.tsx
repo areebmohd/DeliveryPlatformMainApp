@@ -66,6 +66,8 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [tagInput, setTagInput] = useState('');
   const [inStock, setInStock] = useState(product?.in_stock !== false);
   const [preparationTime, setPreparationTime] = useState(product?.preparation_time?.toString() || '0');
+  const [allowRefund, setAllowRefund] = useState(product?.allow_refund || false);
+  const [allowExchange, setAllowExchange] = useState(product?.allow_exchange || false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
@@ -125,6 +127,8 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             setPreparationTime(data.preparation_time?.toString() || '0');
             setRawImageUrl(data.raw_image_url || null);
             setIsOversized(data.needs_large_vehicle || false);
+            setAllowRefund(data.allow_refund || false);
+            setAllowExchange(data.allow_exchange || false);
             
             // Re-initialize lists with fresh data
             if (data.description) {
@@ -394,6 +398,8 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         is_info_complete: isComplete, // Mark as complete once saved with details
         raw_image_url: rawImageUrl,
         preparation_time: parseInt(preparationTime) || 0,
+        allow_refund: allowRefund,
+        allow_exchange: allowExchange,
         updated_at: new Date().toISOString(),
       };
 
@@ -832,6 +838,68 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               </View>
             </>
           )}
+        </View>
+
+        {/* Return Policy Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { marginBottom: 4 }]}>Return Policy</Text>
+          <Text style={styles.helperText}>Specify how customers can return this product after delivery in case of damage or defect in 24 hours.</Text>
+          
+          <View style={styles.returnOptionsContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.returnOptionCard, 
+                allowRefund && styles.returnOptionActive
+              ]}
+              onPress={() => setAllowRefund(!allowRefund)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkbox, allowRefund && styles.checkboxChecked]}>
+                {allowRefund && <Icon name="check" size={16} color={Colors.white} />}
+              </View>
+              <View style={styles.returnOptionContent}>
+                <Text style={[styles.returnOptionTitle, allowRefund && { color: Colors.primary }]}>Return & Refund</Text>
+                <Text style={styles.returnOptionSub}>Money will be returned to customer</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.returnOptionCard, 
+                allowExchange && styles.returnOptionActive
+              ]}
+              onPress={() => setAllowExchange(!allowExchange)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkbox, allowExchange && styles.checkboxChecked]}>
+                {allowExchange && <Icon name="check" size={16} color={Colors.white} />}
+              </View>
+              <View style={styles.returnOptionContent}>
+                <Text style={[styles.returnOptionTitle, allowExchange && { color: Colors.primary }]}>Return & Exchange</Text>
+                <Text style={styles.returnOptionSub}>Product will be replaced with new one</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.returnOptionCard, 
+                (!allowRefund && !allowExchange) && styles.returnOptionActiveNoReturn
+              ]}
+              onPress={() => {
+                setAllowRefund(false);
+                setAllowExchange(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkbox, (!allowRefund && !allowExchange) && styles.checkboxCheckedNoReturn]}>
+                {(!allowRefund && !allowExchange) && <Icon name="close" size={16} color={Colors.white} />}
+              </View>
+              <View style={styles.returnOptionContent}>
+                <Text style={[styles.returnOptionTitle, (!allowRefund && !allowExchange) && { color: Colors.error }]}>No Return</Text>
+                <Text style={styles.returnOptionSub}>Product cannot be returned once delivered</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -1566,5 +1634,57 @@ const styles = StyleSheet.create({
   },
   removeTagBtn: {
     marginLeft: 6,
+  },
+  returnOptionsContainer: {
+    marginTop: Spacing.md,
+    gap: 12,
+  },
+  returnOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  returnOptionActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + '08',
+  },
+  returnOptionActiveNoReturn: {
+    borderColor: Colors.error,
+    backgroundColor: Colors.error + '08',
+  },
+  returnOptionContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  returnOptionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  returnOptionSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  checkboxCheckedNoReturn: {
+    backgroundColor: Colors.error,
+    borderColor: Colors.error,
   },
 });

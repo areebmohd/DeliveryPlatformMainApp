@@ -23,7 +23,8 @@ import { NotificationsScreen } from '../screens/customer/NotificationsScreen';
 import { MapSelectionScreen } from '../screens/customer/MapSelectionScreen';
 import { CustomerOffersScreen } from '../screens/customer/CustomerOffersScreen';
 import { SupportScreen as CustomerSupportScreen } from '../screens/customer/SupportScreen';
-import { PremiumScreen } from '../screens/customer/PremiumScreen';
+import { ApplyReturnScreen } from '../screens/customer/ApplyReturnScreen';
+import { ReturnsScreen } from '../screens/customer/ReturnsScreen';
 
 const Tab = createBottomTabNavigator();
 const HomeStackNav = createNativeStackNavigator();
@@ -61,7 +62,8 @@ const AccountStack = () => {
       <AccountStackNav.Screen name="Notifications" component={NotificationsScreen} />
       <AccountStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
       <AccountStackNav.Screen name="CustomerSupport" component={CustomerSupportScreen} />
-      <AccountStackNav.Screen name="Premium" component={PremiumScreen} />
+      <AccountStackNav.Screen name="ApplyReturn" component={ApplyReturnScreen} />
+      <AccountStackNav.Screen name="Returns" component={ReturnsScreen} />
     </AccountStackNav.Navigator>
   );
 };
@@ -99,7 +101,7 @@ export const CustomerNavigator = () => {
         const hideOnScreens = [
           'StoreDetails', 'ProductDetail', 'AddAddress', 'AddLiveLocation', 
           'Search', 'Category', 'MapSelection', 'Notifications', 
-          'Favourites', 'CustomerOrders', 'Addresses', 'CustomerSupport', 'Premium'
+          'Favourites', 'CustomerOrders', 'Addresses', 'CustomerSupport', 'ApplyReturn', 'Returns'
         ];
         const isTabVisible = !hideOnScreens.includes(routeName as string);
 

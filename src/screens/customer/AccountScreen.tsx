@@ -157,9 +157,9 @@ export const AccountScreen = ({ navigation }: any) => {
             onPress={() => navigation.navigate('Favourites')} 
           />
           <OptionItem 
-            icon="crown-outline" 
-            label="Premium" 
-            onPress={() => navigation.navigate('Premium')} 
+            icon="keyboard-return" 
+            label="Returns" 
+            onPress={() => navigation.navigate('Returns')} 
           />
           <OptionItem 
             icon="headset" 

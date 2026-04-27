@@ -51,6 +51,8 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             selected_options,
             products (
               id,
+              allow_refund,
+              allow_exchange,
               stores (id, name)
             )
           ),
@@ -331,17 +333,14 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
           <View style={styles.totalRow}>
             <View>
               <Text style={styles.totalLabel}>Grand Total</Text>
-              <View style={[
-                styles.paymentStatusBadge,
-                { backgroundColor: Colors.warning + '15' }
-              ]}>
-                <Text style={[
-                  styles.paymentStatusText,
-                  { color: Colors.warning }
-                ]}>
-                  POD
-                </Text>
-              </View>
+              {item.status === 'delivered' && (
+                <TouchableOpacity 
+                  onPress={() => navigation.navigate('ApplyReturn', { order: item })}
+                  style={{ marginTop: 4 }}
+                >
+                  <Text style={styles.applyReturnText}>Apply Return</Text>
+                </TouchableOpacity>
+              )}
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={styles.totalAmount}>₹{item.total_amount}</Text>
@@ -711,6 +710,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  applyReturnText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  viewSharesText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '600',
   },
   cancelBtn: {
     flexDirection: 'row',

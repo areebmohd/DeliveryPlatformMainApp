@@ -29,6 +29,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   const [favLoading, setFavLoading] = React.useState(false);
   const [selectedOptions, setSelectedOptions] = React.useState<Record<string, string>>({});
   const [storeCount, setStoreCount] = React.useState(0);
+  const [returnPolicySummary, setReturnPolicySummary] = React.useState<string>('');
   const [currentStore, setCurrentStore] = React.useState(store);
   const { showAlert } = useAlert();
 
@@ -41,21 +42,47 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
     try {
       let query = supabase
         .from('products')
-        .select('*', { count: 'exact', head: true })
+        .select('allow_refund, allow_exchange', { count: 'exact' })
         .neq('is_deleted', true)
         .eq('name', product.name)
         .eq('price', product.price)
-        .eq('weight_kg', product.weight_kg)
-        .eq('description', product.description)
-        .eq('options', product.options || []);
+        .eq('weight_kg', product.weight_kg);
 
       if (product.barcode) {
         query = query.eq('barcode', product.barcode);
       }
 
-      const { count, error } = await query;
+      const { data, count, error } = await query;
       if (error) throw error;
       setStoreCount(count || 1);
+
+      // Generate Return Policy Summary
+      if (data && data.length > 0) {
+        const hasRefund = data.some(p => p.allow_refund);
+        const hasExchange = data.some(p => p.allow_exchange);
+        
+        if (count && count > 1) {
+          if (!hasRefund && !hasExchange) {
+            setReturnPolicySummary('No stores allow return for this product');
+          } else {
+            let options = [];
+            if (hasRefund) options.push('Return with Refund');
+            if (hasExchange) options.push('Return with Exchange');
+            setReturnPolicySummary(`Some stores allow ${options.join(' or ')}`);
+          }
+        } else {
+          // Single store
+          const p = data[0];
+          if (!p.allow_refund && !p.allow_exchange) {
+            setReturnPolicySummary('No return available for this product');
+          } else {
+            let options = [];
+            if (p.allow_refund) options.push('Refund');
+            if (p.allow_exchange) options.push('Exchange');
+            setReturnPolicySummary(`Available for Return with ${options.join(' and ')} within 24 Hours`);
+          }
+        }
+      }
 
       if (!currentStore && product.store_id) {
         const { data: st, error: stErr } = await supabase
@@ -297,6 +324,18 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
               </Text>
             </TouchableOpacity>
           )}
+
+          {/* Return Policy Section */}
+          <View style={styles.returnPolicyContainer}>
+            <Text style={styles.sectionTitle}>Return Policy</Text>
+            <Text style={[
+              styles.returnPolicyText,
+              !returnPolicySummary.includes('No') && { color: Colors.primary },
+              returnPolicySummary.includes('No') && { color: Colors.error }
+            ]}>
+              {returnPolicySummary || 'Loading policy...'}
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -639,5 +678,17 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 20,
     fontWeight: '800',
+  },
+  returnPolicyContainer: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    marginBottom: Spacing.xl,
+  },
+  returnPolicyText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    fontWeight: '600',
   },
 });
