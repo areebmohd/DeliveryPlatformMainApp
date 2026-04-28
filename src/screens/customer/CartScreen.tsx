@@ -258,11 +258,13 @@ export const CartScreen = ({ navigation }: any) => {
           .in('id', Array.from(productIds));
         
         if (!pError && pData) {
-          const mapping = { ...offerProductDetails };
-          pData.forEach(p => {
-            mapping[p.id] = p;
+          setOfferProductDetails(prev => {
+            const mapping = { ...prev };
+            pData.forEach(p => {
+              mapping[p.id] = p;
+            });
+            return mapping;
           });
-          setOfferProductDetails(mapping);
         }
       }
     } catch (e) {
@@ -271,7 +273,7 @@ export const CartScreen = ({ navigation }: any) => {
     } finally {
       setModalLoading(false);
     }
-  }, [offerProductDetails, showAlert]);
+  }, [showAlert]);
 
   const navigateToStore = useCallback(async (storeId: string) => {
     try {
@@ -560,7 +562,7 @@ export const CartScreen = ({ navigation }: any) => {
     });
     setIsOffersModalVisible(false);
     showToast('Offer applied successfully!', 'success');
-  }, [appliedOffers, setAppliedOffers, showAlert, showToast]);
+  }, [appliedOffers, setAppliedOffers, showAlert, showToast, checkOfferConditions, setItems]);
 
   const renderConditionLine = (offer: any) => {
     const list = getOfferConditionList(offer);

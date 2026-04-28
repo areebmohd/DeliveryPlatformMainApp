@@ -48,7 +48,14 @@ export const BusinessStoreProvider: React.FC<{ children: React.ReactNode }> = ({
       
       // Keep the current active store if it still exists in the list, otherwise pick the first one
       if (data && data.length > 0) {
-        if (!activeStore || !data.find(s => s.id === activeStore.id)) {
+        if (activeStore) {
+          const updatedStore = data.find(s => s.id === activeStore.id);
+          if (updatedStore) {
+            setActiveStore(updatedStore);
+          } else {
+            setActiveStore(data[0]);
+          }
+        } else {
           setActiveStore(data[0]);
         }
       } else {
