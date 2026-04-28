@@ -12,41 +12,41 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
-import { supabase, deleteFile } from '../../api/supabase';
-import { useAuth } from '../../context/AuthContext';
-import { useAlert } from '../../context/AlertContext';
+import { supabase } from '../../api/supabase';
+import { useBusinessStore } from '../../context/BusinessStoreContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-export const ReturnsScreen = ({ navigation }: any) => {
+export const BusinessReturnsScreen = ({ navigation }: any) => {
   const [returns, setReturns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { user } = useAuth();
-  const { showAlert, showToast, hideAlert } = useAlert();
+  const { activeStore } = useBusinessStore();
   const insets = useSafeAreaInsets();
 
   const fetchReturns = useCallback(async () => {
     try {
-      if (!user?.id) return;
+      if (!activeStore?.id) return;
       
       const { data, error } = await supabase
         .from('returns')
         .select(`
           *,
-          orders (order_number),
-          products (name, image_url)
+          products!inner(name, image_url, store_id),
+          orders(order_number),
+          profiles:user_id(full_name, phone)
         `)
-        .eq('user_id', user.id)
+        .eq('products.store_id', activeStore.id)
+        .in('status', ['approved', 'returned', 'refund_paid', 'rider_assigned', 'picked_up_from_customer', 'dropped_at_store', 'delivering_exchange', 'completed'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setReturns(data || []);
     } catch (e) {
-      console.error('Error fetching returns:', e);
+      console.error('Error fetching business returns:', e);
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [activeStore?.id]);
 
   useEffect(() => {
     fetchReturns();
@@ -58,103 +58,7 @@ export const ReturnsScreen = ({ navigation }: any) => {
     setRefreshing(false);
   };
 
-  const handleCancelReturn = async (item: any) => {
-    showAlert({
-      title: 'Cancel Return?',
-      message: 'Are you sure you want to cancel this return request? This action cannot be undone.',
-      type: 'warning',
-      primaryAction: {
-        text: 'No',
-        onPress: () => {}, // Modal closes automatically
-        variant: 'secondary'
-      },
-      secondaryAction: {
-        text: 'Yes',
-        onPress: async () => {
-          hideAlert(); // Close alert immediately
-          try {
-            setLoading(true);
-            
-            // 1. Delete image from storage
-            if (item.image_url) {
-              await deleteFile('products', item.image_url);
-            }
-
-            // 2. Delete record from database
-            const { error: deleteError } = await supabase
-              .from('returns')
-              .delete()
-              .eq('id', item.id);
-
-            if (deleteError) throw deleteError;
-
-            showToast('Return request cancelled successfully', 'success');
-            
-            // Re-fetch to update UI
-            await fetchReturns();
-          } catch (e: any) {
-            showAlert({ 
-              title: 'Error', 
-              message: e.message || 'Failed to cancel return. Please try again.', 
-              type: 'error' 
-            });
-          } finally {
-            setLoading(false);
-          }
-        },
-        variant: 'destructive'
-      },
-      showCancel: false
-    });
-  };
-
-  const getStatusStyle = (status: string, adminComment?: string) => {
-    switch (status) {
-      case 'pending':
-        return { color: Colors.warning, bg: Colors.warning + '15', label: 'Pending', icon: 'clock-outline', note: 'Awaiting admin approval' };
-      case 'approved':
-        return { 
-          color: Colors.success, 
-          bg: Colors.success + '15', 
-          label: 'Approved', 
-          icon: 'check-circle-outline', 
-          note: 'Admin has approved your return request, a rider will contact you soon to pickup the return product and you will soon get your refund/exchange.' 
-        };
-      case 'refund_paid':
-        return { 
-          color: Colors.success, 
-          bg: Colors.success + '15', 
-          label: 'Refund Paid', 
-          icon: 'cash-check', 
-          note: 'Refund has been successfully processed and paid.' 
-        };
-      case 'rejected':
-        return { 
-          color: Colors.error, 
-          bg: Colors.error + '15', 
-          label: 'Rejected', 
-          icon: 'close-circle-outline', 
-          note: adminComment ? `${adminComment}` : 'Request was rejected' 
-        };
-      case 'returned':
-        return { color: Colors.primary, bg: Colors.primary + '15', label: 'Returned', icon: 'package-variant', note: 'Return completed' };
-      case 'rider_assigned':
-        return { color: Colors.primary, bg: Colors.primary + '15', label: 'Rider Assigned', icon: 'motorbike', note: 'Rider is on the way. Please provide the Pickup OTP.' };
-      case 'picked_up_from_customer':
-        return { color: Colors.primary, bg: Colors.primary + '15', label: 'Picked Up', icon: 'package-up', note: 'Product is on the way to the store.' };
-      case 'dropped_at_store':
-        return { color: Colors.primary, bg: Colors.primary + '15', label: 'At Store', icon: 'store', note: 'Product has reached the store. Awaiting exchange processing.' };
-      case 'delivering_exchange':
-        return { color: Colors.primary, bg: Colors.primary + '15', label: 'Exchange on way', icon: 'truck-delivery', note: 'Rider is bringing your exchange product.' };
-      case 'completed':
-        return { color: Colors.success, bg: Colors.success + '15', label: 'Completed', icon: 'check-all', note: 'Return process fully completed.' };
-      default:
-        return { color: Colors.textSecondary, bg: Colors.surface, label: status, icon: 'help-circle-outline', note: '' };
-    }
-  };
-
   const renderReturnItem = ({ item }: { item: any }) => {
-    const status = getStatusStyle(item.status, item.admin_comment);
     const date = new Date(item.created_at).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -168,8 +72,10 @@ export const ReturnsScreen = ({ navigation }: any) => {
             <Text style={styles.orderIdText}>Order #{item.orders?.order_number}</Text>
             <Text style={styles.dateText}>{date}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: (item.status === 'approved' || item.status === 'refund_paid' || item.status === 'completed') ? Colors.success + '15' : Colors.primary + '15' }]}>
+            <Text style={[styles.statusLabel, { color: (item.status === 'approved' || item.status === 'refund_paid' || item.status === 'completed') ? Colors.success : Colors.primary }]}>
+              {item.status.replace(/_/g, ' ')}
+            </Text>
           </View>
         </View>
 
@@ -180,19 +86,22 @@ export const ReturnsScreen = ({ navigation }: any) => {
           />
           <View style={styles.productInfo}>
             <Text style={styles.productName} numberOfLines={1}>{item.products?.name}</Text>
-            <View style={styles.typeBadgeRow}>
-              <View style={styles.typeBadge}>
-                <Text style={styles.typeBadgeText}>{item.return_type}</Text>
-              </View>
-              <Text style={styles.reasonText} numberOfLines={1}>
-                {item.reason}
-              </Text>
+            <View style={styles.userRow}>             
+              <Text style={styles.userName}>{item.profiles?.full_name}</Text>
+            </View>
+            <View style={styles.typeBadge}>
+              <Text style={styles.typeBadgeText}>{item.return_type}</Text>
             </View>
           </View>
         </View>
 
+        <View style={styles.reasonBox}>
+          <Text style={styles.reasonLabel}>Reason</Text>
+          <Text style={styles.reasonText}>{item.reason}</Text>
+        </View>
+
         {!['completed', 'returned', 'rejected'].includes(item.status) && item.image_url && (
-          <TouchableOpacity onPress={() => Linking.openURL(item.image_url)} style={{ marginTop: 8, marginBottom: 0 }}>
+          <TouchableOpacity onPress={() => Linking.openURL(item.image_url)} style={{ marginTop: 8, marginBottom: 0, marginLeft: 12 }}>
             <Text style={{ color: Colors.primary, fontWeight: '600', fontSize: 13 }}>
               View uploaded image
             </Text>
@@ -200,34 +109,16 @@ export const ReturnsScreen = ({ navigation }: any) => {
         )}
 
         <View style={styles.cardFooter}>
-          <View style={styles.footerNote}>
-            <Icon name={status.icon} size={16} color={status.color} />
-            <Text style={[styles.footerNoteText, { color: status.color }]}>
-              {status.note}
-            </Text>
-          </View>
-          {item.status === 'pending' && (
-            <TouchableOpacity 
-              style={styles.cancelBtn}
-              onPress={() => handleCancelReturn(item)}
-            >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-          )}
+          <Icon name="truck-delivery-outline" size={18} color={Colors.primary} />
+          <Text style={styles.footerNoteText}>
+            Rider will bring back the returned product to you for Refund/Exchange.
+          </Text>
         </View>
 
-        {/* Display OTPs based on status */}
-        {item.status === 'rider_assigned' && item.otp_customer_pickup && (
+        {item.status === 'picked_up_from_customer' && item.otp_store_drop && (
           <View style={[styles.otpBox, { backgroundColor: Colors.primary + '10' }]}>
-            <Text style={styles.otpLabel}>Pickup OTP</Text>
-            <Text style={styles.otpValue}>{item.otp_customer_pickup}</Text>
-          </View>
-        )}
-        
-        {item.status === 'delivering_exchange' && item.otp_customer_exchange && item.return_type === 'Exchange' && (
-          <View style={[styles.otpBox, { backgroundColor: Colors.primary + '10' }]}>
-            <Text style={styles.otpLabel}>Exchange Delivery OTP</Text>
-            <Text style={styles.otpValue}>{item.otp_customer_exchange}</Text>
+            <Text style={styles.otpLabel}>Store Drop OTP</Text>
+            <Text style={styles.otpValue}>{item.otp_store_drop}</Text>
           </View>
         )}
       </View>
@@ -243,7 +134,7 @@ export const ReturnsScreen = ({ navigation }: any) => {
         >
           <Icon name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.screenTitle}>Applied Returns</Text>
+        <Text style={styles.screenTitle}>Approved Returns</Text>
       </View>
 
       {loading ? (
@@ -262,9 +153,9 @@ export const ReturnsScreen = ({ navigation }: any) => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="keyboard-return" size={80} color={Colors.border} />
-              <Text style={styles.emptyTitle}>No returns applied</Text>
+              <Text style={styles.emptyTitle}>No approved returns</Text>
               <Text style={styles.emptySubtitle}>
-                Any return requests you make will appear here with their status.
+                When returns are approved by admin, they will appear here for your reference.
               </Text>
             </View>
           }
@@ -370,22 +261,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text,
   },
-  reasonText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  typeBadgeRow: {
+  userRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 6,
+    gap: 4,
+    marginTop: 2,
+  },
+  userName: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '600',
   },
   typeBadge: {
     backgroundColor: Colors.primary + '10',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: 6,
   },
   typeBadgeText: {
     fontSize: 10,
@@ -393,37 +286,38 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
   },
-  footerNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
+  reasonBox: {
+    marginTop: Spacing.md,
+    padding: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
   },
-  footerNoteText: {
+  reasonLabel: {
     fontSize: 12,
+    fontWeight: '700',
     color: Colors.textSecondary,
-    fontWeight: '600',
-    fontStyle: 'italic',
+    marginBottom: 2,
+  },
+  reasonText: {
+    fontSize: 13,
+    color: Colors.text,
+    lineHeight: 18,
   },
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 8,
     marginTop: Spacing.md,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.border + '50',
   },
-  cancelBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: Colors.error + '10',
-  },
-  cancelBtnText: {
+  footerNoteText: {
     fontSize: 12,
+    color: Colors.primary,
     fontWeight: '700',
-    color: Colors.error,
+    flex: 1,
+    fontStyle: 'italic',
   },
   center: {
     flex: 1,
@@ -452,7 +346,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: Spacing.sm,
+    marginTop: Spacing.md,
     padding: Spacing.md,
     borderRadius: 8,
     borderWidth: 1,
@@ -470,5 +364,3 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
 });
-
-export default ReturnsScreen;

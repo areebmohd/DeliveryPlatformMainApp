@@ -113,19 +113,14 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
             onPress={() => navigation.navigate('Notifications')} 
           />
           <OptionItem 
-            icon="crown-outline" 
-            label="Premium" 
-            onPress={() => navigation.navigate('Premium')} 
+            icon="keyboard-return" 
+            label="Returns" 
+            onPress={() => navigation.navigate('Returns')} 
           />
           <OptionItem 
             icon="chart-areaspline" 
             label="Dashboard" 
             onPress={() => navigation.navigate('Dashboard')} 
-          />
-          <OptionItem 
-            icon="bullhorn-outline" 
-            label="Advertise" 
-            onPress={() => navigation.navigate('Advertise')} 
           />
           <OptionItem 
             icon="chat-question-outline" 

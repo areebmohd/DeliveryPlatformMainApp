@@ -335,7 +335,20 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
               <Text style={styles.totalLabel}>Grand Total</Text>
               {item.status === 'delivered' && (
                 <TouchableOpacity 
-                  onPress={() => navigation.navigate('ApplyReturn', { order: item })}
+                  onPress={() => {
+                    const deliveredAt = new Date(item.updated_at).getTime();
+                    const now = new Date().getTime();
+                    const diffInHours = (now - deliveredAt) / (1000 * 60 * 60);
+
+                    if (diffInHours > 24) {
+                      return showAlert({
+                        title: 'Return time finished',
+                        message: 'Return can be applied only within 24 hours of delivery.',
+                        type: 'info'
+                      });
+                    }
+                    navigation.navigate('ApplyReturn', { order: item });
+                  }}
                   style={{ marginTop: 4 }}
                 >
                   <Text style={styles.applyReturnText}>Apply Return</Text>
@@ -856,11 +869,6 @@ const styles = StyleSheet.create({
     color: Colors.success,
     fontWeight: '600',
     marginTop: 1,
-  },
-  viewSharesText: {
-    fontSize: 12,
-    color: Colors.primary,
-    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,

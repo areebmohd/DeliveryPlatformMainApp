@@ -26,6 +26,7 @@ export const AccountScreen = ({ navigation }: any) => {
   // Edit states
   const [editName, setEditName] = useState(profile?.full_name || '');
   const [editPhone, setEditPhone] = useState(profile?.phone || '');
+  const [editUpiId, setEditUpiId] = useState(profile?.upi_id || '');
 
   const { showAlert, showToast } = useAlert();
 
@@ -47,6 +48,7 @@ export const AccountScreen = ({ navigation }: any) => {
     const result = await updateProfile({
       full_name: editName,
       phone: editPhone,
+      upi_id: editUpiId,
     });
     setLoading(false);
 
@@ -56,7 +58,7 @@ export const AccountScreen = ({ navigation }: any) => {
     } else {
       showAlert({ title: 'Error', message: 'Failed to update profile. Please try again.', type: 'error' });
     }
-  }, [editName, editPhone, updateProfile, showAlert, showToast]);
+  }, [editName, editPhone, editUpiId, updateProfile, showAlert, showToast]);
 
   const OptionItem = useCallback(({ icon, label, onPress, isLast }: { icon: string; label: string; onPress?: () => void; isLast?: boolean }) => (
     <TouchableOpacity 
@@ -82,7 +84,7 @@ export const AccountScreen = ({ navigation }: any) => {
       >
         <Text style={styles.headerTitle}>Customer Account</Text>
 
-        {/* Premium User Profile Box */}
+        {/* User Profile Box */}
         <View style={styles.profileCard}>
           <View style={[styles.profileHeader, !isEditing && styles.noBottomMargin]}>
             <View style={styles.avatarWrapper}>
@@ -98,6 +100,10 @@ export const AccountScreen = ({ navigation }: any) => {
                 <Icon name="phone-outline" size={12} color={Colors.success} />
                 <Text style={styles.membershipText}>{profile?.phone || 'No phone set'}</Text>
               </View>
+              <View style={[styles.membershipBadge, { marginTop: 4, backgroundColor: Colors.primary + '15' }]}>
+                <Icon name="bank-outline" size={12} color={Colors.primary} />
+                <Text style={[styles.membershipText, { color: Colors.primary }]}>{profile?.upi_id || 'No UPI ID set'}</Text>
+              </View>              
             </View>
             <TouchableOpacity 
               onPress={() => setIsEditing(!isEditing)} 
@@ -124,6 +130,16 @@ export const AccountScreen = ({ navigation }: any) => {
                 keyboardType="phone-pad"
                 leftIcon="phone-outline"
               />
+              <Input
+                label="UPI ID"
+                value={editUpiId}
+                onChangeText={setEditUpiId}
+                placeholder="example@upi"
+                leftIcon="bank-outline"
+              />
+              <Text style={{ fontSize: 11, color: Colors.textSecondary, marginTop: -8, marginBottom: 12, marginLeft: 4, fontStyle: 'italic' }}>
+                * This UPI ID will be used for secure refunds
+              </Text>
               <Button 
                 title="Save Profile" 
                 onPress={handleUpdateProfile} 

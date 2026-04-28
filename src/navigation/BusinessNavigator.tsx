@@ -13,13 +13,11 @@ import { Colors } from '../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { NotificationsScreen } from '../screens/business/NotificationsScreen';
-import { PremiumScreen } from '../screens/business/PremiumScreen';
 import { DashboardScreen } from '../screens/business/DashboardScreen';
 import { ProductFormScreen } from '../screens/business/ProductFormScreen';
 import { StoreDetailsFormScreen } from '../screens/business/StoreDetailsFormScreen';
 import { PaymentsScreen } from '../screens/business/PaymentsScreen';
 import { SupportScreen } from '../screens/business/SupportScreen';
-import { AdvertiseScreen } from '../screens/business/AdvertiseScreen';
 import { MapSelectionScreen } from '../screens/customer/MapSelectionScreen';
 
 const Tab = createBottomTabNavigator();
@@ -38,16 +36,17 @@ const StoreStack = () => {
   );
 };
 
+import { BusinessReturnsScreen } from '../screens/business/BusinessReturnsScreen';
+
 const AccountStack = () => {
   return (
     <AccountStackNav.Navigator screenOptions={{ headerShown: false }}>
       <AccountStackNav.Screen name="AccountMain" component={BusinessAccountScreen} />
       <AccountStackNav.Screen name="Notifications" component={NotificationsScreen} />
-      <AccountStackNav.Screen name="Premium" component={PremiumScreen} />
       <AccountStackNav.Screen name="Dashboard" component={DashboardScreen} />
       <AccountStackNav.Screen name="Payments" component={PaymentsScreen} />
+      <AccountStackNav.Screen name="Returns" component={BusinessReturnsScreen} />
       <AccountStackNav.Screen name="Support" component={SupportScreen} />
-      <AccountStackNav.Screen name="Advertise" component={AdvertiseScreen} />
     </AccountStackNav.Navigator>
   );
 };
@@ -61,7 +60,7 @@ export const BusinessNavigator = () => {
         const routeName = getFocusedRouteNameFromRoute(route);
         const hideOnScreens = [
           'ManageProducts', 'ProductForm', 'StoreDetailsForm', 'MapSelection',
-          'Notifications', 'Premium', 'Dashboard', 'Payments', 'Support', 'Advertise'
+          'Notifications', 'Dashboard', 'Payments', 'Returns', 'Support'
         ];
         const isTabVisible = !hideOnScreens.includes(routeName as string);
 

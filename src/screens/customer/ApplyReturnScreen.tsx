@@ -18,6 +18,7 @@ import { Input } from '../../components/ui/Input';
 import { useAlert } from '../../context/AlertContext';
 import { supabase, uploadImage } from '../../api/supabase';
 import { launchCamera } from 'react-native-image-picker';
+import { getItemTotals } from '../../utils/offerUtils';
 
 const RETURN_REASONS = [
   'Damaged or Defective product',
@@ -48,11 +49,12 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
     try {
       const { data, error } = await supabase
         .from('returns')
-        .select('product_id')
+        .select('product_id, status')
         .eq('order_id', order.id);
 
       if (error) throw error;
-      setExistingReturns(data?.map(r => r.product_id) || []);
+      const activeReturns = data?.filter(r => r.status !== 'rejected').map(r => r.product_id) || [];
+      setExistingReturns(activeReturns);
     } catch (e) {
       console.error('Error fetching existing returns:', e);
     } finally {
@@ -100,6 +102,22 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
       const fileName = `returns/${user.id}/${Date.now()}.jpg`;
       const imageUrl = await uploadImage('products', fileName, image.base64);
 
+      // Calculate refund amount
+      let refundAmount = 0;
+      if (selectedReturnType === 'Refund') {
+        try {
+          const storeId = selectedProduct.products?.stores?.id || order.store_id;
+          const storeOffer = order.applied_offers?.[storeId];
+          const allStoreItems = order.order_items.filter((i: any) => 
+            (i.products?.stores?.id || order.store_id) === storeId
+          );
+          const { discounted } = getItemTotals(selectedProduct, allStoreItems, storeOffer);
+          refundAmount = Math.round(discounted);
+        } catch (e) {
+          refundAmount = selectedProduct.product_price * selectedProduct.quantity;
+        }
+      }
+
       // Insert return record
       const { error } = await supabase
         .from('returns')
@@ -110,7 +128,8 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
           reason: selectedReason,
           return_type: selectedReturnType,
           image_url: imageUrl,
-          status: 'pending'
+          status: 'pending',
+          refund_amount: refundAmount > 0 ? refundAmount : null
         });
 
       if (error) throw error;
