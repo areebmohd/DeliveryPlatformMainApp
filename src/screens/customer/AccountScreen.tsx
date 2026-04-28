@@ -45,6 +45,17 @@ export const AccountScreen = ({ navigation }: any) => {
   }, [signOut, showAlert]);
 
   const handleUpdateProfile = useCallback(async () => {
+    if (!editPhone || !editPhone.trim()) {
+      showAlert({ title: 'Required Field', message: 'Phone Number is mandatory.', type: 'error' });
+      return;
+    }
+
+    if (!editUpiId || !editUpiId.trim()) {
+      showAlert({ title: 'Required Field', message: 'UPI ID is mandatory as it is required for refunds.', type: 'error' });
+      return;
+    }
+
+    setLoading(true);
     const result = await updateProfile({
       full_name: editName,
       phone: editPhone,
@@ -123,7 +134,7 @@ export const AccountScreen = ({ navigation }: any) => {
                 leftIcon="account-outline"
               />
               <Input
-                label="Phone Number"
+                label="Phone Number *"
                 value={editPhone}
                 onChangeText={setEditPhone}
                 placeholder="Enter phone number"
@@ -131,7 +142,7 @@ export const AccountScreen = ({ navigation }: any) => {
                 leftIcon="phone-outline"
               />
               <Input
-                label="UPI ID"
+                label="UPI ID *"
                 value={editUpiId}
                 onChangeText={setEditUpiId}
                 placeholder="example@upi"

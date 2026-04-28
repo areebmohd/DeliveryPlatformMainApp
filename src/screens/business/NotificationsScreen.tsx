@@ -33,7 +33,7 @@ export const NotificationsScreen = ({ navigation }: any) => {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .or(`user_id.eq.${user.id},target_group.eq.business`)
+        .or(`user_id.eq.${user.id},and(user_id.is.null,target_group.eq.business)`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
