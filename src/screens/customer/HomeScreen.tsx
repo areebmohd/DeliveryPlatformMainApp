@@ -277,7 +277,7 @@ export const HomeScreen = ({ navigation }: any) => {
           .sort((a: any, b: any) => a._distance - b._distance);
       }
 
-      setStores(sortedStores);
+      setStores(sortedStores.slice(0, 10));
     } catch (e) {
       // Silent in production
     } finally {
@@ -329,7 +329,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
         if (fbError) throw fbError;
         const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
-        setBestSellers(deduplicateProducts(fallbackData || [], userCoords));
+        setBestSellers(deduplicateProducts(fallbackData || [], userCoords).slice(0, 20));
         return;
       }
 
@@ -348,18 +348,42 @@ export const HomeScreen = ({ navigation }: any) => {
       if (pError) throw pError;
 
       const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
-      const deduped = deduplicateProducts(productData || [], userCoords);
+      let finalBestSellers = deduplicateProducts(productData || [], userCoords);
 
-      // Sort deduplicated products by their sales rank
+      // Sort by sales rank
       const rankMap = new Map<string, number>();
       sortedProductIds.forEach((id, index) => rankMap.set(id, index));
-      deduped.sort((a: any, b: any) => {
+      finalBestSellers.sort((a: any, b: any) => {
         const rankA = rankMap.get(a.id) ?? Infinity;
         const rankB = rankMap.get(b.id) ?? Infinity;
         return rankA - rankB;
       });
 
-      setBestSellers(deduped.slice(0, 10));
+      // If we have fewer than 20 items, fill with recent products
+      if (finalBestSellers.length < 20) {
+        const excludeIds = [...topIds, ...finalBestSellers.map(p => p.id)].filter(id => !!id);
+        let query = supabase
+          .from('products')
+          .select('*, stores:stores_view!inner(*)')
+          .eq('stores.is_active', true)
+          .eq('stores.is_approved', true)
+          .eq('is_deleted', false)
+          .eq('is_info_complete', true)
+          .eq('in_stock', true);
+        
+        if (excludeIds.length > 0) {
+          query = query.not('id', 'in', `(${excludeIds.join(',')})`);
+        }
+        
+        const { data: moreProducts } = await query.limit(20 - finalBestSellers.length);
+        
+        if (moreProducts) {
+          const additional = deduplicateProducts(moreProducts, userCoords);
+          finalBestSellers = [...finalBestSellers, ...additional];
+        }
+      }
+
+      setBestSellers(finalBestSellers.slice(0, 20));
     } catch (e) {
       // Silent in production
     } finally {

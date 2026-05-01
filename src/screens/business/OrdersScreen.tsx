@@ -334,14 +334,14 @@ export const OrdersScreen = () => {
                     )}
                   </Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginHorizontal: 8 }}>
-                  {discounted < original ? (
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginHorizontal: 8 }}>
+                  {discounted < original - 0.1 ? (
                     <>
+                      <Text style={[styles.itemPriceText, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 13 }]}>
+                        ₹{original}
+                      </Text>
                       <Text style={[styles.itemPriceText, { color: Colors.success, fontWeight: '800' }]}>
                         ₹{Math.round(discounted)}
-                      </Text>
-                      <Text style={[styles.itemPriceText, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 11 }]}>
-                        ₹{original}
                       </Text>
                     </>
                   ) : (
@@ -358,25 +358,30 @@ export const OrdersScreen = () => {
           })}
         </View>
 
-        {/* Applied Offers for THIS store */}
+        {/* Promotions Section */}
         {(() => {
           const storeId = store?.id;
-          if (!item.applied_offers || !storeId) return null;
+          if (!item.applied_offers) return null;
 
           const storeOffers = [];
-          const stdOffer = item.applied_offers[storeId];
-          const delOffer = item.applied_offers[`${storeId}_delivery`];
+          if (storeId) {
+            const stdOffer = item.applied_offers[storeId];
+            const delOffer = item.applied_offers[`${storeId}_delivery`];
+            if (stdOffer) storeOffers.push(stdOffer);
+            if (delOffer) storeOffers.push(delOffer);
+          }
 
-          if (stdOffer) storeOffers.push(stdOffer);
-          if (delOffer) storeOffers.push(delOffer);
-
-          if (storeOffers.length === 0) return null;
+          const hasAppOffer = !!item.applied_offers?.app_offer;
+          
+          if (storeOffers.length === 0 && !hasAppOffer) return null;
 
           return (
             <View style={styles.promoContainer}>
               <Text style={styles.promoLabel}>PROMOTIONS APPLIED</Text>
+              
+              {/* Store Offers */}
               {storeOffers.map((offer, oIdx) => (
-                <View key={oIdx} style={styles.promoBadge}>
+                <View key={`store-${oIdx}`} style={styles.promoBadge}>
                   <View style={styles.promoIconCircle}>
                     <Icon name="ticket-percent" size={14} color={Colors.success} />
                   </View>
@@ -390,6 +395,19 @@ export const OrdersScreen = () => {
                   </View>
                 </View>
               ))}
+
+              {/* App Offer */}
+              {hasAppOffer && (
+                <View style={[styles.promoBadge, { backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '20', borderWidth: 1, marginBottom: 0 }]}>
+                  <View style={[styles.promoIconCircle, { backgroundColor: Colors.primary }]}>
+                    <Icon name="ticket-percent" size={14} color={Colors.white} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.promoTitle, { color: Colors.primary }]}>App Offer</Text>
+                    <Text style={[styles.promoDescription, { color: Colors.primary, opacity: 0.8 }]}>Free delivery above ₹99</Text>
+                  </View>
+                </View>
+              )}
             </View>
           );
         })()}
@@ -533,7 +551,9 @@ export const OrdersScreen = () => {
                   {breakdownModal.order.delivery_fee !== undefined && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Delivery Fee</Text>
-                      <Text style={styles.breakdownValue}>₹{breakdownModal.order.delivery_fee}</Text>
+                      <Text style={styles.breakdownValue}>
+                        {breakdownModal.order.applied_offers?.app_offer ? '₹0' : `₹${breakdownModal.order.delivery_fee}`}
+                      </Text>
                     </View>
                   )}
                   {breakdownModal.order.platform_fee !== undefined && (

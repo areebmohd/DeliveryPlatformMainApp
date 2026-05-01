@@ -51,6 +51,10 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             selected_options,
             products (
               id,
+              name,
+              weight_kg,
+              barcode,
+              product_type,
               allow_refund,
               allow_exchange,
               stores (id, name)
@@ -233,27 +237,28 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* Items Grouped by Store */}
         {(() => {
-          const groups: { [key: string]: any[] } = {};
+          const groups: { [key: string]: { name: string, items: any[], id: string } } = {};
           item.order_items.forEach((oi: any) => {
-            const sName = oi.products?.stores?.name || item.stores?.name || 'Multiple Stores';
-            if (!groups[sName]) groups[sName] = [];
-            groups[sName].push(oi);
+            const product = Array.isArray(oi.products) ? oi.products[0] : oi.products;
+            const store = product?.stores || item.stores;
+            const sId = store?.id || 'unknown';
+            const sName = store?.name || 'Multiple Stores';
+            if (!groups[sId]) groups[sId] = { name: sName, items: [], id: sId };
+            groups[sId].items.push(oi);
           });
 
-          return Object.keys(groups).map((sName, gIdx) => (
+          return Object.values(groups).map((group, gIdx) => (
             <View key={gIdx} style={styles.storeSection}>
               <View style={styles.storeHeaderRow}>
                 <Icon name="storefront-outline" size={16} color={Colors.text} />
-                <Text style={styles.storeName}>{sName}</Text>
+                <Text style={styles.storeName}>{group.name}</Text>
               </View>
               <View style={styles.itemsList}>
                 {(() => {
-                  const storeId = groups[sName][0]?.products?.stores?.id || item.stores?.id || 'unknown';
-                  const storeOffer = item.applied_offers?.[storeId];
-                  return groups[sName].map((oi: any, idx: number) => {
-                    const { original, discounted } = getItemTotals(oi, groups[sName], storeOffer);
+                  const storeOffer = item.applied_offers?.[group.id];
+                  return group.items.map((oi: any, idx: number) => {
+                    const { original, discounted } = getItemTotals(oi, group.items, storeOffer);
                     return (
                       <View key={idx} style={styles.orderItemWrapper}>
                         <View style={styles.orderItemRow}>
@@ -270,13 +275,13 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
                               )}
                             </Text>
                           </View>
-                          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginLeft: 8 }}>
-                            {discounted < original ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginLeft: 8 }}>
+                            {discounted < original - 0.1 ? (
                               <>
-                                <Text style={styles.itemPrice}>₹{Math.round(discounted)}</Text>
-                                <Text style={[styles.itemPrice, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 11 }]}>
+                                <Text style={[styles.itemPrice, { textDecorationLine: 'line-through', color: Colors.textSecondary, fontSize: 13 }]}>
                                   ₹{original}
                                 </Text>
+                                <Text style={[styles.itemPrice, { color: Colors.success }]}>₹{Math.round(discounted)}</Text>
                               </>
                             ) : (
                               <Text style={styles.itemPrice}>₹{original}</Text>
@@ -291,7 +296,7 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
 
               {/* Applied Offers for this store */}
               {(() => {
-                const storeId = groups[sName][0]?.products?.stores?.id || item.stores?.id;
+                const storeId = group.id;
                 if (!item.applied_offers || !storeId) return null;
 
                 const storeOffers = [];
@@ -322,6 +327,19 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
             </View>
           ));
         })()}
+
+        {/* App Offer Display */}
+        {item.applied_offers?.app_offer && (
+          <View style={styles.appOfferBadge}>
+            <View style={styles.appOfferIconBox}>
+              <Icon name="ticket-percent" size={14} color={Colors.white} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.appOfferTitle}>App Offer</Text>
+              <Text style={styles.appOfferDesc}>Free delivery above ₹99</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.cardFooter}>
           {item.transport_type === 'heavy' && item.has_helper && (
@@ -456,7 +474,9 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
                   {breakdownModal.order.delivery_fee !== undefined && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Delivery Fee</Text>
-                      <Text style={styles.breakdownValue}>₹{breakdownModal.order.delivery_fee}</Text>
+                      <Text style={styles.breakdownValue}>
+                        {breakdownModal.order.applied_offers?.app_offer ? '₹0' : `₹${breakdownModal.order.delivery_fee}`}
+                      </Text>
                     </View>
                   )}
                   {breakdownModal.order.platform_fee !== undefined && (
@@ -958,5 +978,34 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 16,
     fontWeight: '800',
+  },
+  appOfferBadge: {
+    flexDirection: 'row',
+    backgroundColor: Colors.primaryLight,
+    padding: 10,
+    borderRadius: 14,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary + '20',
+    gap: 10,
+    alignItems: 'center',
+  },
+  appOfferIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  appOfferTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  appOfferDesc: {
+    fontSize: 11,
+    color: Colors.primary,
+    opacity: 0.8,
   },
 });

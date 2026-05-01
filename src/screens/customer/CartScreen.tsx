@@ -11,6 +11,7 @@ import {
   TextInput,
   Dimensions,
   Linking,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -793,6 +794,8 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
+  const isAppOfferActive = !!appliedOffers['app_offer'] && subtotal >= 99;
+
   const platformFee = subtotal >= 1000 ? 20 : (subtotal >= 500 ? 10 : 5);
   const baseDeliveryFee = items.length === 0 ? 0 : (
     isLargeVehicle 
@@ -881,7 +884,8 @@ export const CartScreen = ({ navigation }: any) => {
     totalOfferDiscount += offerDiscount;
   });
 
-  deliveryFee = Math.max(0, baseDeliveryFee - totalStoreContribution);
+  const rawDeliveryFee = Math.max(0, baseDeliveryFee - totalStoreContribution);
+  deliveryFee = isAppOfferActive ? 0 : rawDeliveryFee;
 
   // Sync state for use in checkout
   useEffect(() => {
@@ -892,7 +896,11 @@ export const CartScreen = ({ navigation }: any) => {
   const grandTotal = Math.max(0, subtotal + deliveryFee + platformFee + helperFee - totalOfferDiscount);
 
   const handleCheckout = async () => {
-    if (items.length === 0) return;
+    console.log('Checkout button pressed');
+    if (items.length === 0) {
+      showAlert({ title: 'Cart Empty', message: 'Add some items first!', type: 'warning' });
+      return;
+    }
 
     try {
       setLoading(true);
@@ -900,7 +908,7 @@ export const CartScreen = ({ navigation }: any) => {
       
       for (const stId of storesInCart) {
         const { data: store, error: storeError } = await supabase
-          .from('stores_view')
+          .from('stores')
           .select('is_currently_open, opening_hours, name')
           .eq('id', stId)
           .single();
@@ -1088,7 +1096,9 @@ export const CartScreen = ({ navigation }: any) => {
         .insert(orderItems);
       if (itemsError) throw itemsError;
 
-      const appliedOfferIds = Object.values(appliedOffers as Record<string, any>).map(o => o.id).filter(Boolean);
+      const appliedOfferIds = Object.values(appliedOffers as Record<string, any>)
+        .map(o => o.id)
+        .filter(id => id && id !== 'app_free_delivery');
       if (appliedOfferIds.length > 0) {
         await Promise.all(appliedOfferIds.map(oid => supabase.rpc('increment_offer_used_count', { offer_id: oid })));
       }
@@ -1104,7 +1114,7 @@ export const CartScreen = ({ navigation }: any) => {
 
   const processOrder = async () => {
     try {
-      finalizeOrderCreation('pending');
+      await finalizeOrderCreation('pending');
     } catch (e: any) {
       setLoading(false);
       showAlert({ title: 'Error', message: e.message, type: 'error' });
@@ -1379,6 +1389,57 @@ export const CartScreen = ({ navigation }: any) => {
           </View>
         ))}
 
+        {/* App Offers Section */}
+        <View style={styles.appOfferSection}>
+          <Text style={styles.sectionTitle}>App Offers</Text>
+          <View style={[styles.appOfferCard, appliedOffers['app_offer'] && styles.appOfferCardActive]}>
+            <View style={styles.appOfferHeader}>
+              <View style={[styles.appOfferIconBox, appliedOffers['app_offer'] && { backgroundColor: '#d0e4ff' }]}>
+                <Icon name="ticket-percent" size={24} color={Colors.primary} />
+              </View>
+              <View style={styles.appOfferInfo}>
+                <Text style={styles.appOfferTitle}>App Offer</Text>
+                <Text style={styles.appOfferDesc}>Free delivery above ₹99</Text>
+              </View>
+              <TouchableOpacity 
+                style={[styles.appOfferBtn, appliedOffers['app_offer'] ? styles.appOfferRemoveBtn : styles.appOfferAddBtn]}
+                onPress={() => {
+                  const newOffers = { ...appliedOffers };
+                  if (appliedOffers['app_offer']) {
+                    delete newOffers['app_offer'];
+                    showToast('App offer removed', 'info');
+                  } else {
+                    if (subtotal < 99) {
+                      showAlert({
+                        title: 'Min. Order Not Met',
+                        message: 'App offer requires a minimum order of ₹99.',
+                        type: 'warning'
+                      });
+                      return;
+                    }
+                    newOffers['app_offer'] = {
+                      id: 'app_free_delivery',
+                      name: 'App Offer',
+                      type: 'free_delivery' as any,
+                      amount: 0,
+                      conditions: { min_price: 99 },
+                      status: 'active',
+                      store_id: 'platform',
+                      created_at: new Date().toISOString()
+                    };
+                    showToast('App offer applied!', 'success');
+                  }
+                  setAppliedOffers(newOffers);
+                }}
+              >
+                <Text style={[styles.appOfferBtnText, appliedOffers['app_offer'] && styles.appOfferRemoveBtnText]}>
+                  {appliedOffers['app_offer'] ? 'Remove' : 'Add'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
         <View style={styles.addressSection}>
           <Text style={styles.sectionTitle}>Delivery Address</Text>
           <TouchableOpacity 
@@ -1406,8 +1467,9 @@ export const CartScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.billDetails}>
-          <Text style={styles.sectionTitle}>Bill Details</Text>
+        <View style={styles.billingSection}>
+          <Text style={styles.sectionTitle}>Payment Details</Text>
+          <View style={styles.billDetails}>
           
           <View style={styles.billRow}>
             <Text style={styles.billLabel}>Item Total</Text>
@@ -1429,12 +1491,12 @@ export const CartScreen = ({ navigation }: any) => {
                   ? `₹300 pickup fee + ₹30 per km\n(Large Vehicle / Truck)\n\nDistance: ${distance.toFixed(2)} km`
                   : `₹10 pickup fee + ₹5 per km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
               })}>
-                <Icon name="information-outline" size={16} color={Colors.textSecondary} />
+                <Icon name="information-outline" size={16} color={Colors.primary} />
               </TouchableOpacity>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
-              {totalStoreFees > 0 && deliveryFee < baseDeliveryFee && (
+              {(totalStoreFees > 0 || isAppOfferActive) && deliveryFee < baseDeliveryFee && (
                 <Text style={styles.originalTotalText}>₹{baseDeliveryFee.toFixed(2)}</Text>
               )}
             </View>
@@ -1479,7 +1541,7 @@ export const CartScreen = ({ navigation }: any) => {
                 title: 'Platform Fee',
                 content: '• Orders below ₹500: ₹5 platform fee\n• Orders below ₹1000: ₹10 platform fee\n• Orders above ₹1000: ₹20 platform fee'
               })}>
-                <Icon name="information-outline" size={16} color={Colors.textSecondary} />
+                <Icon name="information-outline" size={16} color={Colors.primary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.billValue}>₹{platformFee.toFixed(2)}</Text>
@@ -1494,6 +1556,7 @@ export const CartScreen = ({ navigation }: any) => {
               )}
             </View>
           </View>
+        </View>
         </View>
 
         <View style={styles.paymentSection}>
@@ -1948,7 +2011,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   billValue: {
-    color: Colors.text,
+    color: Colors.primary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -1966,7 +2029,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 20,
     fontWeight: '900',
-    color: Colors.text,
+    color: Colors.primary,
   },
   footer: {
     position: 'absolute',
@@ -1985,6 +2048,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
+    zIndex: 1000,
   },
   checkoutInfo: {
     flex: 1,
@@ -1992,7 +2056,7 @@ const styles = StyleSheet.create({
   checkoutTotal: {
     fontSize: 22,
     fontWeight: '900',
-    color: Colors.text,
+    color: Colors.primary,
   },
   checkoutLabel: {
     fontSize: 12,
@@ -2461,6 +2525,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   billingSection: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xl,
   },
   originalTotalText: {
     fontSize: 14,
@@ -2624,5 +2690,68 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     color: '#059669',
+  },
+  appOfferSection: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  appOfferCard: {
+    backgroundColor: Colors.white,
+    padding: Spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  appOfferCardActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  appOfferHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  appOfferIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  appOfferInfo: {
+    flex: 1,
+  },
+  appOfferTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  appOfferDesc: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  appOfferBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  appOfferAddBtn: {
+    backgroundColor: Colors.primary,
+  },
+  appOfferRemoveBtn: {
+    backgroundColor: Colors.error,
+  },
+  appOfferBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.white,
+  },
+  appOfferRemoveBtnText: {
+    color: Colors.white,
+    fontWeight: '600',
   },
 });
