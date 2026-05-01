@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -18,7 +20,7 @@ import { Input } from '../../components/ui/Input';
 import { useAlert } from '../../context/AlertContext';
 import { supabase, uploadImage } from '../../api/supabase';
 import { launchCamera } from 'react-native-image-picker';
-import { getItemTotals } from '../../utils/offerUtils';
+
 
 const RETURN_REASONS = [
   'Damaged or Defective product',
@@ -38,12 +40,11 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
   const [fetchingExisting, setFetchingExisting] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState('');
-  const [selectedReturnType, setSelectedReturnType] = useState('');
+  const [selectedReturnType, setSelectedReturnType] = useState('Exchange');
   const [image, setImage] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isProductModalVisible, setIsProductModalVisible] = useState(false);
   const [isReasonModalVisible, setIsReasonModalVisible] = useState(false);
-  const [isReturnTypeModalVisible, setIsReturnTypeModalVisible] = useState(false);
 
   const fetchExistingReturns = useCallback(async () => {
     try {
@@ -67,24 +68,41 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
   }, [fetchExistingReturns]);
 
   const handleSelectImage = async () => {
-    const result = await launchCamera({
-      mediaType: 'photo',
-      includeBase64: true,
-      quality: 0.5,
-      saveToPhotos: false,
-    });
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'App needs access to your camera to take product pictures.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          return showAlert({ title: 'Permission Denied', message: 'Camera permission is required to capture product photos.', type: 'warning' });
+        }
+      }
 
-    if (result.assets && result.assets[0]) {
-      setImage(result.assets[0]);
+      const result = await launchCamera({
+        mediaType: 'photo',
+        includeBase64: true,
+        quality: 0.5,
+        saveToPhotos: false,
+      });
+      if (result.assets && result.assets[0]) {
+        setImage(result.assets[0]);
+      }
+    } catch (e) {
+      console.error('Camera Error:', e);
+      showAlert({ title: 'Error', message: 'Failed to open camera.', type: 'error' });
     }
   };
 
   const handleSubmit = async () => {
     if (!selectedProduct) {
       return showAlert({ title: 'Error', message: 'Please select a product to return.', type: 'error' });
-    }
-    if (!selectedReturnType) {
-      return showAlert({ title: 'Error', message: 'Please select a return type (Refund or Exchange).', type: 'error' });
     }
     if (!selectedReason) {
       return showAlert({ title: 'Error', message: 'Please select a reason for return.', type: 'error' });
@@ -98,27 +116,14 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not found');
 
+      if (!image.base64) {
+        throw new Error('Image data missing. Please try capturing the photo again.');
+      }
+
       // Upload image now on submit
       const fileName = `returns/${user.id}/${Date.now()}.jpg`;
       const imageUrl = await uploadImage('products', fileName, image.base64);
 
-      // Calculate refund amount
-      let refundAmount = 0;
-      if (selectedReturnType === 'Refund') {
-        try {
-          const storeId = selectedProduct.products?.stores?.id || order.store_id;
-          const storeOffer = order.applied_offers?.[storeId];
-          const allStoreItems = order.order_items.filter((i: any) => 
-            (i.products?.stores?.id || order.store_id) === storeId
-          );
-          const { discounted } = getItemTotals(selectedProduct, allStoreItems, storeOffer);
-          refundAmount = Math.round(discounted);
-        } catch (e) {
-          refundAmount = selectedProduct.product_price * selectedProduct.quantity;
-        }
-      }
-
-      // Insert return record
       const { error } = await supabase
         .from('returns')
         .insert({
@@ -126,10 +131,9 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
           product_id: selectedProduct.product_id,
           user_id: user.id,
           reason: selectedReason,
-          return_type: selectedReturnType,
+          return_type: 'Exchange',
           image_url: imageUrl,
-          status: 'pending',
-          refund_amount: refundAmount > 0 ? refundAmount : null
+          status: 'pending'
         });
 
       if (error) throw error;
@@ -145,7 +149,7 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
 
   const renderProductItem = ({ item }: { item: any }) => {
     const isAlreadyReturned = existingReturns.includes(item.product_id);
-    const isAvailable = (item.products?.allow_refund || item.products?.allow_exchange) && !isAlreadyReturned;
+    const isAvailable = !isAlreadyReturned;
     
     return (
       <TouchableOpacity
@@ -158,15 +162,7 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
               type: 'info' 
             });
           }
-          if (!isAvailable) {
-            return showAlert({ 
-              title: 'Not Returnable', 
-              message: 'This product is not available for return as per store policy.', 
-              type: 'info' 
-            });
-          }
           setSelectedProduct(item);
-          setSelectedReturnType(''); // Reset return type when product changes
           setIsProductModalVisible(false);
         }}
       >
@@ -186,20 +182,7 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
     );
   };
 
-  const renderReturnTypeItem = ({ item }: { item: string }) => (
-    <TouchableOpacity
-      style={styles.modalItem}
-      onPress={() => {
-        setSelectedReturnType(item);
-        setIsReturnTypeModalVisible(false);
-      }}
-    >
-      <Text style={styles.modalItemText}>{item}</Text>
-      {selectedReturnType === item && (
-        <Icon name="check-circle" size={20} color={Colors.primary} />
-      )}
-    </TouchableOpacity>
-  );
+
 
   const renderReasonItem = ({ item }: { item: string }) => (
     <TouchableOpacity
@@ -254,21 +237,7 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
           <Icon name="chevron-down" size={24} color={Colors.textSecondary} />
         </TouchableOpacity>
 
-        {/* Return Type Selection - Only if product is selected */}
-        {selectedProduct && (
-          <>
-            <Text style={styles.label}>Return Type</Text>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => setIsReturnTypeModalVisible(true)}
-            >
-              <Text style={[styles.dropdownText, !selectedReturnType && styles.placeholder]}>
-                {selectedReturnType || 'Select return type'}
-              </Text>
-              <Icon name="chevron-down" size={24} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </>
-        )}
+
 
         {/* Reason Selection */}
         <Text style={styles.label}>Reason for Return</Text>
@@ -287,6 +256,7 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
         <TouchableOpacity 
           style={styles.imageUploadBox} 
           onPress={handleSelectImage}
+          activeOpacity={0.7}
         >
           {image ? (
             <View style={styles.imageWrapper}>
@@ -333,28 +303,7 @@ export const ApplyReturnScreen = ({ route, navigation }: any) => {
         </View>
       </Modal>
 
-      {/* Return Type Selection Modal */}
-      <Modal visible={isReturnTypeModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Return Type</Text>
-              <TouchableOpacity onPress={() => setIsReturnTypeModalVisible(false)}>
-                <Icon name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={[
-                ...(selectedProduct?.products?.allow_refund ? ['Refund'] : []),
-                ...(selectedProduct?.products?.allow_exchange ? ['Exchange'] : []),
-              ]}
-              renderItem={renderReturnTypeItem}
-              keyExtractor={(item) => item}
-              contentContainerStyle={styles.modalList}
-            />
-          </View>
-        </View>
-      </Modal>
+
 
       {/* Reason Selection Modal */}
       <Modal visible={isReasonModalVisible} transparent animationType="slide">

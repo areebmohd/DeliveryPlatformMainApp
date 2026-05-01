@@ -2011,7 +2011,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   billValue: {
-    color: Colors.primary,
+    color: Colors.text,
     fontSize: 15,
     fontWeight: '700',
   },

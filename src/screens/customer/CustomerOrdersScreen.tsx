@@ -22,7 +22,7 @@ import { Button } from '../../components/ui/Button';
 import { getOfferDescription, getItemTotals } from '../../utils/offerUtils';
 import { notificationService } from '../../utils/notificationService';
 
-export const CustomerOrdersScreen = ({ navigation }: any) => {
+export const CustomerOrdersScreen = ({ navigation, route }: any) => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,8 +55,6 @@ export const CustomerOrdersScreen = ({ navigation }: any) => {
               weight_kg,
               barcode,
               product_type,
-              allow_refund,
-              allow_exchange,
               stores (id, name)
             )
           ),

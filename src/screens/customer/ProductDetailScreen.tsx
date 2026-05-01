@@ -42,7 +42,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
     try {
       let query = supabase
         .from('products')
-        .select('allow_refund, allow_exchange', { count: 'exact' })
+        .select('id', { count: 'exact' })
         .neq('is_deleted', true)
         .eq('name', product.name)
         .eq('price', product.price)
@@ -52,37 +52,12 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
         query = query.eq('barcode', product.barcode);
       }
 
-      const { data, count, error } = await query;
+      const { count, error } = await query;
       if (error) throw error;
       setStoreCount(count || 1);
 
-      // Generate Return Policy Summary
-      if (data && data.length > 0) {
-        const hasRefund = data.some(p => p.allow_refund);
-        const hasExchange = data.some(p => p.allow_exchange);
-        
-        if (count && count > 1) {
-          if (!hasRefund && !hasExchange) {
-            setReturnPolicySummary('No stores allow return for this product');
-          } else {
-            let options = [];
-            if (hasRefund) options.push('Return with Refund');
-            if (hasExchange) options.push('Return with Exchange');
-            setReturnPolicySummary(`Some stores allow ${options.join(' or ')}`);
-          }
-        } else {
-          // Single store
-          const p = data[0];
-          if (!p.allow_refund && !p.allow_exchange) {
-            setReturnPolicySummary('No return available for this product');
-          } else {
-            let options = [];
-            if (p.allow_refund) options.push('Refund');
-            if (p.allow_exchange) options.push('Exchange');
-            setReturnPolicySummary(`Available for Return with ${options.join(' and ')} within 24 Hours`);
-          }
-        }
-      }
+      // Generate Return Policy Summary - Now standardized to Exchange only within 24 hours
+      setReturnPolicySummary('Available for Return with Exchange within 24 Hours');
 
       if (!currentStore && product.store_id) {
         const { data: st, error: stErr } = await supabase

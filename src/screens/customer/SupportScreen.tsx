@@ -95,7 +95,7 @@ export const SupportScreen = ({ navigation }: any) => {
           <SupportActionCard 
             icon="email-outline"
             title="Email Support"
-            subtitle="Best for account or refund inquiries"
+            subtitle="Best for account or return inquiries"
             onPress={handleEmailSupport}
             color={Colors.success}
             secondaryColor={Colors.successLight}
@@ -118,7 +118,7 @@ export const SupportScreen = ({ navigation }: any) => {
             <Text style={[styles.tipTitle, { color: '#1E40AF' }]}>Store Policy</Text>
           </View>
           <Text style={[styles.tipContent, { color: '#1E40AF' }]}>
-            If you find any problem in the product after delivery then contact the store from their store info.
+            If getting any problem in the product then contact the store or apply return within 24 hours of delivery for exchange.
           </Text>
         </View>
 

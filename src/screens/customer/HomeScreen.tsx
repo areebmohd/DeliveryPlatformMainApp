@@ -250,7 +250,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
   const fetchStores = async () => {
     try {
-      setLoading(true);
+      if (stores.length === 0) setLoading(true);
       const { data, error } = await supabase
         .from('stores_view')
         .select('*')
@@ -287,7 +287,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
   const fetchBestSellers = async () => {
     try {
-      setBestSellersLoading(true);
+      if (bestSellers.length === 0) setBestSellersLoading(true);
 
       // Get the timestamp for 24 hours ago
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -393,7 +393,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
   const fetchSuggestions = async () => {
     try {
-      setSuggestionsLoading(true);
+      if (suggestions.length === 0) setSuggestionsLoading(true);
       const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
 
       if (!user?.id) {
@@ -490,6 +490,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
   const fetchHomeBanners = async () => {
     try {
+      if (homeBanners.length > 0) return;
       const { data, error } = await supabase
         .from('home_banners')
         .select('*')
@@ -504,6 +505,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
   const fetchCategoryImages = async () => {
     try {
+      if (Object.keys(categoryImages).length > 0) return;
       const { data, error } = await supabase
         .from('category_images')
         .select('*');

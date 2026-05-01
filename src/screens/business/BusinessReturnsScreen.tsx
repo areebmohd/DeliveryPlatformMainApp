@@ -36,7 +36,7 @@ export const BusinessReturnsScreen = ({ navigation }: any) => {
           profiles:user_id(full_name, phone)
         `)
         .eq('products.store_id', activeStore.id)
-        .in('status', ['approved', 'returned', 'refund_paid', 'rider_assigned', 'picked_up_from_customer', 'dropped_at_store', 'delivering_exchange', 'completed'])
+        .in('status', ['approved', 'returned', 'rider_assigned', 'picked_up_from_customer', 'dropped_at_store', 'delivering_exchange', 'completed'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -72,8 +72,8 @@ export const BusinessReturnsScreen = ({ navigation }: any) => {
             <Text style={styles.orderIdText}>Order #{item.orders?.order_number}</Text>
             <Text style={styles.dateText}>{date}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: (item.status === 'approved' || item.status === 'refund_paid' || item.status === 'completed') ? Colors.success + '15' : Colors.primary + '15' }]}>
-            <Text style={[styles.statusLabel, { color: (item.status === 'approved' || item.status === 'refund_paid' || item.status === 'completed') ? Colors.success : Colors.primary }]}>
+          <View style={[styles.statusBadge, { backgroundColor: (item.status === 'approved' || item.status === 'completed') ? Colors.success + '15' : Colors.primary + '15' }]}>
+            <Text style={[styles.statusLabel, { color: (item.status === 'approved' || item.status === 'completed') ? Colors.success : Colors.primary }]}>
               {item.status.replace(/_/g, ' ')}
             </Text>
           </View>
@@ -111,7 +111,7 @@ export const BusinessReturnsScreen = ({ navigation }: any) => {
         <View style={styles.cardFooter}>
           <Icon name="truck-delivery-outline" size={18} color={Colors.primary} />
           <Text style={styles.footerNoteText}>
-            Rider will bring back the returned product to you for Refund/Exchange.
+            Rider will bring back the returned product to you for Exchange.
           </Text>
         </View>
 

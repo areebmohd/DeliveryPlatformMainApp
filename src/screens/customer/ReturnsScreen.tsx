@@ -118,15 +118,7 @@ export const ReturnsScreen = ({ navigation }: any) => {
           bg: Colors.success + '15', 
           label: 'Approved', 
           icon: 'check-circle-outline', 
-          note: 'Admin has approved your return request, a rider will contact you soon to pickup the return product and you will soon get your refund/exchange.' 
-        };
-      case 'refund_paid':
-        return { 
-          color: Colors.success, 
-          bg: Colors.success + '15', 
-          label: 'Refund Paid', 
-          icon: 'cash-check', 
-          note: 'Refund has been successfully processed and paid.' 
+          note: 'Admin has approved your return request, a rider will contact you soon to pickup the return product and you will soon get your exchange.' 
         };
       case 'rejected':
         return { 
@@ -224,7 +216,7 @@ export const ReturnsScreen = ({ navigation }: any) => {
           </View>
         )}
         
-        {item.status === 'delivering_exchange' && item.otp_customer_exchange && item.return_type === 'Exchange' && (
+        {item.status === 'delivering_exchange' && item.otp_customer_exchange && (
           <View style={[styles.otpBox, { backgroundColor: Colors.primary + '10' }]}>
             <Text style={styles.otpLabel}>Exchange Delivery OTP</Text>
             <Text style={styles.otpValue}>{item.otp_customer_exchange}</Text>
