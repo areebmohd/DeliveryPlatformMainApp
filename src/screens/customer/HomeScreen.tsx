@@ -121,6 +121,14 @@ export const HomeScreen = ({ navigation }: any) => {
     return unsubscribe;
   }, [user, navigation]);
 
+  // Re-deduplicate products when delivery address changes
+  useEffect(() => {
+    if (sessionAddress) {
+      fetchBestSellers();
+      fetchSuggestions();
+    }
+  }, [sessionAddress]);
+
   // Check GPS status when using live location
   useEffect(() => {
     let interval: any;

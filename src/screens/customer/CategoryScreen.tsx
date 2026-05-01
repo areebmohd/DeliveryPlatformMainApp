@@ -56,7 +56,7 @@ export const CategoryScreen = ({ navigation, route }: any) => {
 
   useEffect(() => {
     fetchResults();
-  }, [categoryName]);
+  }, [categoryName, sessionAddress]);
 
   const fetchResults = async () => {
     try {
