@@ -46,9 +46,9 @@ export const getHaversineDistance = (lat1: number, lon1: number, lat2: number, l
 /**
  * Utility to deduplicate products based on user criteria:
  * 1. Personal: Never deduplicated.
- * 2. Barcode: Same barcode number -> Keep nearest.
- * 3. Common: Same name, price, weight, description, options -> Keep nearest.
- * Fallback to cheapest if no user location is provided.
+ * 2. Barcode: Same barcode number -> Keep nearest open store.
+ * 3. Common: Same name, price, weight, description, options -> Keep nearest open store.
+ * Priority: Open store > Closed store. Among same status, nearest wins. Fallback to cheapest.
  */
 export const deduplicateProducts = (products: any[], userLocation?: { lat: number, lng: number } | null): any[] => {
   if (!products || products.length === 0) return [];
@@ -87,33 +87,44 @@ export const deduplicateProducts = (products: any[], userLocation?: { lat: numbe
     if (!existing) {
       groupMap.set(uniqueKey, product);
     } else {
-      // Comparison logic: Nearest store wins. Fallback to cheapest.
+      // Comparison logic: Open store wins over closed. Among same status, nearest wins. Fallback to cheapest.
       let useNew = false;
 
-      if (userLocation) {
-        const existingLoc = parseWKT(existing.stores?.location_wkt);
-        const currentLoc = parseWKT(product.stores?.location_wkt);
+      const existingOpen = existing.stores?.is_currently_open !== false;
+      const currentOpen = product.stores?.is_currently_open !== false;
 
-        if (currentLoc && existingLoc) {
-          const distExisting = getHaversineDistance(userLocation.lat, userLocation.lng, existingLoc.lat, existingLoc.lng);
-          const distCurrent = getHaversineDistance(userLocation.lat, userLocation.lng, currentLoc.lat, currentLoc.lng);
-          
-          if (distCurrent < distExisting) {
+      // Open store always beats closed store
+      if (currentOpen && !existingOpen) {
+        useNew = true;
+      } else if (!currentOpen && existingOpen) {
+        useNew = false;
+      } else {
+        // Both have same open status — compare by distance then price
+        if (userLocation) {
+          const existingLoc = parseWKT(existing.stores?.location_wkt);
+          const currentLoc = parseWKT(product.stores?.location_wkt);
+
+          if (currentLoc && existingLoc) {
+            const distExisting = getHaversineDistance(userLocation.lat, userLocation.lng, existingLoc.lat, existingLoc.lng);
+            const distCurrent = getHaversineDistance(userLocation.lat, userLocation.lng, currentLoc.lat, currentLoc.lng);
+            
+            if (distCurrent < distExisting) {
+              useNew = true;
+            } else if (distCurrent === distExisting) {
+              // Tie-break with price
+              if (product.price < existing.price) useNew = true;
+            }
+          } else if (currentLoc) {
+            // If existing has no location but current does, use current
             useNew = true;
-          } else if (distCurrent === distExisting) {
+          } else {
             // Tie-break with price
             if (product.price < existing.price) useNew = true;
           }
-        } else if (currentLoc) {
-          // If existing has no location but current does, use current
-          useNew = true;
         } else {
-          // Tie-break with price
+          // Fallback to cheapest
           if (product.price < existing.price) useNew = true;
         }
-      } else {
-        // Fallback to cheapest
-        if (product.price < existing.price) useNew = true;
       }
 
       if (useNew) {

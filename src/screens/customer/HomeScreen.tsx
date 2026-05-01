@@ -29,7 +29,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
 import Geolocation from '@react-native-community/geolocation';
-import { deduplicateProducts, parseWKT } from '../../utils/productUtils';
+import { deduplicateProducts, parseWKT, getHaversineDistance } from '../../utils/productUtils';
 
 const CATEGORIES = PRODUCT_CATEGORIES;
 
@@ -121,9 +121,10 @@ export const HomeScreen = ({ navigation }: any) => {
     return unsubscribe;
   }, [user, navigation]);
 
-  // Re-deduplicate products when delivery address changes
+  // Re-sort stores and re-deduplicate products when delivery address changes
   useEffect(() => {
     if (sessionAddress) {
+      fetchStores();
       fetchBestSellers();
       fetchSuggestions();
     }
@@ -257,7 +258,26 @@ export const HomeScreen = ({ navigation }: any) => {
         .eq('is_approved', true);
 
       if (error) throw error;
-      setStores(data || []);
+
+      // Sort stores by distance from user location (nearest first)
+      const userCoords = sessionAddress
+        ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location))
+        : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
+
+      let sortedStores = data || [];
+      if (userCoords) {
+        sortedStores = sortedStores
+          .map((store: any) => {
+            const storeLoc = parseWKT(store.location_wkt);
+            const distance = storeLoc
+              ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLoc.lat, storeLoc.lng)
+              : Infinity;
+            return { ...store, _distance: distance };
+          })
+          .sort((a: any, b: any) => a._distance - b._distance);
+      }
+
+      setStores(sortedStores);
     } catch (e) {
       // Silent in production
     } finally {
@@ -268,19 +288,78 @@ export const HomeScreen = ({ navigation }: any) => {
   const fetchBestSellers = async () => {
     try {
       setBestSellersLoading(true);
-      const { data, error } = await supabase
+
+      // Get the timestamp for 24 hours ago
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      // Query order_items from the last 24 hours with their associated orders
+      const { data: recentOrderItems, error: oiError } = await supabase
+        .from('order_items')
+        .select('product_id, quantity, orders!inner(created_at, status)')
+        .gte('orders.created_at', twentyFourHoursAgo)
+        .neq('orders.status', 'cancelled')
+        .eq('is_removed', false);
+
+      if (oiError) throw oiError;
+
+      // Aggregate total quantity sold per product_id
+      const salesMap = new Map<string, number>();
+      (recentOrderItems || []).forEach((item: any) => {
+        if (item.product_id) {
+          salesMap.set(item.product_id, (salesMap.get(item.product_id) || 0) + item.quantity);
+        }
+      });
+
+      // Get sorted product IDs by sales count
+      const sortedProductIds = Array.from(salesMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([productId]) => productId);
+
+      if (sortedProductIds.length === 0) {
+        // Fallback: if no sales in 24h, show recent products
+        const { data: fallbackData, error: fbError } = await supabase
+          .from('products')
+          .select('*, stores:stores_view!inner(*)')
+          .eq('stores.is_active', true)
+          .eq('stores.is_approved', true)
+          .eq('is_deleted', false)
+          .eq('is_info_complete', true)
+          .eq('in_stock', true)
+          .limit(10);
+
+        if (fbError) throw fbError;
+        const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
+        setBestSellers(deduplicateProducts(fallbackData || [], userCoords));
+        return;
+      }
+
+      // Fetch full product details for top sellers (limit to top 20 before dedup)
+      const topIds = sortedProductIds.slice(0, 20);
+      const { data: productData, error: pError } = await supabase
         .from('products')
         .select('*, stores:stores_view!inner(*)')
+        .in('id', topIds)
         .eq('stores.is_active', true)
         .eq('stores.is_approved', true)
         .eq('is_deleted', false)
         .eq('is_info_complete', true)
-        .eq('in_stock', true)
-        .limit(10);
+        .eq('in_stock', true);
 
-      if (error) throw error;
+      if (pError) throw pError;
+
       const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
-      setBestSellers(deduplicateProducts(data || [], userCoords));
+      const deduped = deduplicateProducts(productData || [], userCoords);
+
+      // Sort deduplicated products by their sales rank
+      const rankMap = new Map<string, number>();
+      sortedProductIds.forEach((id, index) => rankMap.set(id, index));
+      deduped.sort((a: any, b: any) => {
+        const rankA = rankMap.get(a.id) ?? Infinity;
+        const rankB = rankMap.get(b.id) ?? Infinity;
+        return rankA - rankB;
+      });
+
+      setBestSellers(deduped.slice(0, 10));
     } catch (e) {
       // Silent in production
     } finally {
@@ -291,20 +370,93 @@ export const HomeScreen = ({ navigation }: any) => {
   const fetchSuggestions = async () => {
     try {
       setSuggestionsLoading(true);
-      const { data, error } = await supabase
+      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
+
+      if (!user?.id) {
+        // Not logged in — show recent products as fallback
+        const { data, error } = await supabase
+          .from('products')
+          .select('*, stores:stores_view!inner(*)')
+          .eq('stores.is_active', true)
+          .eq('stores.is_approved', true)
+          .eq('is_deleted', false)
+          .eq('is_info_complete', true)
+          .eq('in_stock', true)
+          .order('id', { ascending: false })
+          .limit(40);
+
+        if (error) throw error;
+        setSuggestions(deduplicateProducts(data || [], userCoords));
+        return;
+      }
+
+      // Query all order_items for this user's delivered/completed orders
+      const { data: userOrderItems, error: oiError } = await supabase
+        .from('order_items')
+        .select('product_id, quantity, orders!inner(customer_id, status)')
+        .eq('orders.customer_id', user.id)
+        .neq('orders.status', 'cancelled')
+        .eq('is_removed', false);
+
+      if (oiError) throw oiError;
+
+      // Aggregate total quantity purchased per product_id
+      const purchaseMap = new Map<string, number>();
+      (userOrderItems || []).forEach((item: any) => {
+        if (item.product_id) {
+          purchaseMap.set(item.product_id, (purchaseMap.get(item.product_id) || 0) + item.quantity);
+        }
+      });
+
+      // Get sorted product IDs by purchase count
+      const sortedProductIds = Array.from(purchaseMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([productId]) => productId);
+
+      if (sortedProductIds.length === 0) {
+        // No purchase history — show recent products as fallback
+        const { data, error } = await supabase
+          .from('products')
+          .select('*, stores:stores_view!inner(*)')
+          .eq('stores.is_active', true)
+          .eq('stores.is_approved', true)
+          .eq('is_deleted', false)
+          .eq('is_info_complete', true)
+          .eq('in_stock', true)
+          .order('id', { ascending: false })
+          .limit(40);
+
+        if (error) throw error;
+        setSuggestions(deduplicateProducts(data || [], userCoords));
+        return;
+      }
+
+      // Fetch full product details for user's most purchased items
+      const topIds = sortedProductIds.slice(0, 40);
+      const { data: productData, error: pError } = await supabase
         .from('products')
         .select('*, stores:stores_view!inner(*)')
+        .in('id', topIds)
         .eq('stores.is_active', true)
         .eq('stores.is_approved', true)
         .eq('is_deleted', false)
         .eq('is_info_complete', true)
-        .eq('in_stock', true)
-        .order('id', { ascending: false })
-        .limit(40);
+        .eq('in_stock', true);
 
-      if (error) throw error;
-      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
-      setSuggestions(deduplicateProducts(data || [], userCoords));
+      if (pError) throw pError;
+
+      const deduped = deduplicateProducts(productData || [], userCoords);
+
+      // Sort by user's purchase rank (most bought first)
+      const rankMap = new Map<string, number>();
+      sortedProductIds.forEach((id, index) => rankMap.set(id, index));
+      deduped.sort((a: any, b: any) => {
+        const rankA = rankMap.get(a.id) ?? Infinity;
+        const rankB = rankMap.get(b.id) ?? Infinity;
+        return rankA - rankB;
+      });
+
+      setSuggestions(deduped);
     } catch (e) {
       // Silent in production
     } finally {
