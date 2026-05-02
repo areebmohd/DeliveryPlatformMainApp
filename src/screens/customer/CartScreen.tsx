@@ -62,6 +62,7 @@ export const CartScreen = ({ navigation }: any) => {
   const [totalStoreFees, setTotalStoreFees] = useState(0);
   const [offerProductDetails, setOfferProductDetails] = useState<Record<string, any>>({});
   const [isGPSEnabled, setIsGPSEnabled] = useState(true);
+  const [sortedStoreList, setSortedStoreList] = useState<any[]>([]);
 
   // Background fetch for reward product details (if missing)
   useEffect(() => {
@@ -719,6 +720,7 @@ export const CartScreen = ({ navigation }: any) => {
         distancesMap[s.id] = s.distToUser;
       });
       setStoreDistances(distancesMap);
+      setSortedStoreList(storesWithUserDist);
       setDistance(totalRouteDist);
 
     } catch (e) {
@@ -884,8 +886,33 @@ export const CartScreen = ({ navigation }: any) => {
     totalOfferDiscount += offerDiscount;
   });
 
-  const rawDeliveryFee = Math.max(0, baseDeliveryFee - totalStoreContribution);
-  deliveryFee = isAppOfferActive ? 0 : rawDeliveryFee;
+  // New Delivery Fee Logic based on "Extra Distance" for multi-store mixed offers
+  let extraDistance = 0;
+  const firstFreeIdx = sortedStoreList.findIndex(s => !!appliedOffers[`${s.id}_delivery`]);
+
+  if (firstFreeIdx === -1) {
+    // No free delivery offers, entire route is paid
+    extraDistance = distance;
+  } else if (firstFreeIdx === 0) {
+    // Furthest store is free, entire route is considered covered
+    extraDistance = 0;
+  } else {
+    // Some paid stores are further than all free stores
+    // Calculate extra distance as the sum of segments up to the first free store
+    for (let i = 0; i < firstFreeIdx; i++) {
+      const current = sortedStoreList[i];
+      const next = sortedStoreList[i+1];
+      if (current && next) {
+        extraDistance += calculateDistance(current.lat, current.lng, next.lat, next.lng);
+      }
+    }
+  }
+
+  const pFee = isLargeVehicle ? 300 : 10;
+  const kRate = isLargeVehicle ? 30 : 5;
+  const extraDeliveryFee = extraDistance > 0 ? (pFee + extraDistance * kRate) : 0;
+  
+  deliveryFee = isAppOfferActive ? 0 : extraDeliveryFee;
 
   // Sync state for use in checkout
   useEffect(() => {
@@ -1038,7 +1065,7 @@ export const CartScreen = ({ navigation }: any) => {
           subtotal: subtotal,
           total_amount: grandTotal, 
           delivery_fee: deliveryFee,
-          rider_delivery_fee: baseDeliveryFee,
+          rider_delivery_fee: isAppOfferActive ? totalStoreContribution : (deliveryFee + totalStoreContribution),
           platform_fee: platformFee,
           status: 'waiting_for_pickup',
           payment_method: paymentMethod,

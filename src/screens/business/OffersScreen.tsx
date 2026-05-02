@@ -529,7 +529,7 @@ export const OffersScreen = ({ navigation }: any) => {
 
               <Text style={[styles.modalSubtitle, { marginBottom: 20 }]}>
                 {selectedType === 'free_delivery' 
-                  ? `Delivery fee will be deducted from your earnings for riders and the rest for platform for managing multiple stores in a order if available.` 
+                  ? `Delivery fee will be deducted from your earnings and given to the rider.` 
                   : 'Configure rewards & conditions'}
               </Text>
 
