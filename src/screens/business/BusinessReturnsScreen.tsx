@@ -108,12 +108,14 @@ export const BusinessReturnsScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         )}
 
-        <View style={styles.cardFooter}>
-          <Icon name="truck-delivery-outline" size={18} color={Colors.primary} />
-          <Text style={styles.footerNoteText}>
-            Rider will bring back the returned product to you for Exchange.
-          </Text>
-        </View>
+        {!['completed', 'returned'].includes(item.status) && (
+          <View style={styles.cardFooter}>
+            <Icon name="truck-delivery-outline" size={18} color={Colors.primary} />
+            <Text style={styles.footerNoteText}>
+              Rider will bring back the returned product to you for Exchange.
+            </Text>
+          </View>
+        )}
 
         {item.status === 'picked_up_from_customer' && item.otp_store_drop && (
           <View style={[styles.otpBox, { backgroundColor: Colors.primary + '10' }]}>
