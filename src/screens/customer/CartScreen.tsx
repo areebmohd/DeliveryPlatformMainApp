@@ -789,6 +789,24 @@ export const CartScreen = ({ navigation }: any) => {
           showToast(`Offer removed: All required products must be in cart.`, 'info');
         }
       }
+
+      // 4. App Offer specific restrictions
+      if (offerKey === 'app_offer') {
+        if (isLargeVehicle) {
+          delete newOffers[offerKey];
+          changed = true;
+          showToast('App offer removed: Only applicable for bike deliveries.', 'info');
+          return;
+        }
+
+        const isTooFar = Object.values(storeDistances).some(d => d >= 1);
+        if (isTooFar) {
+          delete newOffers[offerKey];
+          changed = true;
+          showToast('App offer removed: Only applicable for shops under 1km.', 'info');
+          return;
+        }
+      }
     });
 
     if (changed) {
@@ -796,7 +814,11 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
-  const isAppOfferActive = !!appliedOffers['app_offer'] && subtotal >= 99;
+  const isAppOfferActive = !!appliedOffers['app_offer'] && 
+                           subtotal >= 99 && 
+                           !isLargeVehicle && 
+                           Object.keys(storeDistances).length > 0 &&
+                           Object.values(storeDistances).every(d => d < 1);
 
   const platformFee = subtotal >= 1000 ? 20 : (subtotal >= 500 ? 10 : 5);
   const baseDeliveryFee = items.length === 0 ? 0 : (
@@ -1444,12 +1466,33 @@ export const CartScreen = ({ navigation }: any) => {
                       });
                       return;
                     }
+
+                    if (isLargeVehicle) {
+                      showAlert({
+                        title: 'Bike Only Offer',
+                        message: 'Only applicable for bike deliveries',
+                        type: 'warning'
+                      });
+                      return;
+                    }
+
+                    const distances = Object.values(storeDistances);
+                    const isTooFar = distances.some(d => d >= 1);
+                    if (isTooFar || distances.length === 0) {
+                      showAlert({
+                        title: 'Distance Restriction',
+                        message: 'Only applicable for shops under 1km distance from delivery location',
+                        type: 'warning'
+                      });
+                      return;
+                    }
+
                     newOffers['app_offer'] = {
                       id: 'app_free_delivery',
                       name: 'App Offer',
                       type: 'free_delivery' as any,
                       amount: 0,
-                      conditions: { min_price: 99 },
+                      conditions: { min_price: 99, max_distance: 1 },
                       status: 'active',
                       store_id: 'platform',
                       created_at: new Date().toISOString()
