@@ -1,8 +1,4 @@
-# ZORO Delivery 🚀
-
-<p align="center">
-  <img src="./ZOROLogo.png" alt="ZORO Delivery Logo" width="200"/>
-</p>
+# ZORO Delivery App 🚀
 
 A comprehensive, high-performance delivery platform built with React Native. ZORO Delivery provides a seamless experience for both customers looking for quick deliveries and businesses managing their stores and orders in real-time.
 
@@ -26,6 +22,9 @@ A comprehensive, high-performance delivery platform built with React Native. ZOR
 - **Store Configuration**: Full control over store details, operation hours, and location.
 
 ---
+
+<img width="1920" height="1080" alt="mainApp" src="https://github.com/user-attachments/assets/ef97867e-56cd-4ca3-a289-f4b7f959af45" />
+
 
 ## 🛠 Tech Stack
 
