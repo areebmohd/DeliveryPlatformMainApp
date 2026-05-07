@@ -177,7 +177,7 @@ export const OrdersScreen = () => {
               const remainingItems = activeItems.filter((i: any) => i.id !== itemToRemove.id);
               const newSubtotal = remainingItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
               const deliveryFee = 25;
-              const platformFee = 2;
+              const platformFee = 10;
               const newTotal = newSubtotal + deliveryFee + platformFee;
 
               const { error: orderError } = await supabase
@@ -260,6 +260,7 @@ export const OrdersScreen = () => {
             <Text style={styles.orderTime}>
               {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               {item.transport_type && ` • ${item.transport_type === 'heavy' ? 'Truck' : 'Bike'}`}
+              {item.delivery_type === 'batch' && item.delivery_slot && ` • Batch: ${item.delivery_slot}`}
             </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>

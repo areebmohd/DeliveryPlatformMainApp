@@ -63,6 +63,9 @@ export const CartScreen = ({ navigation }: any) => {
   const [offerProductDetails, setOfferProductDetails] = useState<Record<string, any>>({});
   const [isGPSEnabled, setIsGPSEnabled] = useState(true);
   const [sortedStoreList, setSortedStoreList] = useState<any[]>([]);
+  const [deliveryType, setDeliveryType] = useState<'fast' | 'batch'>('fast');
+  const [deliverySlot, setDeliverySlot] = useState<string | null>(null);
+  const [slotModalVisible, setSlotModalVisible] = useState(false);
 
   // Background fetch for reward product details (if missing)
   useEffect(() => {
@@ -731,7 +734,7 @@ export const CartScreen = ({ navigation }: any) => {
   useEffect(() => {
     calculateFees();
     validateAppliedOffers();
-  }, [items, selectedAddress, sessionAddress]);
+  }, [items, selectedAddress, sessionAddress, deliveryType]);
 
   const validateAppliedOffers = () => {
     if (Object.keys(appliedOffers).length === 0) return;
@@ -792,6 +795,13 @@ export const CartScreen = ({ navigation }: any) => {
 
       // 4. App Offer specific restrictions
       if (offerKey === 'app_offer') {
+        if (deliveryType === 'fast') {
+          delete newOffers[offerKey];
+          changed = true;
+          showToast('App offer removed: Only applicable for Batch Delivery.', 'info');
+          return;
+        }
+
         if (isLargeVehicle) {
           delete newOffers[offerKey];
           changed = true;
@@ -799,11 +809,11 @@ export const CartScreen = ({ navigation }: any) => {
           return;
         }
 
-        const isTooFar = Object.values(storeDistances).some(d => d >= 1);
+        const isTooFar = Object.values(storeDistances).some(d => d >= 2);
         if (isTooFar) {
           delete newOffers[offerKey];
           changed = true;
-          showToast('App offer removed: Only applicable for shops under 1km.', 'info');
+          showToast('App offer removed: Only applicable for shops under 2km.', 'info');
           return;
         }
       }
@@ -814,19 +824,22 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
-  const isAppOfferActive = !!appliedOffers['app_offer'] && 
-                           subtotal >= 99 && 
-                           !isLargeVehicle && 
-                           Object.keys(storeDistances).length > 0 &&
-                           Object.values(storeDistances).every(d => d < 1);
+  const isBatchAllowed = !isLargeVehicle && 
+                         Object.keys(storeDistances).length > 0 &&
+                         Object.values(storeDistances).every(d => d < 2);
 
-  const platformFee = subtotal >= 1000 ? 20 : (subtotal >= 500 ? 10 : 5);
+  const isAppOfferActive = !!appliedOffers['app_offer'] && 
+                           deliveryType === 'batch' &&
+                           subtotal >= 49 && 
+                           isBatchAllowed;
+
+  const platformFee = 10;
   const baseDeliveryFee = items.length === 0 ? 0 : (
     isLargeVehicle 
-      ? 300 + (distance * 30)
-      : 10 + (distance * 5)
+      ? 300 + Math.max(0, distance - 1) * 30
+      : 30 + Math.max(0, distance - 1) * 10
   );
-  const helperFee = hasHelper ? 400 : 0;
+  const helperFee = hasHelper ? 300 : 0;
   const baseGrandTotal = subtotal + baseDeliveryFee + platformFee + helperFee;
 
   let deliveryFee = baseDeliveryFee;
@@ -839,8 +852,8 @@ export const CartScreen = ({ navigation }: any) => {
     if (offer.type === 'free_delivery') {
       const dist = storeDistances[offer.store_id] || 0;
       const storeFee = isLargeVehicle 
-        ? 300 + (dist * 30)
-        : 10 + (dist * 5);
+        ? 300 + Math.max(0, dist - 1) * 30
+        : 30 + Math.max(0, dist - 1) * 10;
       
       storeContributions[offer.store_id] = storeFee;
       totalStoreContribution += storeFee;
@@ -930,9 +943,9 @@ export const CartScreen = ({ navigation }: any) => {
     }
   }
 
-  const pFee = isLargeVehicle ? 300 : 10;
-  const kRate = isLargeVehicle ? 30 : 5;
-  const extraDeliveryFee = extraDistance > 0 ? (pFee + extraDistance * kRate) : 0;
+  const pFee = isLargeVehicle ? 300 : 30;
+  const kRate = isLargeVehicle ? 30 : 10;
+  const extraDeliveryFee = extraDistance > 0 ? (pFee + Math.max(0, extraDistance - 1) * kRate) : 0;
   
   deliveryFee = isAppOfferActive ? 0 : extraDeliveryFee;
 
@@ -1053,6 +1066,13 @@ export const CartScreen = ({ navigation }: any) => {
     try {
       setLoading(true);
 
+      if (deliveryType === 'batch' && !deliverySlot) {
+        showAlert({ title: 'Slot Required', message: 'Please select a delivery slot for Batch Delivery.', type: 'warning' });
+        setSlotModalVisible(true);
+        setLoading(false);
+        return;
+      }
+
       let finalAddressId = selectedAddress?.id;
       if (sessionAddress) {
         const { data: tempAddr, error: addrError } = await supabase
@@ -1101,7 +1121,9 @@ export const CartScreen = ({ navigation }: any) => {
           applied_offers: appliedOffers,
           total_store_delivery_fees: totalStoreFees,
           store_delivery_fees: storeDeliveryFees,
-          ready_at: readyAt
+          ready_at: readyAt,
+          delivery_type: deliveryType,
+          delivery_slot: deliverySlot
         })
         .select()
         .single();
@@ -1448,7 +1470,7 @@ export const CartScreen = ({ navigation }: any) => {
               </View>
               <View style={styles.appOfferInfo}>
                 <Text style={styles.appOfferTitle}>App Offer</Text>
-                <Text style={styles.appOfferDesc}>Free delivery above ₹99</Text>
+                <Text style={styles.appOfferDesc}>Free batch delivery above ₹49</Text>
               </View>
               <TouchableOpacity 
                 style={[styles.appOfferBtn, appliedOffers['app_offer'] ? styles.appOfferRemoveBtn : styles.appOfferAddBtn]}
@@ -1458,10 +1480,19 @@ export const CartScreen = ({ navigation }: any) => {
                     delete newOffers['app_offer'];
                     showToast('App offer removed', 'info');
                   } else {
-                    if (subtotal < 99) {
+                    if (deliveryType !== 'batch') {
+                      showAlert({
+                        title: 'Batch Only Offer',
+                        message: 'This offer is only available for Batch Delivery. Please switch your delivery type first.',
+                        type: 'warning'
+                      });
+                      return;
+                    }
+
+                    if (subtotal < 49) {
                       showAlert({
                         title: 'Min. Order Not Met',
-                        message: 'App offer requires a minimum order of ₹99.',
+                        message: 'App offer requires a minimum order of ₹49.',
                         type: 'warning'
                       });
                       return;
@@ -1477,11 +1508,11 @@ export const CartScreen = ({ navigation }: any) => {
                     }
 
                     const distances = Object.values(storeDistances);
-                    const isTooFar = distances.some(d => d >= 1);
+                    const isTooFar = distances.some(d => d >= 2);
                     if (isTooFar || distances.length === 0) {
                       showAlert({
                         title: 'Distance Restriction',
-                        message: 'Only applicable for shops under 1km distance from delivery location',
+                        message: 'Only applicable for shops under 2km distance from delivery location',
                         type: 'warning'
                       });
                       return;
@@ -1492,7 +1523,7 @@ export const CartScreen = ({ navigation }: any) => {
                       name: 'App Offer',
                       type: 'free_delivery' as any,
                       amount: 0,
-                      conditions: { min_price: 99, max_distance: 1 },
+                      conditions: { min_price: 49, max_distance: 2 },
                       status: 'active',
                       store_id: 'platform',
                       created_at: new Date().toISOString()
@@ -1537,6 +1568,87 @@ export const CartScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.deliveryTypeSection}>
+          <Text style={styles.sectionTitle}>Delivery Type</Text>
+          <View style={styles.deliveryTypeContainer}>
+            <TouchableOpacity 
+              style={[styles.deliveryTypeCard, deliveryType === 'fast' && styles.deliveryTypeCardActive]}
+              onPress={() => {
+                setDeliveryType('fast');
+                setDeliverySlot(null);
+              }}
+            >
+              <Icon 
+                name="flash" 
+                size={24} 
+                color={deliveryType === 'fast' ? Colors.primary : Colors.textSecondary} 
+              />
+              <View style={styles.deliveryTypeInfo}>
+                <Text style={[styles.deliveryTypeTitle, deliveryType === 'fast' && styles.deliveryTypeTitleActive]}>
+                  Fast Delivery
+                </Text>
+                <Text style={styles.deliveryTypeDesc}>Delivered as soon as ready</Text>
+              </View>
+              <Icon 
+                name={deliveryType === 'fast' ? "radiobox-marked" : "radiobox-blank"} 
+                size={20} 
+                color={deliveryType === 'fast' ? Colors.primary : Colors.border} 
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              disabled={!isBatchAllowed}
+              style={[
+                styles.deliveryTypeCard, 
+                deliveryType === 'batch' && styles.deliveryTypeCardActive,
+                !isBatchAllowed && styles.deliveryTypeCardDisabled
+              ]}
+              onPress={() => {
+                setDeliveryType('batch');
+                if (!deliverySlot) setSlotModalVisible(true);
+              }}
+            >
+              <Icon 
+                name="truck-delivery" 
+                size={24} 
+                color={!isBatchAllowed ? '#94A3B8' : (deliveryType === 'batch' ? Colors.primary : Colors.textSecondary)} 
+              />
+              <View style={styles.deliveryTypeInfo}>
+                <Text style={[
+                  styles.deliveryTypeTitle, 
+                  deliveryType === 'batch' && styles.deliveryTypeTitleActive,
+                  !isBatchAllowed && styles.deliveryTypeTitleDisabled
+                ]}>
+                  Batch Delivery
+                </Text>
+                <Text style={[
+                  styles.deliveryTypeDesc,
+                  !isBatchAllowed && styles.deliveryTypeDescDisabled
+                ]}>
+                  {!isBatchAllowed 
+                    ? (isLargeVehicle ? 'Not available for Truck' : 'All shops must be under 2km') 
+                    : 'Schedule for a time slot'}
+                </Text>
+                {deliveryType === 'batch' && deliverySlot && isBatchAllowed && (
+                  <View style={styles.slotBadgeSmall}>
+                    <Text style={styles.slotBadgeTextSmall}>{deliverySlot} Slot</Text>
+                    <TouchableOpacity onPress={() => setSlotModalVisible(true)}>
+                      <Text style={styles.changeSlotTextSmall}>Change</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+              {isBatchAllowed && (
+                <Icon 
+                  name={deliveryType === 'batch' ? "radiobox-marked" : "radiobox-blank"} 
+                  size={20} 
+                  color={deliveryType === 'batch' ? Colors.primary : Colors.border} 
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.billingSection}>
           <Text style={styles.sectionTitle}>Payment Details</Text>
           <View style={styles.billDetails}>
@@ -1558,8 +1670,8 @@ export const CartScreen = ({ navigation }: any) => {
                 visible: true,
                 title: 'Delivery Fee',
                 content: isLargeVehicle 
-                  ? `₹300 pickup fee + ₹30 per km\n(Large Vehicle / Truck)\n\nDistance: ${distance.toFixed(2)} km`
-                  : `₹10 pickup fee + ₹5 per km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
+                  ? `₹300 (fixed for 1st km) + ₹30 per extra km\n(Large Vehicle / Truck)\n\nDistance: ${distance.toFixed(2)} km`
+                  : `₹30 (fixed for 1st km) + ₹10 per extra km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
               })}>
                 <Icon name="information-outline" size={16} color={Colors.primary} />
               </TouchableOpacity>
@@ -1584,7 +1696,7 @@ export const CartScreen = ({ navigation }: any) => {
                 onPress={() => setHasHelper(!hasHelper)}
               >
                 <View style={styles.helperInfo}>
-                  <Text style={styles.helperTitle}>Add Helper (₹400)</Text>
+                  <Text style={styles.helperTitle}>Add Helper (₹300)</Text>
                   <Text style={styles.helperSubtitle}>A professional to help load/unload large items.</Text>
                 </View>
                 <Icon 
@@ -1609,7 +1721,7 @@ export const CartScreen = ({ navigation }: any) => {
               <TouchableOpacity onPress={() => setInfoModal({
                 visible: true,
                 title: 'Platform Fee',
-                content: '• Orders below ₹500: ₹5 platform fee\n• Orders below ₹1000: ₹10 platform fee\n• Orders above ₹1000: ₹20 platform fee'
+                content: 'This fee is temporary to maintain the platform.'
               })}>
                 <Icon name="information-outline" size={16} color={Colors.primary} />
               </TouchableOpacity>
@@ -1848,6 +1960,59 @@ export const CartScreen = ({ navigation }: any) => {
             )}
           </View>
         </View>
+      </Modal>
+
+      <Modal
+        visible={slotModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSlotModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setSlotModalVisible(false)}
+        >
+          <View style={styles.slotModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Delivery Slot</Text>
+              <TouchableOpacity onPress={() => setSlotModalVisible(false)}>
+                <Icon name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.slotOptionsContainer}>
+              <TouchableOpacity 
+                style={[styles.slotOption, deliverySlot === '2:00 PM' && styles.selectedSlotOption]}
+                onPress={() => {
+                  setDeliverySlot('2:00 PM');
+                  setSlotModalVisible(false);
+                }}
+              >
+                <Icon 
+                  name={deliverySlot === '2:00 PM' ? "radiobox-marked" : "radiobox-blank"} 
+                  size={24} 
+                  color={deliverySlot === '2:00 PM' ? Colors.primary : Colors.textSecondary} 
+                />
+                <Text style={styles.slotOptionText}>2:00 PM</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.slotOption, deliverySlot === '8:00 PM' && styles.selectedSlotOption]}
+                onPress={() => {
+                  setDeliverySlot('8:00 PM');
+                  setSlotModalVisible(false);
+                }}
+              >
+                <Icon 
+                  name={deliverySlot === '8:00 PM' ? "radiobox-marked" : "radiobox-blank"} 
+                  size={24} 
+                  color={deliverySlot === '8:00 PM' ? Colors.primary : Colors.textSecondary} 
+                />
+                <Text style={styles.slotOptionText}>8:00 PM</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       <Modal
@@ -2287,7 +2452,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 24,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -2823,5 +2989,103 @@ const styles = StyleSheet.create({
   appOfferRemoveBtnText: {
     color: Colors.white,
     fontWeight: '600',
+  },
+  deliveryTypeSection: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xl,
+  },
+  deliveryTypeContainer: {
+    gap: 12,
+  },
+  deliveryTypeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    padding: Spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  deliveryTypeCardActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight + '10',
+  },
+  deliveryTypeCardDisabled: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  deliveryTypeInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  deliveryTypeTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  deliveryTypeTitleActive: {
+    color: Colors.primary,
+  },
+  deliveryTypeTitleDisabled: {
+    color: '#94A3B8',
+  },
+  deliveryTypeDesc: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  deliveryTypeDescDisabled: {
+    color: '#94A3B8',
+  },
+  slotBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  slotBadgeTextSmall: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  changeSlotTextSmall: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '700',
+    textDecorationLine: 'none',
+  },
+  slotModalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  slotOptionsContainer: {
+    padding: 24,
+    paddingTop: 32,
+    paddingBottom: 60,
+  },
+  slotOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  selectedSlotOption: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  slotOptionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+    marginLeft: 12,
   },
 });

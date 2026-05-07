@@ -225,7 +225,9 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
             <Text style={styles.orderNumber}>#{item.order_number}</Text>
             <Text style={styles.dateTime}>
               {formattedTime}
-              {item.transport_type && ` • ${item.transport_type === 'heavy' ? 'Truck' : 'Bike'}`}
+              {item.transport_type === 'heavy' && ` • Truck`}
+              {item.delivery_type === 'batch' && item.delivery_slot && ` • ${item.delivery_slot} Batch`}
+              {item.delivery_type === 'fast' && ` • Fast Delivery`}
             </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '15' }]}>
@@ -334,7 +336,7 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.appOfferTitle}>App Offer</Text>
-              <Text style={styles.appOfferDesc}>Free delivery above ₹99</Text>
+              <Text style={styles.appOfferDesc}>Free batch delivery above 49</Text>
             </View>
           </View>
         )}
