@@ -809,11 +809,11 @@ export const CartScreen = ({ navigation }: any) => {
           return;
         }
 
-        const isTooFar = Object.values(storeDistances).some(d => d >= 2);
+        const isTooFar = Object.values(storeDistances).some(d => d >= 1);
         if (isTooFar) {
           delete newOffers[offerKey];
           changed = true;
-          showToast('App offer removed: Only applicable for shops under 2km.', 'info');
+          showToast('App offer removed: Only applicable for shops under 1km.', 'info');
           return;
         }
       }
@@ -826,7 +826,7 @@ export const CartScreen = ({ navigation }: any) => {
 
   const isBatchAllowed = !isLargeVehicle && 
                          Object.keys(storeDistances).length > 0 &&
-                         Object.values(storeDistances).every(d => d < 2);
+                         Object.values(storeDistances).every(d => d < 1);
 
   const isSlotAvailable = useCallback((slot: string) => {
     const now = new Date();
@@ -1527,11 +1527,11 @@ export const CartScreen = ({ navigation }: any) => {
                     }
 
                     const distances = Object.values(storeDistances);
-                    const isTooFar = distances.some(d => d >= 2);
+                    const isTooFar = distances.some(d => d >= 1);
                     if (isTooFar || distances.length === 0) {
                       showAlert({
                         title: 'Distance Restriction',
-                        message: 'Only applicable for shops under 2km distance from delivery location',
+                        message: 'Only applicable for shops under 1km distance from delivery location',
                         type: 'warning'
                       });
                       return;
@@ -1542,7 +1542,7 @@ export const CartScreen = ({ navigation }: any) => {
                       name: 'App Offer',
                       type: 'free_delivery' as any,
                       amount: 0,
-                      conditions: { min_price: 29, max_distance: 2 },
+                      conditions: { min_price: 29, max_distance: 1 },
                       status: 'active',
                       store_id: 'platform',
                       created_at: new Date().toISOString()
@@ -1645,7 +1645,7 @@ export const CartScreen = ({ navigation }: any) => {
                   !isBatchAllowed && styles.deliveryTypeDescDisabled
                 ]}>
                   {!isBatchAllowed 
-                    ? (isLargeVehicle ? 'Not available for Truck' : 'All shops must be under 2km') 
+                    ? (isLargeVehicle ? 'Not available for Truck' : 'All shops must be under 1km') 
                     : 'Schedule for a time slot'}
                 </Text>
                 {deliveryType === 'batch' && deliverySlot && isBatchAllowed && (
@@ -2084,8 +2084,6 @@ export const CartScreen = ({ navigation }: any) => {
           </View>
         </TouchableOpacity>
       </Modal>
-
-      {/* No local AlertModals needed anymore as they are handled globally */}
 
       {/* No local AlertModals needed anymore as they are handled globally */}
     </View>

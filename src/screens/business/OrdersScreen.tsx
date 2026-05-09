@@ -174,15 +174,54 @@ export const OrdersScreen = () => {
 
               showAlert({ title: 'Order Cancelled', message: 'The order was cancelled because all items were removed.', type: 'info' });
             } else {
-              const remainingItems = activeItems.filter((i: any) => i.id !== itemToRemove.id);
-              const newSubtotal = remainingItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
-              const deliveryFee = 25;
-              const platformFee = 10;
-              const newTotal = newSubtotal + deliveryFee + platformFee;
+              const storeId = store?.id;
+              const storeOffer = storeId ? order.applied_offers?.[storeId] : null;
+              
+              // 1. Calculate the store's contribution BEFORE removal
+              const oldStoreSubtotal = activeItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
+              const oldStoreDiscountedTotal = activeItems.reduce((acc: number, curr: any) => {
+                const { discounted } = getItemTotals(curr, activeItems, storeOffer);
+                return acc + discounted;
+              }, 0);
+
+              // 2. Calculate the store's contribution AFTER removal
+              const remainingStoreItems = activeItems.filter((i: any) => i.id !== itemToRemove.id);
+              const newStoreSubtotal = remainingStoreItems.reduce((acc: number, curr: any) => acc + (curr.product_price * curr.quantity), 0);
+              
+              // Check if the store offer is still valid for the new store subtotal
+              const isOfferStillValid = !storeOffer || !storeOffer.conditions?.min_price || newStoreSubtotal >= storeOffer.conditions.min_price;
+              const effectiveOffer = isOfferStillValid ? storeOffer : null;
+              
+              const newStoreDiscountedTotal = remainingStoreItems.reduce((acc: number, curr: any) => {
+                const { discounted } = getItemTotals(curr, remainingStoreItems, effectiveOffer);
+                return acc + discounted;
+              }, 0);
+
+              // 3. Calculate differences
+              const subtotalDiff = oldStoreSubtotal - newStoreSubtotal;
+              const discountedTotalDiff = oldStoreDiscountedTotal - newStoreDiscountedTotal;
+
+              // 4. Update the global order totals
+              const newGlobalSubtotal = (order.subtotal || 0) - subtotalDiff;
+              let newGlobalTotal = (order.total_amount || 0) - discountedTotalDiff;
+
+              // 5. Recalculate platform fee if it was present
+              let newPlatformFee = order.platform_fee;
+              if (order.platform_fee !== undefined) {
+                const calculatedPlatformFee = newGlobalSubtotal < 500 ? 5 : (newGlobalSubtotal <= 1000 ? 10 : 20);
+                if (calculatedPlatformFee !== order.platform_fee) {
+                  newGlobalTotal = newGlobalTotal - order.platform_fee + calculatedPlatformFee;
+                  newPlatformFee = calculatedPlatformFee;
+                }
+              }
 
               const { error: orderError } = await supabase
                 .from('orders')
-                .update({ subtotal: newSubtotal, total_amount: newTotal })
+                .update({ 
+                  subtotal: Math.max(0, newGlobalSubtotal), 
+                  total_amount: Math.max(0, newGlobalTotal),
+                  platform_fee: newPlatformFee
+                })
                 .eq('id', order.id);
 
               if (orderError) throw orderError;
@@ -610,7 +649,7 @@ export const OrdersScreen = () => {
         </View>
       ) : (
         <ScrollView 
-          contentContainerStyle={[styles.listContent, { paddingTop: Spacing.md, paddingBottom: insets.bottom + 100 }]}
+          contentContainerStyle={[styles.listContent, { paddingTop: Spacing.sm, paddingBottom: insets.bottom + 100 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
           showsVerticalScrollIndicator={false}
         >
@@ -656,7 +695,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: Colors.surface,
     marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
     borderRadius: borderRadius.lg,
     padding: 4,
   },
@@ -704,7 +743,7 @@ const styles = StyleSheet.create({
   dateHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
     marginBottom: Spacing.md,
     gap: 10,
   },

@@ -8,6 +8,7 @@ import {
   Animated,
   Dimensions,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -47,7 +48,14 @@ export const AlertModal = ({
   cancelText = 'Cancel',
   verticalButtons = false,
 }: AlertModalProps) => {
+  const [loadingIdx, setLoadingIdx] = React.useState<number | null>(null);
   const scaleValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!visible) {
+      setLoadingIdx(null);
+    }
+  }, [visible]);
 
   // Combine actions into a single array  // Combine actions into a single array for rendering
   const finalActions: AlertAction[] = [];
@@ -91,10 +99,13 @@ export const AlertModal = ({
     const isOutline = action.variant === 'outline';
     const isSecondary = action.variant === 'secondary';
 
+    const isLoading = loadingIdx === index;
+
     return (
       <TouchableOpacity 
         key={index}
         activeOpacity={0.8}
+        disabled={loadingIdx !== null}
         style={[
           styles.button, 
           verticalButtons ? styles.verticalButton : { flex: 1 },
@@ -102,19 +113,28 @@ export const AlertModal = ({
           isOutline && { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: icon.color },
           isSecondary && { backgroundColor: Colors.background },
           !isDestructive && !isOutline && !isSecondary && { backgroundColor: icon.color },
+          loadingIdx !== null && { opacity: 0.7 },
         ]} 
         onPress={async () => {
-          await action.onPress();
-          onClose();
+          setLoadingIdx(index);
+          try {
+            await action.onPress();
+          } finally {
+            onClose();
+          }
         }}
       >
-        <Text style={[
-          styles.buttonText,
-          isOutline && { color: icon.color },
-          isSecondary && { color: Colors.textSecondary },
-        ]}>
-          {action.text}
-        </Text>
+        {isLoading ? (
+          <ActivityIndicator color={isOutline || isSecondary ? icon.color : Colors.white} />
+        ) : (
+          <Text style={[
+            styles.buttonText,
+            isOutline && { color: icon.color },
+            isSecondary && { color: Colors.textSecondary },
+          ]}>
+            {action.text}
+          </Text>
+        )}
       </TouchableOpacity>
     );
   };
