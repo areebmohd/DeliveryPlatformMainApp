@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
-import { supabase } from './src/api/supabase';
-import { Session } from '@supabase/supabase-js';
 import { View, ActivityIndicator, StatusBar } from 'react-native';
 import { Colors } from './src/theme/colors';
 
@@ -37,7 +35,6 @@ function App() {
 
 function AppContent() {
   const { session, profile, loading, isResettingPassword } = useAuth();
-  const insets = useSafeAreaInsets();
 
   useNotificationListener();
 

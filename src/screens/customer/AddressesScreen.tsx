@@ -316,12 +316,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     textTransform: 'uppercase',
   },
-  receiverName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 4,
-  },
   addressText: {
     fontSize: 14,
     color: Colors.textSecondary,
@@ -365,10 +359,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: Colors.primary,
-  },
-  deleteBtn: {
-    padding: 8,
-    justifyContent: 'flex-start',
   },
   center: {
     flex: 1,

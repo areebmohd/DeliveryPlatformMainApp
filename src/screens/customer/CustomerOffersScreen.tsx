@@ -969,12 +969,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 5,
   },
-  modalTypeLabel: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: Colors.primary,
-    marginBottom: 4,
-  },
   modalTitle: {
     fontSize: 24,
     fontWeight: '900',

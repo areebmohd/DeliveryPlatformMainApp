@@ -116,7 +116,6 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           
           if (error) throw error;
           if (data) {
-            console.log('Fresh Product Data Loaded:', data.id);
             setName(data.name || '');
             setPrice(data.price?.toString() || '');
             setWeight(data.weight_kg?.toString() || '');
@@ -406,10 +405,6 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         updated_at: new Date().toISOString(),
       };
 
-      console.log('--- SAVING PRODUCT ---');
-      console.log('ID:', product?.id);
-      console.log('Payload:', JSON.stringify(productData, null, 2));
-
       if (isEditing) {
         const { data: updatedData, error } = await supabase
           .from('products')
@@ -418,16 +413,13 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           .select();
         
         if (error) {
-          console.error('SUPABASE UPDATE ERROR:', error);
           throw error;
         }
         
         if (!updatedData || updatedData.length === 0) {
-          console.error('UPDATE FAILED: No rows were affected. Check RLS or ID matching.');
           throw new Error('Product could not be updated. Please ensure you have permission to edit this item.');
         }
         
-        console.log('UPDATE SUCCESS:', updatedData[0]);
       } else {
         // INSERT MODE
         const { error } = await supabase
@@ -435,10 +427,8 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           .insert(productData);
         
         if (error) {
-          console.error('SUPABASE INSERT ERROR:', error);
           throw error;
         }
-        console.log('INSERT SUCCESS');
       }
       
       showToast(isEditing ? 'Product updated!' : 'Product added!', 'success');

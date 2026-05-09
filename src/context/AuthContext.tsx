@@ -60,7 +60,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
           
           if (currentUser) {
-            console.log('Profile missing for:', currentUser.email, '- Attempting manual creation fallback');
             const { data: newProfile, error: insertError } = await supabase
               .from('profiles')
               .insert({
@@ -101,8 +100,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       await GoogleSignin.signOut();
-    } catch (error) {
-      console.log('Google Sign-Out Error:', error);
+    } catch {
+      // Silent
     }
     await supabase.auth.signOut();
   };

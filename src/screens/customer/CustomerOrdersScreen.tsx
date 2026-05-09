@@ -835,29 +835,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text,
   },
-  paymentDetailsContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  paymentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  paymentLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  paymentValue: {
-    fontSize: 12,
-    color: Colors.text,
-    fontWeight: '700',
-  },
   offersContainer: {
     marginTop: Spacing.sm,
     gap: 8,

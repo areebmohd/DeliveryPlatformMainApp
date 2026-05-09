@@ -12,7 +12,7 @@ class NotificationService {
 
   private configure() {
     PushNotification.configure({
-      onRegister: (token) => {
+      onRegister: () => {
         // Silent
       },
       onNotification: (notification) => {
@@ -67,7 +67,7 @@ class NotificationService {
         importance: Importance.HIGH,
         vibrate: true,
       },
-      (created) => { /* Silent */ }
+      () => { /* Silent */ }
     );
   }
 
@@ -103,7 +103,6 @@ class NotificationService {
 
   async saveToken(userId: string, role: string) {
     try {
-      console.log(`[NotificationService] Registering token for user ${userId} (${role})...`);
       const token = await this.getFcmToken();
       if (!token) {
         console.warn('[NotificationService] Failed to retrieve FCM token');
@@ -113,8 +112,6 @@ class NotificationService {
       let targetGroup = 'customer';
       if (role === 'store') targetGroup = 'business';
       else if (role === 'rider') targetGroup = 'rider';
-
-      console.log(`[NotificationService] Upserting token with target group: ${targetGroup}`);
 
       const { error } = await supabase
         .from('fcm_tokens')
@@ -133,7 +130,7 @@ class NotificationService {
       } else {
         // Success
       }
-    } catch (error) {
+    } catch {
       // Silent error
     }
   }
@@ -156,7 +153,6 @@ class NotificationService {
     description: string;
     targetGroup: 'customer' | 'business' | 'rider';
   }) {
-    console.log(`[NotificationService] Sending notification: "${params.title}" to group: ${params.targetGroup}`);
     try {
       const { error } = await supabase
         .from('notifications')

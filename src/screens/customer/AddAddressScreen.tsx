@@ -120,7 +120,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
   // Listen for location from MapSelectionScreen
   React.useEffect(() => {
     if (route.params?.selectedLocation) {
-      const { latitude, longitude, address: selAddress, details, preservedFormData } = route.params.selectedLocation;
+      const { latitude, longitude, details, preservedFormData } = route.params.selectedLocation;
       
       setFormData(prev => ({
         ...(preservedFormData || prev),

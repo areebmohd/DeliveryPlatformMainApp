@@ -14,8 +14,6 @@ export const useNotificationListener = () => {
     if (profile.role === 'store') targetGroup = 'business';
     else if (profile.role === 'rider') targetGroup = 'rider';
 
-    console.log(`Subscribing to notifications for: ${targetGroup}`);
-
     const subscription = supabase
       .channel('public:notifications')
       .on(
@@ -27,7 +25,6 @@ export const useNotificationListener = () => {
           filter: `target_group=eq.${targetGroup}`,
         },
         (payload) => {
-          console.log('New notification received:', payload);
           const { user_id, title, description, order_id, target_group } = payload.new;
 
           // If the notification is targeted to a specific user, FCM will deliver it.
