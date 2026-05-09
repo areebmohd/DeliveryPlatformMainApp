@@ -337,7 +337,7 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.appOfferTitle}>App Offer</Text>
-              <Text style={styles.appOfferDesc}>Free batch delivery above ₹49</Text>
+              <Text style={styles.appOfferDesc}>Free batch delivery above ₹29</Text>
             </View>
           </View>
         )}

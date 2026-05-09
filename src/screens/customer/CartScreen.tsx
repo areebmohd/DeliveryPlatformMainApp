@@ -1345,8 +1345,10 @@ export const CartScreen = ({ navigation }: any) => {
                   }
                 }
 
+                const itemKey = `${item.id}_${JSON.stringify(item.selected_options || {})}`;
+
                 return (
-                  <View key={item.id} style={{ marginBottom: Spacing.md }}>
+                  <View key={itemKey} style={{ marginBottom: Spacing.md }}>
                     <View style={styles.itemCard}>
                       <View style={styles.itemInfo}>
                         <Text style={styles.itemName}>
@@ -1433,8 +1435,8 @@ export const CartScreen = ({ navigation }: any) => {
 
               return (
                 <View style={styles.storeAppliedOffers}>
-                  {offers.map((offer: any) => (
-                    <View key={offer.id} style={styles.storeOfferTag}>
+                  {offers.map((offer: any, idx: number) => (
+                    <View key={`${offer.id}_${idx}`} style={styles.storeOfferTag}>
                       <View style={styles.storeOfferIcon}>
                         <Icon name={offer.type === 'free_delivery' ? "truck-fast" : "tag-heart"} size={16} color={offer.type === 'free_delivery' ? Colors.primary : "#059669"} />
                       </View>
@@ -1487,7 +1489,7 @@ export const CartScreen = ({ navigation }: any) => {
               </View>
               <View style={styles.appOfferInfo}>
                 <Text style={styles.appOfferTitle}>App Offer</Text>
-                <Text style={styles.appOfferDesc}>Free batch delivery above ₹49</Text>
+                <Text style={styles.appOfferDesc}>Free batch delivery above ₹29</Text>
               </View>
               <TouchableOpacity 
                 style={[styles.appOfferBtn, appliedOffers['app_offer'] ? styles.appOfferRemoveBtn : styles.appOfferAddBtn]}
@@ -1506,10 +1508,10 @@ export const CartScreen = ({ navigation }: any) => {
                       return;
                     }
 
-                    if (subtotal < 49) {
+                    if (subtotal < 29) {
                       showAlert({
                         title: 'Min. Order Not Met',
-                        message: 'App offer requires a minimum order of ₹49.',
+                        message: 'App offer requires a minimum order of ₹29.',
                         type: 'warning'
                       });
                       return;
@@ -1540,7 +1542,7 @@ export const CartScreen = ({ navigation }: any) => {
                       name: 'App Offer',
                       type: 'free_delivery' as any,
                       amount: 0,
-                      conditions: { min_price: 49, max_distance: 2 },
+                      conditions: { min_price: 29, max_distance: 2 },
                       status: 'active',
                       store_id: 'platform',
                       created_at: new Date().toISOString()
@@ -1687,7 +1689,7 @@ export const CartScreen = ({ navigation }: any) => {
                 visible: true,
                 title: 'Delivery Fee',
                 content: isLargeVehicle 
-                  ? `₹300 (fixed for 1st km) + ₹30 per extra km\n(Large Vehicle / Truck)\n\nDistance: ${distance.toFixed(2)} km`
+                  ? `₹300 (fixed for 1st km) + ₹30 per extra km\n(Large Vehicle)\n\nDistance: ${distance.toFixed(2)} km`
                   : `₹30 (fixed for 1st km) + ₹10 per extra km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
               })}>
                 <Icon name="information-outline" size={16} color={Colors.primary} />
@@ -2280,7 +2282,7 @@ const styles = StyleSheet.create({
   billLabel: {
     color: Colors.textSecondary,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   billValue: {
     color: Colors.text,

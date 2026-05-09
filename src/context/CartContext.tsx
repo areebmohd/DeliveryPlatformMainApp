@@ -209,7 +209,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newItems = [...prev];
         newItems[existingIdx] = { 
           ...existing, 
-          quantity: existing.quantity + 1 
+          quantity: existing.quantity + (quantity || 1) 
         };
         return newItems;
       }

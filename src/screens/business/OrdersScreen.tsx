@@ -407,7 +407,7 @@ export const OrdersScreen = () => {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.promoTitle, { color: Colors.primary }]}>App Offer</Text>
-                    <Text style={[styles.promoDescription, { color: Colors.primary, opacity: 0.8 }]}>Free batch delivery above ₹49</Text>
+                    <Text style={[styles.promoDescription, { color: Colors.primary, opacity: 0.8 }]}>Free batch delivery above ₹29</Text>
                   </View>
                 </View>
               )}

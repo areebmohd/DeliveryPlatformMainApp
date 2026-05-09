@@ -541,11 +541,15 @@ export const HomeScreen = ({ navigation }: any) => {
 
       const processedProducts = deduplicateProducts(pageProducts, userCoords);
       
-      if (page === 0) {
-        setSuggestions(processedProducts);
-      } else {
-        setSuggestions(prev => [...prev, ...processedProducts]);
-      }
+      setSuggestions(prev => {
+        const combined = page === 0 ? processedProducts : [...prev, ...processedProducts];
+        const seen = new Set();
+        return combined.filter(item => {
+          if (seen.has(item.id)) return false;
+          seen.add(item.id);
+          return true;
+        });
+      });
 
       setHasMoreSuggestions(pageProducts.length === PAGE_SIZE);
       setSuggestionsPage(page);

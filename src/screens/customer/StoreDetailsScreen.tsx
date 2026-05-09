@@ -441,7 +441,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
               <View style={styles.productsGrid}>
                 {products.map((product) => (
                     <CustomerProductCard
-                      key={product.id}
+                      key={`${product.id}_${product.store_id}`}
                       product={product}
                       onAdd={() => handleAddToCart(product)}
                       quantity={getQuantity(product.id)}
