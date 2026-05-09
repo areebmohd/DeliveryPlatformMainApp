@@ -19,6 +19,13 @@ export const Colors = {
   infoLight: '#d1ecf1',    // Light Info Blue
   glass: 'rgba(255, 255, 255, 0.85)',
   overlay: 'rgba(0, 0, 0, 0.5)',
+  gradients: {
+    primary: ['#007bff', '#00c6ff'],
+    premium: ['#121212', '#333333'],
+    business: ['#FF512F', '#DD2476'],
+    customer: ['#00B4DB', '#0083B0'],
+    surface: ['#FFFFFF', '#F8F9FA'],
+  }
 };
 
 export const Spacing = {
