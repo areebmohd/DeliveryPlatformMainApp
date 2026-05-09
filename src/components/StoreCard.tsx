@@ -35,7 +35,7 @@ export const StoreCard = React.memo(({ store, onPress, width, horizontal }: Stor
         width ? { width } : null,
         horizontal ? { marginBottom: 0, marginRight: Spacing.md } : null
       ]}
-      onPress={onPress}
+      onPress={() => onPress?.(store)}
       activeOpacity={0.9}
     >
       <View style={[styles.imageContainer, horizontal ? { aspectRatio: 2 / 1 } : null]}>

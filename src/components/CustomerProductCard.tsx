@@ -43,7 +43,7 @@ export const CustomerProductCard = React.memo(({
   return (
     <TouchableOpacity 
       style={[styles.container, { width }]} 
-      onPress={onPress}
+      onPress={() => onPress?.(product)}
       activeOpacity={onPress ? 0.9 : 1}
       disabled={!onPress}
     >
@@ -59,18 +59,18 @@ export const CustomerProductCard = React.memo(({
           <View style={styles.controlsLayer}>
             {quantity > 0 ? (
               <View style={styles.quantityControls}>
-                <TouchableOpacity onPress={onDecrease} style={styles.controlBtn}>
+                <TouchableOpacity onPress={() => onDecrease?.(product)} style={styles.controlBtn}>
                   <Icon name="minus" size={14} color={Colors.white} />
                 </TouchableOpacity>
                 <Text style={styles.quantityText}>{quantity}</Text>
-                <TouchableOpacity onPress={onIncrease} style={styles.controlBtn}>
+                <TouchableOpacity onPress={() => onIncrease?.(product)} style={styles.controlBtn}>
                   <Icon name="plus" size={14} color={Colors.white} />
                 </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity 
                 style={styles.addButton} 
-                onPress={() => onAdd(product)}
+                onPress={() => onAdd?.(product)}
                 activeOpacity={0.8}
               >
                 <Icon name="plus" size={18} color={Colors.white} />

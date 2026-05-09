@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,72 @@ import Geolocation from '@react-native-community/geolocation';
 import { deduplicateProducts, parseWKT, getHaversineDistance } from '../../utils/productUtils';
 
 const CATEGORIES = PRODUCT_CATEGORIES;
+
+
+
+const MemoizedProductItem = React.memo(({ item, onPress, onAdd, onIncrease, onDecrease, quantity, width }: any) => (
+  <CustomerProductCard 
+    product={item}
+    onPress={onPress}
+    onAdd={onAdd}
+    quantity={quantity}
+    onIncrease={onIncrease}
+    onDecrease={onDecrease}
+    width={width}
+  />
+));
+
+const MemoizedStoreItem = React.memo(({ item, onPress }: any) => (
+  <StoreCard 
+    store={item} 
+    onPress={onPress} 
+    width={260}
+    horizontal
+  />
+));
+
+const HomeBanners = React.memo(({ banners, activeIndex, onBannerScroll, onTouchStart, onTouchEnd, scrollViewRef }: any) => {
+  if (!banners || banners.length === 0) return null;
+
+  return (
+    <View style={styles.bannerContainer}>
+      <ScrollView 
+        ref={scrollViewRef}
+        horizontal 
+        pagingEnabled 
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={(e) => {
+          const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+          onBannerScroll(newIndex);
+        }}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        scrollEventThrottle={16}
+      >
+        {banners.map((banner: any) => (
+          <View key={banner.id} style={styles.bannerWrapper}>
+            <Image source={{ uri: banner.image_url }} style={styles.bannerImage} />
+          </View>
+        ))}
+      </ScrollView>
+      
+      {/* Pagination Dots */}
+      {banners.length > 1 && (
+        <View style={styles.paginationContainer}>
+          {banners.map((_: any, index: number) => (
+            <View 
+              key={index} 
+              style={[
+                styles.dot, 
+                activeIndex === index ? styles.activeDot : styles.inactiveDot
+              ]} 
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+});
 
 export const HomeScreen = ({ navigation }: any) => {
   const [stores, setStores] = useState<any[]>([]);
@@ -83,7 +149,8 @@ export const HomeScreen = ({ navigation }: any) => {
 
 
 
-  const handleAddToCart = useCallback((product: any, store: any) => {
+  const handleAddToCart = useCallback((product: any) => {
+    const store = product.stores;
     if (!sessionAddress) {
       showAlert({
         title: 'Select Location',
@@ -104,36 +171,47 @@ export const HomeScreen = ({ navigation }: any) => {
     }
   }, [addItem, sessionAddress, showAlert]);
 
+  // Initial data fetch
   useEffect(() => {
-    fetchStores();
-    fetchBestSellers();
-    initSuggestions();
-    fetchHomeBanners();
-    fetchCategoryImages();
+    const initData = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchStores(),
+        fetchBestSellers(),
+        initSuggestions(),
+        fetchHomeBanners(),
+        fetchCategoryImages()
+      ]);
+      setLoading(false);
+    };
+
+    initData();
+
     if (user) {
       fetchAddresses();
     }
 
     const unsubscribe = navigation.addListener('focus', () => {
+      // Refresh notifications and potentially banners on focus
       if (user) {
-        fetchAddresses();
         checkNotifications();
         fetchHomeBanners();
-        fetchCategoryImages();
       }
     });
 
     return unsubscribe;
   }, [user, navigation]);
 
-  // Re-sort stores and re-deduplicate products when delivery address changes
+  // Refresh data when delivery address changes, but ONLY if we have an address
   useEffect(() => {
     if (sessionAddress) {
       fetchStores();
+      // Best sellers and suggestions are less sensitive to location, 
+      // but we might want to refresh them if stores change.
       fetchBestSellers();
       initSuggestions();
     }
-  }, [sessionAddress]);
+  }, [sessionAddress?.id, sessionAddress?.address_line]); // Stable dependency
 
   // Check GPS status when using live location
   useEffect(() => {
@@ -255,7 +333,6 @@ export const HomeScreen = ({ navigation }: any) => {
 
   const fetchStores = async () => {
     try {
-      if (stores.length === 0) setLoading(true);
       const { data, error } = await supabase
         .from('stores_view')
         .select('*')
@@ -264,10 +341,10 @@ export const HomeScreen = ({ navigation }: any) => {
 
       if (error) throw error;
 
-      // Sort stores by distance from user location (nearest first)
+      // Get user location for distance sorting
       const userCoords = sessionAddress
         ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location))
-        : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
+        : null;
 
       let sortedStores = data || [];
       if (userCoords) {
@@ -282,47 +359,57 @@ export const HomeScreen = ({ navigation }: any) => {
           .sort((a: any, b: any) => a._distance - b._distance);
       }
 
+      // Limit to 10 nearest stores
       setStores(sortedStores.slice(0, 10));
     } catch (e) {
       // Silent in production
-    } finally {
-      setLoading(false);
     }
   };
 
   const fetchBestSellers = async () => {
     try {
-      if (bestSellers.length === 0) setBestSellersLoading(true);
-
-      // Get the timestamp for 24 hours ago
+      setBestSellersLoading(true);
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // Query order_items from the last 24 hours with their associated orders
-      const { data: recentOrderItems, error: oiError } = await supabase
+      // Get top 10 products sold in last 24h
+      const { data: recentSales, error: salesError } = await supabase
         .from('order_items')
         .select('product_id, quantity, orders!inner(created_at, status)')
         .gte('orders.created_at', twentyFourHoursAgo)
-        .neq('orders.status', 'cancelled')
-        .eq('is_removed', false);
+        .neq('orders.status', 'cancelled');
 
-      if (oiError) throw oiError;
+      if (salesError) throw salesError;
 
-      // Aggregate total quantity sold per product_id
       const salesMap = new Map<string, number>();
-      (recentOrderItems || []).forEach((item: any) => {
-        if (item.product_id) {
-          salesMap.set(item.product_id, (salesMap.get(item.product_id) || 0) + item.quantity);
-        }
+      recentSales?.forEach((item: any) => {
+        salesMap.set(item.product_id, (salesMap.get(item.product_id) || 0) + item.quantity);
       });
 
-      // Get sorted product IDs by sales count
-      const sortedProductIds = Array.from(salesMap.entries())
+      const topProductIds = Array.from(salesMap.entries())
         .sort((a, b) => b[1] - a[1])
-        .map(([productId]) => productId);
+        .slice(0, 10)
+        .map(([id]) => id);
 
-      if (sortedProductIds.length === 0) {
-        // Fallback: if no sales in 24h, show recent products
-        const { data: fallbackData, error: fbError } = await supabase
+      let baseQuery = supabase
+        .from('products')
+        .select('*, stores:stores_view!inner(*)')
+        .eq('stores.is_active', true)
+        .eq('stores.is_approved', true)
+        .eq('is_deleted', false)
+        .eq('is_info_complete', true)
+        .eq('in_stock', true);
+
+      let productData: any[] = [];
+      
+      if (topProductIds.length > 0) {
+        const { data: topProducts } = await baseQuery.in('id', topProductIds);
+        productData = topProducts || [];
+      }
+
+      // If less than 10, fill with latest products
+      if (productData.length < 10) {
+        const excludeIds = productData.map(p => p.id).filter(id => !!id);
+        let fallbackQuery = supabase
           .from('products')
           .select('*, stores:stores_view!inner(*)')
           .eq('stores.is_active', true)
@@ -330,67 +417,23 @@ export const HomeScreen = ({ navigation }: any) => {
           .eq('is_deleted', false)
           .eq('is_info_complete', true)
           .eq('in_stock', true)
-          .limit(10);
-
-        if (fbError) throw fbError;
-        const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
-        setBestSellers(deduplicateProducts(fallbackData || [], userCoords).slice(0, 20));
-        return;
-      }
-
-      // Fetch full product details for top sellers (limit to top 20 before dedup)
-      const topIds = sortedProductIds.slice(0, 20);
-      const { data: productData, error: pError } = await supabase
-        .from('products')
-        .select('*, stores:stores_view!inner(*)')
-        .in('id', topIds)
-        .eq('stores.is_active', true)
-        .eq('stores.is_approved', true)
-        .eq('is_deleted', false)
-        .eq('is_info_complete', true)
-        .eq('in_stock', true);
-
-      if (pError) throw pError;
-
-      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
-      let finalBestSellers = deduplicateProducts(productData || [], userCoords);
-
-      // Sort by sales rank
-      const rankMap = new Map<string, number>();
-      sortedProductIds.forEach((id, index) => rankMap.set(id, index));
-      finalBestSellers.sort((a: any, b: any) => {
-        const rankA = rankMap.get(a.id) ?? Infinity;
-        const rankB = rankMap.get(b.id) ?? Infinity;
-        return rankA - rankB;
-      });
-
-      // If we have fewer than 20 items, fill with recent products
-      if (finalBestSellers.length < 20) {
-        const excludeIds = [...topIds, ...finalBestSellers.map(p => p.id)].filter(id => !!id);
-        let query = supabase
-          .from('products')
-          .select('*, stores:stores_view!inner(*)')
-          .eq('stores.is_active', true)
-          .eq('stores.is_approved', true)
-          .eq('is_deleted', false)
-          .eq('is_info_complete', true)
-          .eq('in_stock', true);
+          .order('created_at', { ascending: false })
+          .limit(10 - productData.length);
         
         if (excludeIds.length > 0) {
-          query = query.not('id', 'in', `(${excludeIds.join(',')})`);
+          fallbackQuery = fallbackQuery.not('id', 'in', `(${excludeIds.join(',')})`);
         }
         
-        const { data: moreProducts } = await query.limit(20 - finalBestSellers.length);
-        
-        if (moreProducts) {
-          const additional = deduplicateProducts(moreProducts, userCoords);
-          finalBestSellers = [...finalBestSellers, ...additional];
+        const { data: fallbackData } = await fallbackQuery;
+        if (fallbackData) {
+          productData = [...productData, ...fallbackData];
         }
       }
 
-      setBestSellers(finalBestSellers.slice(0, 20));
+      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
+      setBestSellers(deduplicateProducts(productData, userCoords).slice(0, 10));
     } catch (e) {
-      // Silent in production
+      // Silent
     } finally {
       setBestSellersLoading(false);
     }
@@ -447,102 +490,52 @@ export const HomeScreen = ({ navigation }: any) => {
   const initSuggestions = async () => {
     setSuggestionsPage(0);
     setHasMoreSuggestions(true);
-    setSuggestions([]);
-    
-    const { rankedIds, allTimeSet } = await fetchUserHistory();
+    // DO NOT clear suggestions here to avoid image flickering
+    const { rankedIds } = await fetchUserHistory();
     setRankedBoughtIds(rankedIds);
-    setAllTimeBoughtIds(allTimeSet);
-    
-    fetchSuggestions(0, rankedIds, allTimeSet);
+    fetchSuggestions(0, rankedIds);
   };
 
-  const fetchSuggestions = async (page: number, currentRankedIds?: string[], currentAllTimeSet?: Set<string>) => {
+  const fetchSuggestions = async (page: number, currentRankedIds?: string[]) => {
     try {
-      const activeRankedIds = currentRankedIds || rankedBoughtIds;
-      const activeAllTimeSet = currentAllTimeSet || allTimeBoughtIds;
-      
       if (page === 0) setSuggestionsLoading(true);
       else setIsMoreSuggestionsLoading(true);
 
-      const userCoords = sessionAddress 
-        ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) 
-        : (selectedAddress ? parseWKT(selectedAddress.location_wkt) : null);
+      const activeRankedIds = currentRankedIds || rankedBoughtIds;
+      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
 
-      const PAGE_SIZE = 10;
+      const PAGE_SIZE = 15;
       const offset = page * PAGE_SIZE;
-      let pageProducts: any[] = [];
 
-      // 1. Try to fetch from ranked bought IDs first
-      if (offset < activeRankedIds.length) {
-        const idsToFetch = activeRankedIds.slice(offset, offset + PAGE_SIZE);
-        const { data: boughtData } = await supabase
-          .from('products')
-          .select('*, stores:stores_view!inner(*)')
-          .in('id', idsToFetch)
-          .eq('stores.is_active', true)
-          .eq('stores.is_approved', true)
-          .eq('is_deleted', false)
-          .eq('is_info_complete', true)
-          .eq('in_stock', true);
+      // Simple approach: Fetch products, and sort them in memory if they match user history
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('*, stores:stores_view!inner(*)')
+        .eq('stores.is_active', true)
+        .eq('stores.is_approved', true)
+        .eq('is_deleted', false)
+        .eq('is_info_complete', true)
+        .eq('in_stock', true)
+        .range(offset, offset + PAGE_SIZE - 1);
 
-        if (boughtData) {
-          // Maintain the rank order
-          const idToIndex = new Map(idsToFetch.map((id, index) => [id, index]));
-          const sortedBought = boughtData.sort((a, b) => (idToIndex.get(a.id) || 0) - (idToIndex.get(b.id) || 0));
-          pageProducts = [...sortedBought];
-        }
+      if (error) throw error;
 
-        // If we still need more products to fill the page, fetch from "never bought"
-        if (pageProducts.length < PAGE_SIZE && activeRankedIds.length < offset + PAGE_SIZE) {
-          const remaining = PAGE_SIZE - pageProducts.length;
-          let query = supabase
-            .from('products')
-            .select('*, stores:stores_view!inner(*)')
-            .eq('stores.is_active', true)
-            .eq('stores.is_approved', true)
-            .eq('is_deleted', false)
-            .eq('is_info_complete', true)
-            .eq('in_stock', true)
-            .limit(remaining);
+      let processed = deduplicateProducts(products || [], userCoords);
 
-          if (activeAllTimeSet.size > 0) {
-            query = query.not('id', 'in', `(${Array.from(activeAllTimeSet).join(',')})`);
-          }
-          
-          const { data: neverBoughtData } = await query;
-            
-          if (neverBoughtData) {
-            pageProducts = [...pageProducts, ...neverBoughtData];
-          }
-        }
-      } else {
-        // 2. Fetch only from "never bought" products
-        const neverBoughtOffset = offset - activeRankedIds.length;
-        let query = supabase
-          .from('products')
-          .select('*, stores:stores_view!inner(*)')
-          .eq('stores.is_active', true)
-          .eq('stores.is_approved', true)
-          .eq('is_deleted', false)
-          .eq('is_info_complete', true)
-          .eq('in_stock', true)
-          .range(neverBoughtOffset, neverBoughtOffset + PAGE_SIZE - 1);
-
-        if (activeAllTimeSet.size > 0) {
-          query = query.not('id', 'in', `(${Array.from(activeAllTimeSet).join(',')})`);
-        }
-
-        const { data: neverBoughtData } = await query;
-
-        if (neverBoughtData) {
-          pageProducts = neverBoughtData;
-        }
+      // Sort by user's 7-day history
+      if (activeRankedIds.length > 0) {
+        processed.sort((a, b) => {
+          const indexA = activeRankedIds.indexOf(a.id);
+          const indexB = activeRankedIds.indexOf(b.id);
+          if (indexA === -1 && indexB === -1) return 0;
+          if (indexA === -1) return 1;
+          if (indexB === -1) return -1;
+          return indexA - indexB;
+        });
       }
 
-      const processedProducts = deduplicateProducts(pageProducts, userCoords);
-      
       setSuggestions(prev => {
-        const combined = page === 0 ? processedProducts : [...prev, ...processedProducts];
+        const combined = page === 0 ? processed : [...prev, ...processed];
         const seen = new Set();
         return combined.filter(item => {
           if (seen.has(item.id)) return false;
@@ -551,10 +544,10 @@ export const HomeScreen = ({ navigation }: any) => {
         });
       });
 
-      setHasMoreSuggestions(pageProducts.length === PAGE_SIZE);
+      setHasMoreSuggestions(products?.length === PAGE_SIZE);
       setSuggestionsPage(page);
     } catch (e) {
-      // Error handled silently
+      // Silent
     } finally {
       setSuggestionsLoading(false);
       setIsMoreSuggestionsLoading(false);
@@ -630,75 +623,67 @@ export const HomeScreen = ({ navigation }: any) => {
     </TouchableOpacity>
   ), [selectedCategory, categoryImages, navigation]);
 
+  const handleProductPress = useCallback((product: any) => {
+    navigation.navigate('ProductDetail', { product, store: product.stores, isFromStore: false });
+  }, [navigation]);
+
+  const handleProductIncrease = useCallback((product: any) => {
+    updateQuantity(product, 1, undefined, product.store_id);
+  }, [updateQuantity]);
+
+  const handleProductDecrease = useCallback((product: any) => {
+    updateQuantity(product, -1, undefined, product.store_id);
+  }, [updateQuantity]);
+
   const renderBestSeller = useCallback(({ item }: { item: any }) => (
     <View style={styles.bestSellerWrapper}>
-      <CustomerProductCard 
-        product={item}
-        onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores, isFromStore: false })}
-        onAdd={() => handleAddToCart(item, item.stores)}
+      <MemoizedProductItem 
+        item={item}
+        onPress={handleProductPress}
+        onAdd={handleAddToCart}
         quantity={getQuantity(item, item.store_id)}
-        onIncrease={() => updateQuantity(item, 1, undefined, item.store_id)}
-        onDecrease={() => updateQuantity(item, -1, undefined, item.store_id)}
+        onIncrease={handleProductIncrease}
+        onDecrease={handleProductDecrease}
         width={140}
       />
     </View>
-  ), [navigation, handleAddToCart, getQuantity, updateQuantity]);
+  ), [handleProductPress, handleAddToCart, getQuantity, handleProductIncrease, handleProductDecrease]);
 
-  const renderSuggestion = useCallback((item: any) => (
-    <CustomerProductCard 
-      key={item.id}
-      product={item}
-      onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores, isFromStore: false })}
-      onAdd={() => handleAddToCart(item, item.stores)}
+  const renderSuggestion = useCallback(({ item }: { item: any }) => (
+    <MemoizedProductItem 
+      item={item}
+      onPress={handleProductPress}
+      onAdd={handleAddToCart}
       quantity={getQuantity(item, item.store_id)}
-      onIncrease={() => updateQuantity(item, 1, undefined, item.store_id)}
-      onDecrease={() => updateQuantity(item, -1, undefined, item.store_id)}
+      onIncrease={handleProductIncrease}
+      onDecrease={handleProductDecrease}
       width={(width - Spacing.md * 2 - 20) / 3 - 2}
     />
-  ), [navigation, handleAddToCart, getQuantity, updateQuantity]);
+  ), [handleProductPress, handleAddToCart, getQuantity, handleProductIncrease, handleProductDecrease]);
+
+  const handleStorePress = useCallback((store: any) => {
+    navigation.navigate('StoreDetails', { store });
+  }, [navigation]);
+
+  const renderStore = useCallback(({ item }: { item: any }) => (
+    <MemoizedStoreItem 
+      item={item} 
+      onPress={handleStorePress} 
+    />
+  ), [handleStorePress]);
 
   const insets = useSafeAreaInsets();
 
-  const renderHeader = () => (
+  const MemoizedHeader = useMemo(() => (
     <>
-      {/* Home Banners */}
-      {homeBanners.length > 0 && (
-        <View style={styles.bannerContainer}>
-          <ScrollView 
-            ref={bannerScrollViewRef}
-            horizontal 
-            pagingEnabled 
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(e) => {
-              const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
-              setActiveBannerIndex(newIndex);
-            }}
-            onTouchStart={stopAutoScroll}
-            onTouchEnd={startAutoScroll}
-          >
-            {homeBanners.map((banner) => (
-              <View key={banner.id} style={styles.bannerWrapper}>
-                <Image source={{ uri: banner.image_url }} style={styles.bannerImage} />
-              </View>
-            ))}
-          </ScrollView>
-          
-          {/* Pagination Dots */}
-          {homeBanners.length > 1 && (
-            <View style={styles.paginationContainer}>
-              {homeBanners.map((_, index) => (
-                <View 
-                  key={index} 
-                  style={[
-                    styles.dot, 
-                    activeBannerIndex === index ? styles.activeDot : styles.inactiveDot
-                  ]} 
-                />
-              ))}
-            </View>
-          )}
-        </View>
-      )}
+      <HomeBanners 
+        banners={homeBanners}
+        activeIndex={activeBannerIndex}
+        onBannerScroll={setActiveBannerIndex}
+        onTouchStart={stopAutoScroll}
+        onTouchEnd={startAutoScroll}
+        scrollViewRef={bannerScrollViewRef}
+      />
 
       {/* Categories */}
       <View style={styles.sectionHeader}>
@@ -747,14 +732,7 @@ export const HomeScreen = ({ navigation }: any) => {
       ) : stores.length > 0 ? (
         <FlatList
           data={stores}
-          renderItem={({ item }) => (
-            <StoreCard 
-              store={item} 
-              onPress={() => (navigation as any).navigate('StoreDetails', { store: item })} 
-              width={260}
-              horizontal
-            />
-          )}
+          renderItem={renderStore}
           keyExtractor={(item) => item.id}
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -779,16 +757,16 @@ export const HomeScreen = ({ navigation }: any) => {
         </View>
       )}
     </>
-  );
+  ), [homeBanners, activeBannerIndex, bestSellers, loading, stores, suggestions.length, renderCategory, renderBestSeller, renderStore, stopAutoScroll, startAutoScroll]);
 
-  const renderFooter = () => {
+  const MemoizedFooter = useMemo(() => {
     if (!isMoreSuggestionsLoading || suggestions.length === 0) return null;
     return (
       <View style={styles.footerLoader}>
         <ActivityIndicator size="small" color={Colors.primary} />
       </View>
     );
-  };
+  }, [isMoreSuggestionsLoading, suggestions.length]);
 
   return (
     <View style={styles.container}>
@@ -861,11 +839,11 @@ export const HomeScreen = ({ navigation }: any) => {
 
       <FlatList
         data={suggestions}
-        renderItem={({ item }) => renderSuggestion(item)}
+        renderItem={renderSuggestion}
         keyExtractor={(item) => item.id}
         numColumns={3}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}
+        ListHeaderComponent={MemoizedHeader}
+        ListFooterComponent={MemoizedFooter}
         onEndReached={handleLoadMoreSuggestions}
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
