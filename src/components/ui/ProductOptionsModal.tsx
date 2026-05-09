@@ -13,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from './Button';
+import { calculateProductPrice, getPriceAdjustmentLabel } from '../../utils/priceUtils';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -20,7 +21,7 @@ interface ProductOptionsModalProps {
   visible: boolean;
   product: any;
   onClose: () => void;
-  onConfirm: (selectedOptions: Record<string, string>) => void;
+  onConfirm: (selectedOptions: Record<string, string>, finalPrice: number) => void;
 }
 
 export const ProductOptionsModal = ({
@@ -69,6 +70,8 @@ export const ProductOptionsModal = ({
 
   if (!product) return null;
 
+  const currentPrice = calculateProductPrice(product, selectedOptions);
+
   const handleConfirm = () => {
     // Validate all options are selected
     const missing = product.options?.find((opt: any) => !selectedOptions[opt.title]);
@@ -76,7 +79,7 @@ export const ProductOptionsModal = ({
       // We could show a tiny internal shake or alert here
       return;
     }
-    onConfirm(selectedOptions);
+    onConfirm(selectedOptions, currentPrice);
     onClose();
   };
 
@@ -115,7 +118,7 @@ export const ProductOptionsModal = ({
               )}
               <View style={styles.titleInfo}>
                 <Text style={styles.productName}>{product.name}</Text>
-                <Text style={styles.productPrice}>₹{product.price}</Text>
+                <Text style={styles.productPrice}>₹{currentPrice}</Text>
               </View>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -136,8 +139,8 @@ export const ProductOptionsModal = ({
                   )}
                 </View>
                 <View style={styles.chipsContainer}>
-                  {opt.values.map((val: string, vIdx: number) => {
-                    const isSelected = selectedOptions[opt.title] === val;
+                  {opt.values.map((val: string | any, vIdx: number) => {
+                    const isSelected = selectedOptions[opt.title] === (typeof val === 'string' ? val : val.value);
                     return (
                       <TouchableOpacity
                         key={vIdx}
@@ -145,14 +148,15 @@ export const ProductOptionsModal = ({
                           styles.chip,
                           isSelected && styles.chipSelected
                         ]}
-                        onPress={() => setSelectedOptions({ ...selectedOptions, [opt.title]: val })}
+                        onPress={() => setSelectedOptions({ ...selectedOptions, [opt.title]: (typeof val === 'string' ? val : (val as any).value) })}
                         activeOpacity={0.7}
                       >
                         <Text style={[
                           styles.chipText,
                           isSelected && styles.chipTextSelected
                         ]}>
-                          {val}
+                          {(typeof val === 'string' ? val : (val as any).value)}
+                          {getPriceAdjustmentLabel(val)}
                         </Text>
                       </TouchableOpacity>
                     );

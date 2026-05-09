@@ -17,6 +17,8 @@ import { useCart } from '../../context/CartContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../api/supabase';
 
+import { calculateProductPrice, getPriceAdjustmentLabel } from '../../utils/priceUtils';
+
 const { width } = Dimensions.get('window');
 
 import { formatPriceFull } from '../../utils/format';
@@ -32,6 +34,8 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   const [returnPolicySummary, setReturnPolicySummary] = React.useState<string>('');
   const [currentStore, setCurrentStore] = React.useState(store);
   const { showAlert } = useAlert();
+
+  const currentPrice = calculateProductPrice(product, selectedOptions);
 
   React.useEffect(() => {
     checkFavourite();
@@ -185,13 +189,14 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           </View>
           
           <View style={styles.priceContainer}>
-            <Text style={styles.price}>₹{formatPriceFull(product.price)}</Text>
+            <Text style={styles.price}>₹{formatPriceFull(currentPrice)}</Text>
             {product.weight_kg ? (
               <Text style={styles.weight}>
                 ({product.weight_kg < 1 ? `${product.weight_kg * 1000}gm` : `${product.weight_kg}kg`})
               </Text>
             ) : null}
           </View>
+
 
           <View style={styles.divider} />
 
@@ -208,8 +213,8 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                     )}
                   </View>
                   <View style={styles.optionsContainer}>
-                    {opt.values.map((val: string, vIdx: number) => {
-                      const isSelected = selectedOptions[opt.title] === val;
+                    {opt.values.map((val: string | any, vIdx: number) => {
+                      const isSelected = selectedOptions[opt.title] === (typeof val === 'string' ? val : val.value);
                       return (
                         <TouchableOpacity 
                           key={vIdx}
@@ -218,7 +223,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                             styles.optionChip,
                             isSelected && styles.optionChipSelected
                           ]}
-                          onPress={() => setSelectedOptions({ ...selectedOptions, [opt.title]: val })}
+                          onPress={() => setSelectedOptions({ ...selectedOptions, [opt.title]: (typeof val === 'string' ? val : val.value) })}
                         >
                           {isSelected && (
                             <Icon name="check-circle" size={16} color={Colors.white} style={{ marginRight: 6 }} />
@@ -226,7 +231,10 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                           <Text style={[
                             styles.optionChipText,
                             isSelected && styles.optionChipSelectedText
-                          ]}>{val}</Text>
+                          ]}>
+                            {(typeof val === 'string' ? val : val.value)}
+                            {getPriceAdjustmentLabel(val)}
+                          </Text>
                         </TouchableOpacity>
                       );
                     })}
@@ -349,7 +357,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                     }
                   });
                 }
-              addItem({ ...product, selectedOptions }, store, isFromStore);
+              addItem({ ...product, price: currentPrice, selectedOptions }, store, isFromStore);
             }}
           >
             <Icon name="cart-plus" size={20} color={Colors.white} style={{ marginRight: 8 }} />

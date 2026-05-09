@@ -684,7 +684,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         visible={!!selectedProductOptions}
         product={selectedProductOptions}
         onClose={() => setSelectedProductOptions(null)}
-        onConfirm={(options) => addItem({ ...selectedProductOptions, selectedOptions: options }, store, true)}
+        onConfirm={(options, finalPrice) => addItem({ ...selectedProductOptions, price: finalPrice, selectedOptions: options }, store, true)}
       />
 
       {/* Detailed View Modal */}

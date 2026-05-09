@@ -57,10 +57,12 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     product?.options?.length 
       ? product.options.map((opt: any) => ({ 
           ...opt, 
-          values: opt.values?.length ? opt.values : [''], 
+          values: opt.values?.length 
+            ? opt.values.map((v: any) => typeof v === 'string' ? { value: v, price_adjustment: 0 } : v) 
+            : [{ value: '', price_adjustment: 0 }], 
           currentInput: '' 
         }))
-      : [{ title: '', values: [''], currentInput: '' }]
+      : [{ title: '', values: [{ value: '', price_adjustment: 0 }], currentInput: '' }]
   );
   const [tags, setTags] = useState<string[]>(product?.tags || []);
   const [tagInput, setTagInput] = useState('');
@@ -139,7 +141,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             if (data.options) {
               setProductOptions(data.options.map((opt: any) => ({
                 ...opt,
-                values: opt.values?.length ? opt.values : [''],
+                values: opt.values?.length 
+                  ? opt.values.map((v: any) => typeof v === 'string' ? { value: v, price_adjustment: 0 } : v)
+                  : [{ value: '', price_adjustment: 0 }],
                 currentInput: ''
               })));
             }
@@ -369,7 +373,12 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       const sanitizedOptions = productOptions
         .map(o => ({
           title: o.title.trim(),
-          values: o.values.map((v: string) => v.trim()).filter((v: string) => v !== '')
+          values: o.values
+            .filter((v: any) => v.value.trim() !== '')
+            .map((v: any) => ({
+              value: v.value.trim(),
+              price_adjustment: parseFloat(v.price_adjustment) || 0
+            }))
         }))
         .filter(o => o.title !== '' || o.values.length > 0);
 
@@ -761,31 +770,58 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                         <View style={styles.optionValuesField}>
                           <Text style={styles.tinyLabel}>Values</Text>
                           <View style={styles.valuesList}>
-                            {(opt.values.length > 0 ? opt.values : ['']).map((val: string, vIdx: number) => (
-                              <View key={vIdx} style={[styles.optionInputWithAction, { marginBottom: 8 }]}>
-                                <TextInput
-                                  placeholder="e.g. Red, XL, etc."
-                                  placeholderTextColor={Colors.textSecondary + '70'}
-                                  value={val}
-                                  onChangeText={(newVal) => {
-                                    setProductOptions(prev => {
-                                      const next = [...prev];
-                                      const updatedValues = [...next[oIdx].values];
-                                      updatedValues[vIdx] = newVal;
-                                      next[oIdx] = { ...next[oIdx], values: updatedValues };
-                                      return next;
-                                    });
-                                  }}
-                                  style={styles.optionValueInput}
-                                  editable={canEditDetails}
-                                />
+                            {opt.values.map((valObj: any, vIdx: number) => (
+                              <View key={vIdx} style={[styles.optionInputWithAction, { marginBottom: 12, alignItems: 'center' }]}>
+                                <View style={{ flex: 1, marginRight: 8 }}>
+                                  <TextInput
+                                    placeholder={vIdx === 0 ? "Base Option (e.g. S)" : "Value (e.g. M)"}
+                                    placeholderTextColor={Colors.textSecondary + '70'}
+                                    value={valObj.value}
+                                    onChangeText={(newVal) => {
+                                      setProductOptions(prev => {
+                                        const next = [...prev];
+                                        const updatedValues = [...next[oIdx].values];
+                                        updatedValues[vIdx] = { ...updatedValues[vIdx], value: newVal };
+                                        next[oIdx] = { ...next[oIdx], values: updatedValues };
+                                        return next;
+                                      });
+                                    }}
+                                    style={[styles.optionValueInput, { width: '100%' }]}
+                                    editable={canEditDetails}
+                                  />
+                                </View>
+                                <View style={{ width: 85, marginRight: 4 }}>
+                                  {vIdx === 0 ? (
+                                    <View style={[styles.optionValueInput, { backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', borderColor: Colors.border, borderStyle: 'dashed' }]}>
+                                      <Text style={{ fontSize: 10, color: Colors.textSecondary, fontWeight: '700', textTransform: 'uppercase' }}>Base Price</Text>
+                                    </View>
+                                  ) : (
+                                    <TextInput
+                                      placeholder="+₹0"
+                                      placeholderTextColor={Colors.textSecondary + '70'}
+                                      value={valObj.price_adjustment?.toString() === '0' ? '' : valObj.price_adjustment?.toString()}
+                                      onChangeText={(newPrice) => {
+                                        setProductOptions(prev => {
+                                          const next = [...prev];
+                                          const updatedValues = [...next[oIdx].values];
+                                          updatedValues[vIdx] = { ...updatedValues[vIdx], price_adjustment: newPrice.replace(/[^0-9]/g, '') };
+                                          next[oIdx] = { ...next[oIdx], values: updatedValues };
+                                          return next;
+                                        });
+                                      }}
+                                      keyboardType="numeric"
+                                      style={[styles.optionValueInput, { textAlign: 'center' }]}
+                                      editable={canEditDetails}
+                                    />
+                                  )}
+                                </View>
                                 {canEditDetails && (
                                   vIdx === 0 ? (
                                     <TouchableOpacity 
                                       onPress={() => {
                                         setProductOptions(prev => {
                                           const next = [...prev];
-                                          const updatedValues = [...next[oIdx].values, ''];
+                                          const updatedValues = [...next[oIdx].values, { value: '', price_adjustment: 0 }];
                                           next[oIdx] = { ...next[oIdx], values: updatedValues };
                                           return next;
                                         });
@@ -822,7 +858,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                   {canEditDetails && (
                     <TouchableOpacity 
                       style={styles.addPairBtn}
-                      onPress={() => setProductOptions(prev => [...prev, { title: '', values: [''], currentInput: '' }])}
+                      onPress={() => setProductOptions(prev => [...prev, { title: '', values: [{ value: '', price_adjustment: 0 }], currentInput: '' }])}
                     >
                       <Icon name="plus-circle-outline" size={20} color={Colors.primary} />
                       <Text style={styles.addPairText}>Add More Options</Text>

@@ -958,7 +958,7 @@ export const HomeScreen = ({ navigation }: any) => {
         visible={!!selectedProductOptions}
         product={selectedProductOptions?.product}
         onClose={() => setSelectedProductOptions(null)}
-        onConfirm={(options) => addItem({ ...selectedProductOptions.product, selectedOptions: options }, selectedProductOptions.store)}
+        onConfirm={(options, finalPrice) => addItem({ ...selectedProductOptions.product, price: finalPrice, selectedOptions: options }, selectedProductOptions.store)}
       />
     </View>
   );
