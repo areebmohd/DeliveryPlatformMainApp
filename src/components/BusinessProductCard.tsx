@@ -32,7 +32,7 @@ interface ProductCardProps {
   onDelete: (id: string) => void;
 }
 
-export const BusinessProductCard = ({ 
+export const BusinessProductCard = React.memo(({ 
   product, 
   onToggleStock, 
   onEdit, 
@@ -107,7 +107,7 @@ export const BusinessProductCard = ({
       </View>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

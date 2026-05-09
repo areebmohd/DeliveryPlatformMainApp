@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../api/supabase';
+import { useBusinessStore } from '../../context/BusinessStoreContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { BusinessProductCard } from '../../components/BusinessProductCard';
 
@@ -36,11 +37,317 @@ const formatOpeningHours = (hoursJson: string) => {
     }
     return hoursJson;
   } catch (e) {
-    return hoursJson || 'Schedule not set';
   }
 };
 
-import { useBusinessStore } from '../../context/BusinessStoreContext';
+const StoreHeaderSection = React.memo(({ store }: any) => {
+  return (
+    <View style={[styles.header, { paddingTop: Spacing.sm }]}>
+      <View style={styles.headerContent}>
+        <Text style={styles.headerName}>{store?.name || 'Your Store'}</Text>
+        <View style={styles.badgeRow}>
+          {store?.category && (
+            <View style={styles.headerCategoryBadge}>
+              <Text style={styles.headerCategoryText}>
+                {store.category}
+              </Text>
+            </View>
+          )}
+          {store?.city && (
+            <View style={styles.headerCategoryBadge}>
+              <Text style={styles.headerCategoryText}>
+                {store.city}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+});
+
+const StoreBannerSection = React.memo(({ store }: any) => {
+  return (
+    <View style={styles.bannerContainer}>
+      {store?.banner_url ? (
+        <Image source={{ uri: store.banner_url }} style={styles.banner} />
+      ) : (
+        <View style={[styles.banner, styles.bannerPlaceholder]}>
+          <Icon name="store" size={60} color={Colors.border} />
+          <Text style={styles.placeholderText}>Design your storefront</Text>
+        </View>
+      )}
+    </View>
+  );
+});
+
+const StoreTabsSection = React.memo(({ activeTab, setActiveTab }: any) => {
+  return (
+    <View style={styles.tabWrapper}>
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'products' && styles.activeTab]}
+          onPress={() => setActiveTab('products')}
+        >
+          <Icon
+            name="package-variant-closed"
+            size={20}
+            color={activeTab === 'products' ? Colors.white : Colors.primary}
+          />
+          <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
+            Products
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'info' && styles.activeTab]}
+          onPress={() => setActiveTab('info')}
+        >
+          <Icon
+            name={activeTab === 'info' ? 'information' : 'information-outline'}
+            size={20}
+            color={activeTab === 'info' ? Colors.white : Colors.primary}
+          />
+          <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>
+            Info
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
+
+const VerificationAlertSection = React.memo(({ 
+  store, 
+  profile, 
+  handleNavigateToStoreForm,
+  calculateDaysRemaining,
+  isStorePending
+}: any) => {
+  if (store?.is_active) return null;
+  
+  const isPending = isStorePending(store);
+  const creationDate = store?.created_at || profile?.created_at;
+  const remaining = calculateDaysRemaining(creationDate);
+
+  return (
+    <TouchableOpacity 
+      style={[styles.inactiveAlert, isPending && styles.pendingAlert, !isPending && { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7', marginHorizontal: Spacing.md, marginTop: Spacing.md }]} 
+      onPress={handleNavigateToStoreForm}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.alertIconBg, isPending && styles.pendingIconBg, !isPending && { backgroundColor: '#FEF3C7' }]}>
+        <Icon 
+          name={isPending ? "clock-check-outline" : "clock-alert-outline"} 
+          size={24} 
+          color={isPending ? Colors.success : "#D97706"} 
+        />
+      </View>
+      <View style={styles.alertTextContainer}>
+        <Text style={[styles.alertTitle, isPending && styles.pendingTitle, !isPending && { color: '#D97706' }]}>
+          {isPending ? 'Verification Pending' : 'Action Required'}
+        </Text>
+        <Text style={[styles.alertSubtitle, isPending && styles.pendingSubtitle, !isPending && { color: '#92400E' }]}>
+          {isPending 
+            ? 'You have submitted all the verifications details and your request is still pending please wait for some time.'
+            : `Please fill all necessary details for verification otherwise this account will be deleted in ${remaining} days.`
+          }
+        </Text>
+      </View>
+      <Icon name="chevron-right" size={20} color={isPending ? Colors.success : "#D97706"} />
+    </TouchableOpacity>
+  );
+});
+
+const BusinessInfoSection = React.memo(({ 
+  store, 
+  handleToggleAvailability, 
+  formatOpeningHours 
+}: any) => {
+  return (
+    <View style={styles.infoContainer}>
+      <View style={styles.infoCard}>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>About the Store</Text>
+          <Text style={styles.infoValue}>
+            {store?.description || 'Build your store profile to attract more customers.'}
+          </Text>
+        </View>
+
+        <View style={styles.infoDivider} />
+
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Operating Hours</Text>
+          <View style={styles.hoursRow}>
+            <Icon name="clock-outline" size={18} color={Colors.primary} />
+            <Text style={styles.infoValue}>{formatOpeningHours(store?.opening_hours)}</Text>
+          </View>
+
+          {store?.is_approved && (
+            <View style={styles.availabilityToggle}>
+              <View>
+                <Text style={styles.availabilityTitle}>Available for Orders</Text>
+                <Text style={styles.availabilitySubtitle}>
+                  {store?.is_currently_open 
+                    ? 'Customers can place orders now' 
+                    : 'Store is manually closed for orders'}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                onPress={handleToggleAvailability}
+                style={[
+                  styles.toggleBtn,
+                  store?.is_currently_open ? styles.toggleBtnActive : styles.toggleBtnInactive
+                ]}
+              >
+                <View style={[
+                  styles.toggleSwitch,
+                  store?.is_currently_open ? styles.switchRight : styles.switchLeft
+                ]} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.infoDivider} />
+
+        {(store?.upi_id || store?.bank_account_number) && (
+          <>
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Payment Information</Text>
+              {store?.upi_id && (
+                <View style={styles.hoursRow}>
+                  <Icon name="qrcode-scan" size={18} color={Colors.primary} />
+                  <Text style={styles.infoValue}>{store.upi_id}</Text>
+                </View>
+              )}
+              {store?.bank_account_number && (
+                <View style={{ marginTop: 8 }}>
+                  <View style={styles.hoursRow}>
+                    <Icon name="bank-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.infoValue}>{store.bank_account_holder_name}</Text>
+                  </View>
+                  <View style={[styles.hoursRow, { marginLeft: 26, marginTop: 4 }]}>
+                    <Text style={styles.infoValue}>{store.bank_account_number}</Text>
+                  </View>
+                  <View style={[styles.hoursRow, { marginLeft: 26, marginTop: 4 }]}>
+                    <Text style={styles.infoValue}>{store.bank_ifsc_code}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+            <View style={styles.infoDivider} />
+          </>
+        )}
+
+        <View style={styles.infoSection}>
+          <Text style={styles.infoLabel}>Pickup Address</Text>
+          <View style={styles.hoursRow}>
+            <Icon name="map-marker-radius" size={18} color={Colors.error} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.infoValue}>
+                {store?.address_line_1 || store?.address || 'Location required for deliveries'}
+                {store?.pincode ? ` - ${store.pincode}` : ''}
+                {store?.city ? `\n${store.city}` : ''}
+                {store?.state ? `, ${store.state}` : ''}
+              </Text>
+            </View>
+          </View>
+
+          {store?.location_wkt && (
+            <TouchableOpacity
+              style={styles.mapLink}
+              onPress={() => {
+                const match = store.location_wkt.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+                if (match) {
+                  const lng = match[1];
+                  const lat = match[2];
+                  const url = Platform.select({
+                    ios: `maps:0,0?q=${store.name}@${lat},${lng}`,
+                    android: `geo:0,0?q=${lat},${lng}(${store.name})`,
+                  });
+                  if (url) Linking.openURL(url);
+                }
+              }}
+            >
+              <Icon name="google-maps" size={16} color={Colors.primary} />
+              <Text style={styles.mapLinkText}>View GPS Coordinates</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {(store?.phone || store?.email || store?.whatsapp_number) && (
+          <>
+            <View style={styles.infoDivider} />
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Contact Information</Text>
+              {store?.phone && (
+                <View style={styles.hoursRow}>
+                  <Icon name="phone-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.infoValue}>{store.phone}</Text>
+                </View>
+              )}
+              {store?.email && (
+                <View style={[styles.hoursRow, { marginTop: 8 }]}>
+                  <Icon name="email-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.infoValue}>{store.email}</Text>
+                </View>
+              )}
+              {store?.whatsapp_number && (
+                <View style={[styles.hoursRow, { marginTop: 8 }]}>
+                  <Icon name="whatsapp" size={18} color={Colors.success} />
+                  <Text style={styles.infoValue}>{store.whatsapp_number}</Text>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+
+        {(store?.instagram_url || store?.facebook_url) && (
+          <>
+            <View style={styles.infoDivider} />
+            <View style={styles.infoSection}>
+              <Text style={styles.infoLabel}>Social Media</Text>
+              {store?.instagram_url && (
+                <TouchableOpacity 
+                  style={styles.hoursRow}
+                  onPress={() => {
+                    const url = store.instagram_url.startsWith('http') 
+                      ? store.instagram_url 
+                      : `https://${store.instagram_url}`;
+                    Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+                  }}
+                >
+                  <Icon name="instagram" size={18} color="#E4405F" />
+                  <Text style={[styles.infoValue, { color: Colors.primary, textDecorationLine: 'underline' }]}>
+                    Instagram
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {store?.facebook_url && (
+                <TouchableOpacity 
+                  style={[styles.hoursRow, { marginTop: 8 }]}
+                  onPress={() => {
+                    const url = store.facebook_url.startsWith('http') 
+                      ? store.facebook_url 
+                      : `https://${store.facebook_url}`;
+                    Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
+                  }}
+                >
+                  <Icon name="facebook" size={18} color="#1877F2" />
+                  <Text style={[styles.infoValue, { color: Colors.primary, textDecorationLine: 'underline' }]}>
+                    Facebook
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
+      </View>
+    </View>
+  );
+});
+
+
 
 export const StoreScreen = ({ navigation }: any) => {
   const { user, profile } = useAuth();
@@ -207,8 +514,8 @@ export const StoreScreen = ({ navigation }: any) => {
         .eq('id', id);
       if (error) throw error;
 
-      setProducts(
-        products.map(p =>
+      setProducts(prev =>
+        prev.map(p =>
           p.id === id ? { ...p, in_stock: !currentStatus } : p,
         ),
       );
@@ -217,27 +524,22 @@ export const StoreScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleDeleteProduct = (product: any) => {
+  const handleDeleteProduct = useCallback((product: any) => {
     showAlert({
       title: 'Delete Product',
-      message:
-        'Are you sure you want to remove this item from your inventory? This cannot be undone.',
+      message: 'Are you sure you want to delete this product? All its data will be removed permanently.',
       type: 'warning',
-      showCancel: true,
       primaryAction: {
         text: 'Delete',
         onPress: async () => {
           try {
             if (product.product_type === 'personal') {
-              // Try hard delete first
               const { error } = await supabase
                 .from('products')
                 .delete()
                 .eq('id', product.id);
               
               if (error) {
-                // If ordered (FK constraint), fallback to soft delete
-                console.log('Ordered product, falling back to soft delete');
                 const { error: updateError } = await supabase
                   .from('products')
                   .update({ is_deleted: true, in_stock: false })
@@ -245,7 +547,6 @@ export const StoreScreen = ({ navigation }: any) => {
                 if (updateError) throw updateError;
               }
             } else {
-              // Common/Barcode: always soft delete
               const { error } = await supabase
                 .from('products')
                 .update({ is_deleted: true, in_stock: false })
@@ -253,20 +554,36 @@ export const StoreScreen = ({ navigation }: any) => {
               if (error) throw error;
             }
             
-            fetchProducts();
-            showToast('Product deleted successfully', 'success');
+            setProducts(prev => prev.filter(p => p.id !== product.id));
+            showToast('Product removed successfully', 'success');
           } catch (e: any) {
-            showAlert({
-              title: 'Error',
-              message: e.message || 'Could not delete product.',
-              type: 'error',
-            });
+            showAlert({ title: 'Error', message: e.message, type: 'error' });
           }
         },
         variant: 'destructive',
-      },
+      }
     });
-  };
+  }, [showAlert, showToast, setProducts]);
+
+  const handleToggleAvailabilityMemo = useCallback(() => {
+    handleToggleAvailability();
+  }, [handleToggleAvailability]);
+
+  const handleToggleStockMemo = useCallback((id: string, currentStatus: boolean) => {
+    handleToggleStock(id, currentStatus);
+  }, [handleToggleStock]);
+
+  const handleEditProductMemo = useCallback((product: any) => {
+    handleNavigateToProductForm(product);
+  }, [handleNavigateToProductForm]);
+
+  const handleDeleteProductMemo = useCallback((product: any) => {
+    handleDeleteProduct(product);
+  }, [handleDeleteProduct]);
+
+  const handleNavigateToStoreFormMemo = useCallback(() => {
+    handleNavigateToStoreForm();
+  }, [handleNavigateToStoreForm]);
 
 
   if (loading || storeLoading) {
@@ -276,126 +593,6 @@ export const StoreScreen = ({ navigation }: any) => {
       </View>
     );
   }
-
-  const renderHeader = () => (
-    <View style={[styles.header, { paddingTop: Spacing.sm }]}>
-      <View style={styles.headerContent}>
-        <Text style={styles.headerName}>{store?.name || 'Your Store'}</Text>
-        <View style={styles.badgeRow}>
-          {store?.category && (
-            <View style={styles.headerCategoryBadge}>
-              <Text style={styles.headerCategoryText}>
-                {store.category}
-              </Text>
-            </View>
-          )}
-          {store?.city && (
-            <View style={styles.headerCategoryBadge}>
-              <Text style={styles.headerCategoryText}>
-                {store.city}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderBanner = () => (
-    <View style={styles.bannerContainer}>
-      {store?.banner_url ? (
-        <Image source={{ uri: store.banner_url }} style={styles.banner} />
-      ) : (
-        <View style={[styles.banner, styles.bannerPlaceholder]}>
-          <Icon name="store" size={60} color={Colors.border} />
-          <Text style={styles.placeholderText}>Design your storefront</Text>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderVerificationAlert = () => {
-    if (store?.is_active) return null;
-    
-    const isPending = isStorePending(store);
-    const creationDate = store?.created_at || profile?.created_at;
-    const remaining = calculateDaysRemaining(creationDate);
-
-    return (
-      <TouchableOpacity 
-        style={[styles.inactiveAlert, isPending && styles.pendingAlert, !isPending && { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7', marginHorizontal: Spacing.md, marginTop: Spacing.md }]} 
-        onPress={handleNavigateToStoreForm}
-        activeOpacity={0.8}
-      >
-        <View style={[styles.alertIconBg, isPending && styles.pendingIconBg, !isPending && { backgroundColor: '#FEF3C7' }]}>
-          <Icon 
-            name={isPending ? "clock-check-outline" : "clock-alert-outline"} 
-            size={24} 
-            color={isPending ? Colors.success : "#D97706"} 
-          />
-        </View>
-        <View style={styles.alertTextContainer}>
-          <Text style={[styles.alertTitle, isPending && styles.pendingTitle, !isPending && { color: '#D97706' }]}>
-            {isPending ? 'Verification Pending' : 'Action Required'}
-          </Text>
-          <Text style={[styles.alertSubtitle, isPending && styles.pendingSubtitle, !isPending && { color: '#92400E' }]}>
-            {isPending 
-              ? 'You have submitted all the verifications details and your request is still pending please wait for some time.'
-              : `Please fill all necessary details for verification otherwise this account will be deleted in ${remaining} days.`
-            }
-          </Text>
-        </View>
-        <Icon name="chevron-right" size={20} color={isPending ? Colors.success : "#D97706"} />
-      </TouchableOpacity>
-    );
-  };
-
-  const renderTabs = () => (
-    <View style={styles.tabWrapper}>
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'products' && styles.activeTab]}
-          onPress={() => setActiveTab('products')}
-        >
-          <Icon
-            name={
-              activeTab === 'products'
-                ? 'package-variant-closed'
-                : 'package-variant-closed'
-            }
-            size={20}
-            color={activeTab === 'products' ? Colors.white : Colors.primary}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'products' && styles.activeTabText,
-            ]}
-          >
-            Products
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'info' && styles.activeTab]}
-          onPress={() => setActiveTab('info')}
-        >
-          <Icon
-            name={activeTab === 'info' ? 'information' : 'information-outline'}
-            size={20}
-            color={activeTab === 'info' ? Colors.white : Colors.primary}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'info' && styles.activeTabText,
-            ]}
-          >
-            Info
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
 
   return (
     <View style={styles.container}>
@@ -409,11 +606,17 @@ export const StoreScreen = ({ navigation }: any) => {
           <RefreshControl refreshing={loading} onRefresh={onRefresh} colors={[Colors.primary]} />
         }
       >
-        {renderHeader()}
-        {renderBanner()}
+        <StoreHeaderSection store={store} />
+        <StoreBannerSection store={store} />
         
         <View>
-          {renderVerificationAlert()}
+          <VerificationAlertSection
+            store={store}
+            profile={profile}
+            handleNavigateToStoreForm={handleNavigateToStoreFormMemo}
+            calculateDaysRemaining={calculateDaysRemaining}
+            isStorePending={isStorePending}
+          />
           
           {store && store.is_active && store.has_pending_changes && (
             <View style={[styles.inactiveAlert, styles.pendingAlert]}>
@@ -434,7 +637,7 @@ export const StoreScreen = ({ navigation }: any) => {
           {store && store.is_active && !store.is_currently_open && (
             <TouchableOpacity 
               style={[styles.inactiveAlert, { backgroundColor: '#FFF4F4', borderColor: '#FFE2E2' }]} 
-              onPress={handleToggleAvailability}
+              onPress={handleToggleAvailabilityMemo}
               activeOpacity={0.8}
             >
               <View style={[styles.alertIconBg, { backgroundColor: '#FFE2E2' }]}>
@@ -455,7 +658,7 @@ export const StoreScreen = ({ navigation }: any) => {
 
         <View style={{ height: 10 }} />
 
-        {renderTabs()}
+        <StoreTabsSection activeTab={activeTab} setActiveTab={setActiveTab} />
 
         <View style={styles.tabContent}>
           {activeTab === 'products' ? (
@@ -469,9 +672,9 @@ export const StoreScreen = ({ navigation }: any) => {
                   <BusinessProductCard
                     key={item.id}
                     product={item}
-                    onToggleStock={handleToggleStock}
-                    onEdit={handleNavigateToProductForm}
-                    onDelete={() => handleDeleteProduct(item)}
+                    onToggleStock={handleToggleStockMemo}
+                    onEdit={handleEditProductMemo}
+                    onDelete={handleDeleteProductMemo}
                   />
                 ))
               ) : (
@@ -491,222 +694,11 @@ export const StoreScreen = ({ navigation }: any) => {
               )}
             </View>
           ) : (
-            <View style={styles.infoContainer}>
-              <View style={styles.infoCard}>
-                <View style={styles.infoSection}>
-                  <Text style={styles.infoLabel}>About the Store</Text>
-                  <Text style={styles.infoValue}>
-                    {store?.description ||
-                      'Build your store profile to attract more customers.'}
-                  </Text>
-                </View>
-
-                <View style={styles.infoDivider} />
-
-                <View style={styles.infoSection}>
-                  <Text style={styles.infoLabel}>Operating Hours</Text>
-                  <View style={styles.hoursRow}>
-                    <Icon
-                      name="clock-outline"
-                      size={18}
-                      color={Colors.primary}
-                    />
-                    <Text style={styles.infoValue}>
-                      {formatOpeningHours(store?.opening_hours)}
-                    </Text>
-                  </View>
-
-                  {store?.is_approved && (
-                    <View style={styles.availabilityToggle}>
-                      <View>
-                        <Text style={styles.availabilityTitle}>Available for Orders</Text>
-                        <Text style={styles.availabilitySubtitle}>
-                          {store?.is_currently_open 
-                            ? 'Customers can place orders now' 
-                            : 'Store is manually closed for orders'}
-                        </Text>
-                      </View>
-                      <TouchableOpacity 
-                        onPress={handleToggleAvailability}
-                        style={[
-                          styles.toggleBtn,
-                          store?.is_currently_open ? styles.toggleBtnActive : styles.toggleBtnInactive
-                        ]}
-                      >
-                        <View style={[
-                          styles.toggleSwitch,
-                          store?.is_currently_open ? styles.switchRight : styles.switchLeft
-                        ]} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.infoDivider} />
-
-                {(store?.upi_id || store?.bank_account_number) && (
-                  <>
-                    <View style={styles.infoSection}>
-                      <Text style={styles.infoLabel}>Payment Information</Text>
-                      {store?.upi_id && (
-                        <View style={styles.hoursRow}>
-                          <Icon name="qrcode-scan" size={18} color={Colors.primary} />
-                          <Text style={styles.infoValue}>{store.upi_id}</Text>
-                        </View>
-                      )}
-                      {store?.bank_account_number && (
-                        <View style={{ marginTop: 8 }}>
-                          <View style={styles.hoursRow}>
-                            <Icon name="bank-outline" size={18} color={Colors.primary} />
-                            <Text style={styles.infoValue}>{store.bank_account_holder_name}</Text>
-                          </View>
-                          <View style={[styles.hoursRow, { marginLeft: 26, marginTop: 4 }]}>
-                            <Text style={styles.infoValue}>{store.bank_account_number}</Text>
-                          </View>
-                          <View style={[styles.hoursRow, { marginLeft: 26, marginTop: 4 }]}>
-                            <Text style={styles.infoValue}>{store.bank_ifsc_code}</Text>
-                          </View>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.infoDivider} />
-                  </>
-                )}
-
-                <View style={styles.infoSection}>
-                  <Text style={styles.infoLabel}>Pickup Address</Text>
-                  <View style={styles.hoursRow}>
-                    <Icon
-                      name="map-marker-radius"
-                      size={18}
-                      color={Colors.error}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.infoValue}>
-                        {store?.address_line_1 ||
-                          store?.address ||
-                          'Location required for deliveries'}
-                        {store?.pincode ? ` - ${store.pincode}` : ''}
-                        {store?.city ? `\n${store.city}` : ''}
-                        {store?.state ? `, ${store.state}` : ''}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {store?.location_wkt && (
-                    <TouchableOpacity
-                      style={styles.mapLink}
-                      onPress={() => {
-                        const match = store.location_wkt.match(
-                          /POINT\(([-\d.]+) ([-\d.]+)\)/,
-                        );
-                        if (match) {
-                          const lng = match[1];
-                          const lat = match[2];
-                          const url = Platform.select({
-                            ios: `maps:0,0?q=${store.name}@${lat},${lng}`,
-                            android: `geo:0,0?q=${lat},${lng}(${store.name})`,
-                          });
-                          if (url) Linking.openURL(url);
-                        }
-                      }}
-                    >
-                      <Icon
-                        name="google-maps"
-                        size={16}
-                        color={Colors.primary}
-                      />
-                      <Text style={styles.mapLinkText}>
-                        View GPS Coordinates
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {(store?.phone || store?.email || store?.whatsapp_number) && (
-                  <>
-                    <View style={styles.infoDivider} />
-                    <View style={styles.infoSection}>
-                      <Text style={styles.infoLabel}>Contact Information</Text>
-                      {store?.phone && (
-                        <View style={styles.hoursRow}>
-                          <Icon
-                            name="phone-outline"
-                            size={18}
-                            color={Colors.primary}
-                          />
-                          <Text style={styles.infoValue}>{store.phone}</Text>
-                        </View>
-                      )}
-                      {store?.email && (
-                        <View style={[styles.hoursRow, { marginTop: 8 }]}>
-                          <Icon
-                            name="email-outline"
-                            size={18}
-                            color={Colors.primary}
-                          />
-                          <Text style={styles.infoValue}>{store.email}</Text>
-                        </View>
-                      )}
-                      {store?.whatsapp_number && (
-                        <View style={[styles.hoursRow, { marginTop: 8 }]}>
-                          <Icon
-                            name="whatsapp"
-                            size={18}
-                            color={Colors.success}
-                          />
-                          <Text style={styles.infoValue}>
-                            {store.whatsapp_number}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </>
-                )}
-
-                {(store?.instagram_url || store?.facebook_url) && (
-                  <>
-                    <View style={styles.infoDivider} />
-                    <View style={styles.infoSection}>
-                      <Text style={styles.infoLabel}>Social Media</Text>
-                      {store?.instagram_url && (
-                        <TouchableOpacity 
-                          style={styles.hoursRow}
-                          onPress={() => {
-                            const url = store.instagram_url.startsWith('http') 
-                              ? store.instagram_url 
-                              : `https://${store.instagram_url}`;
-                            Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
-                          }}
-                        >
-                          <Icon name="instagram" size={18} color="#E4405F" />
-                          <Text style={[styles.infoValue, { color: Colors.primary, textDecorationLine: 'underline' }]}>
-                            Instagram
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                      {store?.facebook_url && (
-                        <TouchableOpacity 
-                          style={[styles.hoursRow, { marginTop: 8 }]}
-                          onPress={() => {
-                            const url = store.facebook_url.startsWith('http') 
-                              ? store.facebook_url 
-                              : `https://${store.facebook_url}`;
-                            Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
-                          }}
-                        >
-                          <Icon name="facebook" size={18} color="#1877F2" />
-                          <Text style={[styles.infoValue, { color: Colors.primary, textDecorationLine: 'underline' }]}>
-                            Facebook
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </>
-                )}
-
-              </View>
-            </View>
+            <BusinessInfoSection
+              store={store}
+              handleToggleAvailability={handleToggleAvailabilityMemo}
+              formatOpeningHours={formatOpeningHours}
+            />
           )}
         </View>
 

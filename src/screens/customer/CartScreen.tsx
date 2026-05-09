@@ -25,8 +25,459 @@ import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import Geolocation from '@react-native-community/geolocation';
 import { notificationService } from '../../utils/notificationService';
+import { getHaversineDistance } from '../../utils/performanceUtils';
 
 const { width, height } = Dimensions.get('window');
+
+const CartItemRow = React.memo(({ 
+  item, 
+  storeId, 
+  items, 
+  appliedOffers, 
+  offerProductDetails, 
+  updateQuantity, 
+  checkOfferConditions 
+}: any) => {
+  const standardOffer = appliedOffers[storeId];
+  let discountedPrice = item.price;
+  let hasDiscount = false;
+
+  if (standardOffer && checkOfferConditions(standardOffer).length === 0) {
+    const eligibleStoreItems = items.filter((i: any) => {
+      if (i.store_id === storeId) return true;
+      if (!i.is_store_specific) return true;
+      return false;
+    });
+    const storeSubtotal = eligibleStoreItems.reduce((sum: number, i: any) => sum + (i.price * i.quantity), 0);
+
+    if (standardOffer.type === 'free_cash') {
+      const discountPercent = standardOffer.amount / (storeSubtotal || 1);
+      discountedPrice = item.price * (1 - discountPercent);
+      hasDiscount = true;
+    } else if (standardOffer.type === 'discount') {
+      discountedPrice = item.price * (1 - standardOffer.amount / 100);
+      hasDiscount = true;
+    } else if (standardOffer.type === 'cheap_product') {
+      const productIds = [...(standardOffer.conditions?.product_ids || []), ...(standardOffer.reward_data?.product_ids || [])];
+      const isEligible = productIds.some((pid: string) => {
+        if (item.id === pid) return true;
+        const rp = offerProductDetails[pid];
+        if (!rp) return false;
+        if (item.is_store_specific || item.product_type === 'personal') return false;
+        if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+        return item.name === rp.name && item.weight_kg === rp.weight_kg;
+      });
+      if (isEligible) {
+        discountedPrice = item.price * (1 - standardOffer.amount / 100);
+        hasDiscount = true;
+      }
+    } else if (standardOffer.type === 'combo') {
+      const productIds = standardOffer.reward_data?.product_ids || [];
+      const isEligible = productIds.some((pid: string) => {
+        if (item.id === pid) return true;
+        const rp = offerProductDetails[pid];
+        if (!rp) return false;
+        if (item.is_store_specific || item.product_type === 'personal') return false;
+        if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+        return item.name === rp.name && item.weight_kg === rp.weight_kg;
+      });
+      if (isEligible) {
+        hasDiscount = true;
+      }
+    } else if (standardOffer.type === 'fixed_price') {
+      const productIds = standardOffer.reward_data?.product_ids || [];
+      const isEligible = productIds.some((pid: string) => {
+        if (item.id === pid) return true;
+        const rp = offerProductDetails[pid];
+        if (!rp) return false;
+        if (item.is_store_specific || item.product_type === 'personal') return false;
+        if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+        return item.name === rp.name && item.weight_kg === rp.weight_kg;
+      });
+      if (isEligible) {
+        discountedPrice = standardOffer.amount;
+        hasDiscount = true;
+      }
+    }
+  }
+
+  const itemKey = `${item.id}_${JSON.stringify(item.selected_options || {})}`;
+
+  return (
+    <View key={itemKey} style={{ marginBottom: Spacing.md }}>
+      <View style={styles.itemCard}>
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName}>
+            {item.name}
+            {item.selected_options && Object.keys(item.selected_options).length > 0 && (
+              <Text style={styles.itemOptionsText}>
+                {` (${Object.entries(item.selected_options).map(([k, v]) => k === 'gift' ? 'Gift' : v).join(', ')})`}
+              </Text>
+            )}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {hasDiscount && discountedPrice < item.price ? (
+              <>
+                <Text style={styles.itemPrice}>₹{discountedPrice.toFixed(2)}</Text>
+                <Text style={styles.itemPriceStrikethrough}>₹{item.price}</Text>
+              </>
+            ) : (
+              <Text style={styles.itemPrice}>₹{item.price}</Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.quantityControls}>
+          <TouchableOpacity onPress={() => updateQuantity(item, -1)} style={styles.qtyBtn}>
+            <Icon name="minus" size={18} color={Colors.primary} />
+          </TouchableOpacity>
+          <Text style={styles.quantity}>{item.quantity}</Text>
+          <TouchableOpacity onPress={() => updateQuantity(item, 1)} style={styles.qtyBtn}>
+            <Icon name="plus" size={18} color={Colors.primary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      {item.preparation_time > 0 && (
+        <Text style={styles.prepTimeText}>
+          This product has {item.preparation_time} minutes preparing time so order will be picked up when it is prepared.
+        </Text>
+      )}
+    </View>
+  );
+});
+
+const DeliveryTypeSection = React.memo(({
+  deliveryType,
+  setDeliveryType,
+  isLargeVehicle,
+  isBatchAllowed,
+  deliverySlot,
+  setSlotModalVisible,
+  setDeliverySlot
+}: any) => {
+  return (
+    <View style={styles.deliveryTypeSection}>
+      <Text style={styles.sectionTitle}>Delivery Type</Text>
+      <View style={styles.deliveryTypeContainer}>
+        <TouchableOpacity 
+          style={[styles.deliveryTypeCard, deliveryType === 'fast' && styles.deliveryTypeCardActive]}
+          onPress={() => {
+            setDeliveryType('fast');
+            setDeliverySlot(null);
+          }}
+        >
+          <Icon 
+            name="flash" 
+            size={24} 
+            color={deliveryType === 'fast' ? Colors.primary : Colors.textSecondary} 
+          />
+          <View style={styles.deliveryTypeInfo}>
+            <Text style={[styles.deliveryTypeTitle, deliveryType === 'fast' && styles.deliveryTypeTitleActive]}>
+              {isLargeVehicle ? 'Truck Delivery' : 'Bike Delivery'}
+            </Text>
+            <Text style={styles.deliveryTypeDesc}>Delivered as soon as ready</Text>
+          </View>
+          <Icon 
+            name={deliveryType === 'fast' ? "radiobox-marked" : "radiobox-blank"} 
+            size={20} 
+            color={deliveryType === 'fast' ? Colors.primary : Colors.border} 
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          disabled={!isBatchAllowed}
+          style={[
+            styles.deliveryTypeCard, 
+            deliveryType === 'batch' && styles.deliveryTypeCardActive,
+            !isBatchAllowed && styles.deliveryTypeCardDisabled
+          ]}
+          onPress={() => {
+            setDeliveryType('batch');
+            if (!deliverySlot) setSlotModalVisible(true);
+          }}
+        >
+          <Icon 
+            name="truck-delivery" 
+            size={24} 
+            color={!isBatchAllowed ? '#94A3B8' : (deliveryType === 'batch' ? Colors.primary : Colors.textSecondary)} 
+          />
+          <View style={styles.deliveryTypeInfo}>
+            <Text style={[
+              styles.deliveryTypeTitle, 
+              deliveryType === 'batch' && styles.deliveryTypeTitleActive,
+              !isBatchAllowed && styles.deliveryTypeTitleDisabled
+            ]}>
+              Batch Delivery
+            </Text>
+            <Text style={[
+              styles.deliveryTypeDesc,
+              !isBatchAllowed && styles.deliveryTypeDescDisabled
+            ]}>
+              {!isBatchAllowed 
+                ? (isLargeVehicle ? 'Not available for Truck' : 'All shops must be under 1km') 
+                : 'Schedule for a time slot'}
+            </Text>
+            {deliveryType === 'batch' && deliverySlot && isBatchAllowed && (
+              <View style={styles.slotBadgeSmall}>
+                <Text style={styles.slotBadgeTextSmall}>{deliverySlot} Slot</Text>
+                <TouchableOpacity onPress={() => setSlotModalVisible(true)}>
+                  <Text style={styles.changeSlotTextSmall}>Change</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+          {isBatchAllowed && (
+            <Icon 
+              name={deliveryType === 'batch' ? "radiobox-marked" : "radiobox-blank"} 
+              size={20} 
+              color={deliveryType === 'batch' ? Colors.primary : Colors.border} 
+            />
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
+
+const BillingSection = React.memo(({
+  subtotal,
+  totalOfferDiscount,
+  isLargeVehicle,
+  distance,
+  deliveryFee,
+  baseDeliveryFee,
+  totalStoreFees,
+  isAppOfferActive,
+  hasHelper,
+  setHasHelper,
+  helperFee,
+  platformFee,
+  grandTotal,
+  baseGrandTotal,
+  setInfoModal
+}: any) => {
+  return (
+    <View style={styles.billingSection}>
+      <Text style={styles.sectionTitle}>Payment Details</Text>
+      <View style={styles.billDetails}>
+        <View style={styles.billRow}>
+          <Text style={styles.billLabel}>Item Total</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.billValue}>₹{(subtotal - totalOfferDiscount).toFixed(2)}</Text>
+            {totalOfferDiscount > 0 && (
+              <Text style={styles.originalTotalText}>₹{subtotal.toFixed(2)}</Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.billRow}>
+          <View style={styles.labelWithInfo}>
+            <Text style={styles.billLabel}>Delivery Fee ({isLargeVehicle ? 'Truck' : 'Bike'})</Text>
+            <TouchableOpacity onPress={() => setInfoModal({
+              visible: true,
+              title: 'Delivery Fee',
+              content: isLargeVehicle 
+                ? `₹300 (fixed for 1st km) + ₹30 per extra km\n(Large Vehicle)\n\nDistance: ${distance.toFixed(2)} km`
+                : `₹30 (fixed for 1st km) + ₹10 per extra km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
+            })}>
+              <Icon name="information-outline" size={16} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
+            {(totalStoreFees > 0 || isAppOfferActive) && deliveryFee < baseDeliveryFee && (
+              <Text style={styles.originalTotalText}>₹{baseDeliveryFee.toFixed(2)}</Text>
+            )}
+          </View>
+        </View>
+        {totalStoreFees > 0 && deliveryFee > 0 && (
+          <Text style={styles.deliveryDisclaimer}>
+            This delivery fee is only from store not having Free Delivery offer.
+          </Text>
+        )}
+
+        {isLargeVehicle && (
+          <View style={styles.vehicleAlertContainer}>
+            <TouchableOpacity 
+              style={[styles.helperToggle, hasHelper && styles.helperToggleActive]}
+              onPress={() => setHasHelper(!hasHelper)}
+            >
+              <View style={styles.helperInfo}>
+                <Text style={styles.helperTitle}>Add Helper (₹300)</Text>
+                <Text style={styles.helperSubtitle}>A professional to help load/unload large items.</Text>
+              </View>
+              <Icon 
+                name={hasHelper ? "checkbox-marked" : "checkbox-blank-outline"} 
+                size={24} 
+                color={hasHelper ? Colors.primary : Colors.textSecondary} 
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {hasHelper && (
+          <View style={styles.billRow}>
+            <Text style={styles.billLabel}>Helper Fee</Text>
+            <Text style={styles.billValue}>₹{helperFee.toFixed(2)}</Text>
+          </View>
+        )}
+
+        <View style={styles.billRow}>
+          <View style={styles.labelWithInfo}>
+            <Text style={styles.billLabel}>Platform Fee</Text>
+            <TouchableOpacity onPress={() => setInfoModal({
+              visible: true,
+              title: 'Platform Fee',
+              content: 'This fee is used to maintain the platform.\n\n• ₹5 for orders below ₹500\n• ₹10 for orders between ₹500 - ₹1000\n• ₹20 for orders above ₹1000'
+            })}>
+              <Icon name="information-outline" size={16} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.billValue}>₹{platformFee.toFixed(2)}</Text>
+        </View>
+
+        <View style={[styles.billRow, styles.totalRow]}>
+          <Text style={styles.totalLabel}>Grand Total</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
+            {totalOfferDiscount > 0 && (
+              <Text style={styles.originalTotalText}>₹{baseGrandTotal.toFixed(2)}</Text>
+            )}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+});
+
+const CartStoreSection = React.memo(({
+  storeId,
+  storeData,
+  navigateToStore,
+  fetchStoreOffers,
+  appliedOffers,
+  items,
+  offerProductDetails,
+  updateQuantity,
+  checkOfferConditions,
+  getOfferDescription,
+  manuallyRemovedStores,
+  setManuallyRemovedStores,
+  setAppliedOffers
+}: any) => {
+  return (
+    <View key={storeId} style={styles.storeSection}>
+      <View style={styles.storeHeader}>
+        <TouchableOpacity 
+          style={styles.storeHeaderLeft}
+          onPress={() => navigateToStore(storeId)}
+        >
+          <Icon name="storefront-outline" size={20} color={Colors.primary} />
+          <Text style={styles.storeName} numberOfLines={1} ellipsizeMode="tail">{storeData.name}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.viewOffersBtn}
+          onPress={() => fetchStoreOffers(storeId)}
+        >
+          <Text style={styles.viewOffersText}>View Offers</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.storeItemsList}>
+        {storeData.items.map((item: any) => (
+          <CartItemRow
+            key={`${item.id}_${JSON.stringify(item.selected_options || {})}`}
+            item={item}
+            storeId={storeId}
+            items={items}
+            appliedOffers={appliedOffers}
+            offerProductDetails={offerProductDetails}
+            updateQuantity={updateQuantity}
+            checkOfferConditions={checkOfferConditions}
+          />
+        ))}
+
+        {/* Free Product Reward */}
+        {(() => {
+          const offer = appliedOffers[storeId];
+          if (offer?.type === 'free_product' && checkOfferConditions(offer).length === 0) {
+            const rewardId = (offer.reward_data as any)?.product_ids?.[0];
+            const manualItem = storeData.items.find((i: any) => i.id === rewardId);
+            const pName = (offer.reward_data as any)?.product_name || manualItem?.name || 'Gift Item';
+            const pPrice = (offer.reward_data as any)?.product_price || manualItem?.price;
+
+            return (
+              <View style={[styles.itemCard, styles.freeItemCard, { marginBottom: Spacing.md }]}>
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName} numberOfLines={1}>
+                    {pName}
+                  </Text>
+                  {pPrice && (
+                    <Text style={[styles.itemPriceStrikethrough, { marginTop: 2 }]}>₹{pPrice}</Text>
+                  )}
+                </View>
+                <View style={[styles.freeBadge, { flexDirection: 'row', gap: 6, alignItems: 'center' }]}>
+                  <Icon name="gift" size={14} color={Colors.white} />
+                  <Text style={styles.freeBadgeText}>Free</Text>
+                </View>
+              </View>
+            );
+          }
+          return null;
+        })()}
+      </View>
+
+      {/* Applied Offers for this store */}
+      {(() => {
+        const standardKey = storeId;
+        const deliveryKey = `${storeId}_delivery`;
+        const offers = [appliedOffers[standardKey], appliedOffers[deliveryKey]].filter(Boolean);
+
+        if (offers.length === 0) return null;
+
+        return (
+          <View style={styles.storeAppliedOffers}>
+            {offers.map((offer: any, idx: number) => (
+              <View key={`${offer.id}_${idx}`} style={styles.storeOfferTag}>
+                <View style={styles.storeOfferIcon}>
+                  <Icon name={offer.type === 'free_delivery' ? "truck-fast" : "tag-heart"} size={16} color={offer.type === 'free_delivery' ? Colors.primary : "#059669"} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.storeOfferName}>
+                    {offer.name || 'Special Offer'}
+                  </Text>
+                  <Text style={styles.storeOfferDesc}>
+                    {(() => {
+                      const getNames = (ids?: string[]) => {
+                        if (!ids || ids.length === 0) return '';
+                        const names = ids.map(id => offerProductDetails[id]?.name).filter(Boolean);
+                        return names.join(', ');
+                      };
+                      const resolvedName = getNames(offer.reward_data?.product_ids || offer.conditions?.product_ids);
+                      return getOfferDescription(offer, resolvedName);
+                    })()}
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={() => {
+                    const newOffers = { ...appliedOffers };
+                    const key = offer.type === 'free_delivery' ? deliveryKey : standardKey;
+                    delete newOffers[key];
+                    setAppliedOffers(newOffers);
+                    if (!manuallyRemovedStores.includes(storeId)) {
+                      setManuallyRemovedStores((prev: any) => [...prev, storeId]);
+                    }
+                  }} 
+                  style={styles.storeOfferRemove}
+                >
+                  <Icon name="close-circle" size={18} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        );
+      })()}
+    </View>
+  );
+});
 
 export const CartScreen = ({ navigation }: any) => {
   const { items, setItems, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress, appliedOffers, setAppliedOffers } = useCart();
@@ -195,18 +646,7 @@ export const CartScreen = ({ navigation }: any) => {
     }
   }, [items, manuallyRemovedStores, setManuallyRemovedStores]);
 
-  // Distance helper
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
+  // Distance helper moved to performanceUtils
 
   const getCoordinates = (location: any) => {
     if (!location) return null;
@@ -341,7 +781,7 @@ export const CartScreen = ({ navigation }: any) => {
       const userCoords = getCoordinates(profile?.location);
       const storeCoords = getCoordinates(offer.store_location);
       if (userCoords && storeCoords) {
-        const dist = calculateDistance(userCoords.lat, userCoords.lng, storeCoords.lat, storeCoords.lng);
+        const dist = getHaversineDistance(userCoords.lat, userCoords.lng, storeCoords.lat, storeCoords.lng);
         if (dist > conditions.max_distance) {
           errors.push(`Maximum distance: ${conditions.max_distance}km. (Your location is ${dist.toFixed(1)}km from store)`);
         }
@@ -700,7 +1140,7 @@ export const CartScreen = ({ navigation }: any) => {
         id,
         lat: (loc as any).lat,
         lng: (loc as any).lng,
-        distToUser: calculateDistance((loc as any).lat, (loc as any).lng, uLat, uLng)
+        distToUser: getHaversineDistance((loc as any).lat, (loc as any).lng, uLat, uLng)
       }));
 
       storesWithUserDist.sort((a, b) => b.distToUser - a.distToUser);
@@ -710,7 +1150,7 @@ export const CartScreen = ({ navigation }: any) => {
         if (i === storesWithUserDist.length - 1) {
           totalRouteDist += storesWithUserDist[i].distToUser;
         } else {
-          const distBetween = calculateDistance(
+          const distBetween = getHaversineDistance(
             storesWithUserDist[i].lat, storesWithUserDist[i].lng,
             storesWithUserDist[i+1].lat, storesWithUserDist[i+1].lng
           );
@@ -824,10 +1264,6 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
-  const isBatchAllowed = !isLargeVehicle && 
-                         Object.keys(storeDistances).length > 0 &&
-                         Object.values(storeDistances).every(d => d < 1);
-
   const isSlotAvailable = useCallback((slot: string) => {
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -845,134 +1281,169 @@ export const CartScreen = ({ navigation }: any) => {
     return true;
   }, []);
 
-  const isAppOfferActive = !!appliedOffers['app_offer'] && 
-                           deliveryType === 'batch' &&
-                           subtotal >= 49 && 
-                           isBatchAllowed;
+  const groupedItems = React.useMemo(() => {
+    return items.reduce((groups: Record<string, any>, item: any) => {
+      const storeId = item.store_id;
+      if (!groups[storeId]) {
+        groups[storeId] = {
+          id: storeId,
+          name: item.store_name,
+          lat: item.store_lat,
+          lng: item.store_lng,
+          items: []
+        };
+      }
+      groups[storeId].items.push(item);
+      return groups;
+    }, {});
+  }, [items]);
 
-  const platformFee = subtotal < 500 ? 5 : (subtotal <= 1000 ? 10 : 20);
-  const baseDeliveryFee = items.length === 0 ? 0 : (
-    isLargeVehicle 
-      ? 300 + Math.max(0, distance - 1) * 30
-      : 30 + Math.max(0, distance - 1) * 10
-  );
-  const helperFee = hasHelper ? 300 : 0;
-  const baseGrandTotal = subtotal + baseDeliveryFee + platformFee + helperFee;
+  const isBatchAllowed = React.useMemo(() => {
+    return !isLargeVehicle && 
+           Object.keys(storeDistances).length > 0 &&
+           Object.values(storeDistances).every(d => d < 1);
+  }, [isLargeVehicle, storeDistances]);
 
-  let deliveryFee = baseDeliveryFee;
-  let totalOfferDiscount = 0;
-  let storeContributions: Record<string, number> = {};
-  let totalStoreContribution = 0;
+  const isAppOfferActive = React.useMemo(() => {
+    return !!appliedOffers['app_offer'] && 
+           deliveryType === 'batch' &&
+           subtotal >= 29 && 
+           isBatchAllowed;
+  }, [appliedOffers, deliveryType, subtotal, isBatchAllowed]);
 
-  Object.values(appliedOffers).forEach(offer => {
-    let offerDiscount = 0;
-    if (offer.type === 'free_delivery') {
-      const dist = storeDistances[offer.store_id] || 0;
-      const storeFee = isLargeVehicle 
-        ? 300 + Math.max(0, dist - 1) * 30
-        : 30 + Math.max(0, dist - 1) * 10;
-      
-      storeContributions[offer.store_id] = storeFee;
-      totalStoreContribution += storeFee;
-    } else if (offer.type === 'free_cash') {
-      offerDiscount = offer.amount;
-    } else if (offer.type === 'discount') {
-      // Identity-aware subtotal for this store
-      const eligibleItems = items.filter(i => {
-        if (i.store_id === offer.store_id) return true;
-        if (!i.is_store_specific) return true; // Could be switched
-        return false;
-      });
-      const storeSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-      offerDiscount = (storeSubtotal * offer.amount) / 100;
-    } else if (offer.type === 'cheap_product') {
-      const eligibleItems = items.filter(item => {
-        const productIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
-        if (productIds.includes(item.id)) return true;
+  const billingData = React.useMemo(() => {
+    const pFee = subtotal < 500 ? 5 : (subtotal <= 1000 ? 10 : 20);
+    const baseDFee = items.length === 0 ? 0 : (
+      isLargeVehicle 
+        ? 300 + Math.max(0, distance - 1) * 30
+        : 30 + Math.max(0, distance - 1) * 10
+    );
+    const hFee = hasHelper ? 300 : 0;
+    
+    let totalOfferDisc = 0;
+    let storeContribs: Record<string, number> = {};
+    let totalStoreContrib = 0;
+
+    Object.values(appliedOffers).forEach(offer => {
+      let offerDiscount = 0;
+      if (offer.type === 'free_delivery') {
+        const dist = storeDistances[offer.store_id] || 0;
+        const storeFee = isLargeVehicle 
+          ? 300 + Math.max(0, dist - 1) * 30
+          : 30 + Math.max(0, dist - 1) * 10;
         
-        // Identity check
-        const hasEquivalent = productIds.some((pid: string) => {
-          const rp = offerProductDetails[pid];
-          if (!rp) return false;
-          if (item.is_store_specific || item.product_type === 'personal') return false;
-          if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-          return item.name === rp.name && item.weight_kg === rp.weight_kg;
+        storeContribs[offer.store_id] = storeFee;
+        totalStoreContrib += storeFee;
+      } else if (offer.type === 'free_cash') {
+        offerDiscount = offer.amount;
+      } else if (offer.type === 'discount') {
+        const eligibleItems = items.filter(i => {
+          if (i.store_id === offer.store_id) return true;
+          if (!i.is_store_specific) return true;
+          return false;
         });
-        return hasEquivalent;
-      });
-      const eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-      offerDiscount = (eligibleSubtotal * offer.amount) / 100;
-    } else if (offer.type === 'combo') {
-      const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
-      const comboItems = items.filter(item => {
-        if (rewardIds.includes(item.id)) return true;
-        const hasEquivalent = rewardIds.some((pid: string) => {
-          const rp = offerProductDetails[pid];
-          if (!rp) return false;
-          if (item.is_store_specific || item.product_type === 'personal') return false;
-          if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-          return item.name === rp.name && item.weight_kg === rp.weight_kg;
+        const storeSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+        offerDiscount = (storeSubtotal * offer.amount) / 100;
+      } else if (offer.type === 'cheap_product') {
+        const eligibleItems = items.filter(item => {
+          const productIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
+          if (productIds.includes(item.id)) return true;
+          const hasEquivalent = productIds.some((pid: string) => {
+            const rp = offerProductDetails[pid];
+            if (!rp) return false;
+            if (item.is_store_specific || item.product_type === 'personal') return false;
+            if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+            return item.name === rp.name && item.weight_kg === rp.weight_kg;
+          });
+          return hasEquivalent;
         });
-        return hasEquivalent;
-      });
-      const comboSubtotal = comboItems.reduce((sum, i) => sum + i.price, 0);
-      offerDiscount = Math.max(0, comboSubtotal - offer.amount);
-    } else if (offer.type === 'fixed_price') {
-      const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
-      const eligibleItems = items.filter(item => {
-        if (rewardIds.includes(item.id)) return true;
-        const hasEquivalent = rewardIds.some((pid: string) => {
-          const rp = offerProductDetails[pid];
-          if (!rp) return false;
-          if (item.is_store_specific || item.product_type === 'personal') return false;
-          if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-          return item.name === rp.name && item.weight_kg === rp.weight_kg;
+        const eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+        offerDiscount = (eligibleSubtotal * offer.amount) / 100;
+      } else if (offer.type === 'combo') {
+        const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
+        const comboItems = items.filter(item => {
+          if (rewardIds.includes(item.id)) return true;
+          const hasEquivalent = rewardIds.some((pid: string) => {
+            const rp = offerProductDetails[pid];
+            if (!rp) return false;
+            if (item.is_store_specific || item.product_type === 'personal') return false;
+            if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+            return item.name === rp.name && item.weight_kg === rp.weight_kg;
+          });
+          return hasEquivalent;
         });
-        return hasEquivalent;
-      });
-      offerDiscount = eligibleItems.reduce((sum, item) => {
-        const diff = item.price - offer.amount;
-        return sum + (diff > 0 ? diff * item.quantity : 0);
-      }, 0);
-    }
-    totalOfferDiscount += offerDiscount;
-  });
+        const comboSubtotal = comboItems.reduce((sum, i) => sum + i.price, 0);
+        offerDiscount = Math.max(0, comboSubtotal - offer.amount);
+      } else if (offer.type === 'fixed_price') {
+        const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
+        const eligibleItems = items.filter(item => {
+          if (rewardIds.includes(item.id)) return true;
+          const hasEquivalent = rewardIds.some((pid: string) => {
+            const rp = offerProductDetails[pid];
+            if (!rp) return false;
+            if (item.is_store_specific || item.product_type === 'personal') return false;
+            if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+            return item.name === rp.name && item.weight_kg === rp.weight_kg;
+          });
+          return hasEquivalent;
+        });
+        offerDiscount = eligibleItems.reduce((sum, item) => {
+          const diff = item.price - offer.amount;
+          return sum + (diff > 0 ? diff * item.quantity : 0);
+        }, 0);
+      }
+      totalOfferDisc += offerDiscount;
+    });
 
-  // New Delivery Fee Logic based on "Extra Distance" for multi-store mixed offers
-  let extraDistance = 0;
-  const firstFreeIdx = sortedStoreList.findIndex(s => !!appliedOffers[`${s.id}_delivery`]);
+    let extraDist = 0;
+    const firstFreeIdx = sortedStoreList.findIndex(s => !!appliedOffers[`${s.id}_delivery`]);
 
-  if (firstFreeIdx === -1) {
-    // No free delivery offers, entire route is paid
-    extraDistance = distance;
-  } else if (firstFreeIdx === 0) {
-    // Furthest store is free, entire route is considered covered
-    extraDistance = 0;
-  } else {
-    // Some paid stores are further than all free stores
-    // Calculate extra distance as the sum of segments up to the first free store
-    for (let i = 0; i < firstFreeIdx; i++) {
-      const current = sortedStoreList[i];
-      const next = sortedStoreList[i+1];
-      if (current && next) {
-        extraDistance += calculateDistance(current.lat, current.lng, next.lat, next.lng);
+    if (firstFreeIdx === -1) {
+      extraDist = distance;
+    } else if (firstFreeIdx === 0) {
+      extraDist = 0;
+    } else {
+      for (let i = 0; i < firstFreeIdx; i++) {
+        const current = sortedStoreList[i];
+        const next = sortedStoreList[i+1];
+        if (current && next) {
+          extraDist += getHaversineDistance(current.lat, current.lng, next.lat, next.lng);
+        }
       }
     }
-  }
 
-  const pFee = isLargeVehicle ? 300 : 30;
-  const kRate = isLargeVehicle ? 30 : 10;
-  const extraDeliveryFee = extraDistance > 0 ? (pFee + Math.max(0, extraDistance - 1) * kRate) : 0;
-  
-  deliveryFee = isAppOfferActive ? 0 : extraDeliveryFee;
+    const pf = isLargeVehicle ? 300 : 30;
+    const kr = isLargeVehicle ? 30 : 10;
+    const extraDFee = extraDist > 0 ? (pf + Math.max(0, extraDist - 1) * kr) : 0;
+    const dFee = isAppOfferActive ? 0 : extraDFee;
+    
+    const baseGTotal = subtotal + baseDFee + pFee + hFee;
+    const gTotal = Math.max(0, subtotal + dFee + pFee + hFee - totalOfferDisc);
 
-  // Sync state for use in checkout
-  useEffect(() => {
-    setStoreDeliveryFees(storeContributions);
-    setTotalStoreFees(totalStoreContribution);
-  }, [JSON.stringify(storeContributions), totalStoreContribution]);
+    return {
+      platformFee: pFee,
+      baseDeliveryFee: baseDFee,
+      helperFee: hFee,
+      baseGrandTotal: baseGTotal,
+      totalOfferDiscount: totalOfferDisc,
+      deliveryFee: dFee,
+      grandTotal: gTotal,
+      storeContributions: storeContribs,
+      totalStoreContribution: totalStoreContrib
+    };
+  }, [subtotal, items, isLargeVehicle, distance, hasHelper, appliedOffers, storeDistances, offerProductDetails, sortedStoreList, isAppOfferActive]);
 
-  const grandTotal = Math.max(0, subtotal + deliveryFee + platformFee + helperFee - totalOfferDiscount);
+  const {
+    platformFee,
+    baseDeliveryFee,
+    helperFee,
+    baseGrandTotal,
+    totalOfferDiscount,
+    deliveryFee,
+    grandTotal,
+    storeContributions,
+    totalStoreContribution
+  } = billingData;
 
   const handleCheckout = async () => {
     console.log('Checkout button pressed');
@@ -1209,17 +1680,6 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
-  const groupedItems = items.reduce((acc: any, item: any) => {
-    if (!acc[item.store_id]) {
-      acc[item.store_id] = {
-        name: item.store_name,
-        items: []
-      };
-    }
-    acc[item.store_id].items.push(item);
-    return acc;
-  }, {});
-
   if (items.length === 0) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -1263,220 +1723,22 @@ export const CartScreen = ({ navigation }: any) => {
         </View>
 
         {Object.entries(groupedItems).map(([storeId, storeData]: [string, any]) => (
-          <View key={storeId} style={styles.storeSection}>
-            <View style={styles.storeHeader}>
-              <TouchableOpacity 
-                style={styles.storeHeaderLeft}
-                onPress={() => navigateToStore(storeId)}
-              >
-                <Icon name="storefront-outline" size={20} color={Colors.primary} />
-                <Text style={styles.storeName} numberOfLines={1} ellipsizeMode="tail">{storeData.name}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.viewOffersBtn}
-                onPress={() => fetchStoreOffers(storeId)}
-              >
-                <Text style={styles.viewOffersText}>View Offers</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.storeItemsList}>
-              {storeData.items.map((item: any) => {
-                const standardOffer = appliedOffers[storeId];
-                let discountedPrice = item.price;
-                let hasDiscount = false;
-
-                if (standardOffer && checkOfferConditions(standardOffer).length === 0) {
-                  // Identity-aware subtotal for this store
-                  const eligibleStoreItems = items.filter(i => {
-                    if (i.store_id === storeId) return true;
-                    if (!i.is_store_specific) return true;
-                    return false;
-                  });
-                  const storeSubtotal = eligibleStoreItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-
-                  if (standardOffer.type === 'free_cash') {
-                    const discountPercent = standardOffer.amount / (storeSubtotal || 1);
-                    discountedPrice = item.price * (1 - discountPercent);
-                    hasDiscount = true;
-                  } else if (standardOffer.type === 'discount') {
-                    discountedPrice = item.price * (1 - standardOffer.amount / 100);
-                    hasDiscount = true;
-                  } else if (standardOffer.type === 'cheap_product') {
-                    const productIds = [...(standardOffer.conditions?.product_ids || []), ...(standardOffer.reward_data?.product_ids || [])];
-                    const isEligible = productIds.some((pid: string) => {
-                      if (item.id === pid) return true;
-                      const rp = offerProductDetails[pid];
-                      if (!rp) return false;
-                      if (item.is_store_specific || item.product_type === 'personal') return false;
-                      if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-                      return item.name === rp.name && item.weight_kg === rp.weight_kg;
-                    });
-                    if (isEligible) {
-                      discountedPrice = item.price * (1 - standardOffer.amount / 100);
-                      hasDiscount = true;
-                    }
-                  } else if (standardOffer.type === 'combo') {
-                    const productIds = standardOffer.reward_data?.product_ids || [];
-                    const isEligible = productIds.some((pid: string) => {
-                      if (item.id === pid) return true;
-                      const rp = offerProductDetails[pid];
-                      if (!rp) return false;
-                      if (item.is_store_specific || item.product_type === 'personal') return false;
-                      if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-                      return item.name === rp.name && item.weight_kg === rp.weight_kg;
-                    });
-                    if (isEligible) {
-                      hasDiscount = true;
-                    }
-                  } else if (standardOffer.type === 'fixed_price') {
-                    const productIds = standardOffer.reward_data?.product_ids || [];
-                    const isEligible = productIds.some((pid: string) => {
-                      if (item.id === pid) return true;
-                      const rp = offerProductDetails[pid];
-                      if (!rp) return false;
-                      if (item.is_store_specific || item.product_type === 'personal') return false;
-                      if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-                      return item.name === rp.name && item.weight_kg === rp.weight_kg;
-                    });
-                    if (isEligible) {
-                      discountedPrice = standardOffer.amount;
-                      hasDiscount = true;
-                    }
-                  }
-                }
-
-                const itemKey = `${item.id}_${JSON.stringify(item.selected_options || {})}`;
-
-                return (
-                  <View key={itemKey} style={{ marginBottom: Spacing.md }}>
-                    <View style={styles.itemCard}>
-                      <View style={styles.itemInfo}>
-                        <Text style={styles.itemName}>
-                          {item.name}
-                          {item.selected_options && Object.keys(item.selected_options).length > 0 && (
-                            <Text style={styles.itemOptionsText}>
-                              {` (${Object.entries(item.selected_options).map(([k, v]) => k === 'gift' ? 'Gift' : v).join(', ')})`}
-                            </Text>
-                          )}
-                        </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          {hasDiscount && discountedPrice < item.price ? (
-                            <>
-                              <Text style={styles.itemPrice}>₹{discountedPrice.toFixed(2)}</Text>
-                              <Text style={styles.itemPriceStrikethrough}>₹{item.price}</Text>
-                            </>
-                          ) : (
-                            <Text style={styles.itemPrice}>₹{item.price}</Text>
-                          )}
-                        </View>
-                      </View>
-                      <View style={styles.quantityControls}>
-                        <TouchableOpacity onPress={() => updateQuantity(item, -1)} style={styles.qtyBtn}>
-                          <Icon name="minus" size={18} color={Colors.primary} />
-                        </TouchableOpacity>
-                        <Text style={styles.quantity}>{item.quantity}</Text>
-                        <TouchableOpacity onPress={() => updateQuantity(item, 1)} style={styles.qtyBtn}>
-                          <Icon name="plus" size={18} color={Colors.primary} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                    {item.preparation_time > 0 && (
-                      <Text style={styles.prepTimeText}>
-                        This product has {item.preparation_time} minutes preparing time so order will be picked up when it is prepared.
-                      </Text>
-                    )}
-                  </View>
-                );
-              })}
-
-              {/* Free Product Reward */}
-              {(() => {
-                const offer = appliedOffers[storeId];
-                if (offer?.type === 'free_product' && checkOfferConditions(offer).length === 0) {
-                  return (
-                    <View style={[styles.itemCard, styles.freeItemCard, { marginBottom: Spacing.md }]}>
-                      {(() => {
-                        const rewardId = (offer.reward_data as any)?.product_ids?.[0];
-                        const manualItem = storeData.items.find((i: any) => i.id === rewardId);
-                        const pName = (offer.reward_data as any)?.product_name || manualItem?.name || 'Gift Item';
-                        const pPrice = (offer.reward_data as any)?.product_price || manualItem?.price;
-
-                        return (
-                          <>
-                            <View style={styles.itemInfo}>
-                              <Text style={styles.itemName} numberOfLines={1}>
-                                {pName}
-                              </Text>
-                              {pPrice && (
-                                <Text style={[styles.itemPriceStrikethrough, { marginTop: 2 }]}>₹{pPrice}</Text>
-                              )}
-                            </View>
-                            <View style={[styles.freeBadge, { flexDirection: 'row', gap: 6, alignItems: 'center' }]}>
-                              <Icon name="gift" size={14} color={Colors.white} />
-                              <Text style={styles.freeBadgeText}>Free</Text>
-                            </View>
-                          </>
-                        );
-                      })()}
-                    </View>
-                  );
-                }
-                return null;
-              })()}
-            </View>
-
-            {/* Applied Offers for this store */}
-            {(() => {
-              const standardKey = storeId;
-              const deliveryKey = `${storeId}_delivery`;
-              const offers = [appliedOffers[standardKey], appliedOffers[deliveryKey]].filter(Boolean);
-
-              if (offers.length === 0) return null;
-
-              return (
-                <View style={styles.storeAppliedOffers}>
-                  {offers.map((offer: any, idx: number) => (
-                    <View key={`${offer.id}_${idx}`} style={styles.storeOfferTag}>
-                      <View style={styles.storeOfferIcon}>
-                        <Icon name={offer.type === 'free_delivery' ? "truck-fast" : "tag-heart"} size={16} color={offer.type === 'free_delivery' ? Colors.primary : "#059669"} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.storeOfferName}>
-                          {offer.name || 'Special Offer'}
-                        </Text>
-                        <Text style={styles.storeOfferDesc}>
-                          {(() => {
-                            const getNames = (ids?: string[]) => {
-                              if (!ids || ids.length === 0) return '';
-                              const names = ids.map(id => offerProductDetails[id]?.name).filter(Boolean);
-                              return names.join(', ');
-                            };
-                            const resolvedName = getNames(offer.reward_data?.product_ids || offer.conditions?.product_ids);
-                            return getOfferDescription(offer, resolvedName);
-                          })()}
-                        </Text>
-                      </View>
-                      <TouchableOpacity 
-                        onPress={() => {
-                          const newOffers = { ...appliedOffers };
-                          const key = offer.type === 'free_delivery' ? deliveryKey : standardKey;
-                          delete newOffers[key];
-                          setAppliedOffers(newOffers);
-                          // Stop auto-apply for this store in this session
-                          if (!manuallyRemovedStores.includes(storeId)) {
-                            setManuallyRemovedStores(prev => [...prev, storeId]);
-                          }
-                        }} 
-                        style={styles.storeOfferRemove}
-                      >
-                        <Icon name="close-circle" size={18} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              );
-            })()}
-          </View>
+          <CartStoreSection
+            key={storeId}
+            storeId={storeId}
+            storeData={storeData}
+            navigateToStore={navigateToStore}
+            fetchStoreOffers={fetchStoreOffers}
+            appliedOffers={appliedOffers}
+            items={items}
+            offerProductDetails={offerProductDetails}
+            updateQuantity={updateQuantity}
+            checkOfferConditions={checkOfferConditions}
+            getOfferDescription={getOfferDescription}
+            manuallyRemovedStores={manuallyRemovedStores}
+            setManuallyRemovedStores={setManuallyRemovedStores}
+            setAppliedOffers={setAppliedOffers}
+          />
         ))}
 
         {/* App Offers Section */}
@@ -1587,178 +1849,33 @@ export const CartScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.deliveryTypeSection}>
-          <Text style={styles.sectionTitle}>Delivery Type</Text>
-          <View style={styles.deliveryTypeContainer}>
-            <TouchableOpacity 
-              style={[styles.deliveryTypeCard, deliveryType === 'fast' && styles.deliveryTypeCardActive]}
-              onPress={() => {
-                setDeliveryType('fast');
-                setDeliverySlot(null);
-              }}
-            >
-              <Icon 
-                name="flash" 
-                size={24} 
-                color={deliveryType === 'fast' ? Colors.primary : Colors.textSecondary} 
-              />
-              <View style={styles.deliveryTypeInfo}>
-                <Text style={[styles.deliveryTypeTitle, deliveryType === 'fast' && styles.deliveryTypeTitleActive]}>
-                  {isLargeVehicle ? 'Truck Delivery' : 'Bike Delivery'}
-                </Text>
-                <Text style={styles.deliveryTypeDesc}>Delivered as soon as ready</Text>
-              </View>
-              <Icon 
-                name={deliveryType === 'fast' ? "radiobox-marked" : "radiobox-blank"} 
-                size={20} 
-                color={deliveryType === 'fast' ? Colors.primary : Colors.border} 
-              />
-            </TouchableOpacity>
+        <DeliveryTypeSection
+          deliveryType={deliveryType}
+          setDeliveryType={setDeliveryType}
+          isLargeVehicle={isLargeVehicle}
+          isBatchAllowed={isBatchAllowed}
+          deliverySlot={deliverySlot}
+          setSlotModalVisible={setSlotModalVisible}
+          setDeliverySlot={setDeliverySlot}
+        />
 
-            <TouchableOpacity 
-              disabled={!isBatchAllowed}
-              style={[
-                styles.deliveryTypeCard, 
-                deliveryType === 'batch' && styles.deliveryTypeCardActive,
-                !isBatchAllowed && styles.deliveryTypeCardDisabled
-              ]}
-              onPress={() => {
-                setDeliveryType('batch');
-                if (!deliverySlot) setSlotModalVisible(true);
-              }}
-            >
-              <Icon 
-                name="truck-delivery" 
-                size={24} 
-                color={!isBatchAllowed ? '#94A3B8' : (deliveryType === 'batch' ? Colors.primary : Colors.textSecondary)} 
-              />
-              <View style={styles.deliveryTypeInfo}>
-                <Text style={[
-                  styles.deliveryTypeTitle, 
-                  deliveryType === 'batch' && styles.deliveryTypeTitleActive,
-                  !isBatchAllowed && styles.deliveryTypeTitleDisabled
-                ]}>
-                  Batch Delivery
-                </Text>
-                <Text style={[
-                  styles.deliveryTypeDesc,
-                  !isBatchAllowed && styles.deliveryTypeDescDisabled
-                ]}>
-                  {!isBatchAllowed 
-                    ? (isLargeVehicle ? 'Not available for Truck' : 'All shops must be under 1km') 
-                    : 'Schedule for a time slot'}
-                </Text>
-                {deliveryType === 'batch' && deliverySlot && isBatchAllowed && (
-                  <View style={styles.slotBadgeSmall}>
-                    <Text style={styles.slotBadgeTextSmall}>{deliverySlot} Slot</Text>
-                    <TouchableOpacity onPress={() => setSlotModalVisible(true)}>
-                      <Text style={styles.changeSlotTextSmall}>Change</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-              {isBatchAllowed && (
-                <Icon 
-                  name={deliveryType === 'batch' ? "radiobox-marked" : "radiobox-blank"} 
-                  size={20} 
-                  color={deliveryType === 'batch' ? Colors.primary : Colors.border} 
-                />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.billingSection}>
-          <Text style={styles.sectionTitle}>Payment Details</Text>
-          <View style={styles.billDetails}>
-          
-          <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Item Total</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={styles.billValue}>₹{(subtotal - totalOfferDiscount).toFixed(2)}</Text>
-              {totalOfferDiscount > 0 && (
-                <Text style={styles.originalTotalText}>₹{subtotal.toFixed(2)}</Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.billRow}>
-            <View style={styles.labelWithInfo}>
-              <Text style={styles.billLabel}>Delivery Fee ({isLargeVehicle ? 'Truck' : 'Bike'})</Text>
-              <TouchableOpacity onPress={() => setInfoModal({
-                visible: true,
-                title: 'Delivery Fee',
-                content: isLargeVehicle 
-                  ? `₹300 (fixed for 1st km) + ₹30 per extra km\n(Large Vehicle)\n\nDistance: ${distance.toFixed(2)} km`
-                  : `₹30 (fixed for 1st km) + ₹10 per extra km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
-              })}>
-                <Icon name="information-outline" size={16} color={Colors.primary} />
-              </TouchableOpacity>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
-              {(totalStoreFees > 0 || isAppOfferActive) && deliveryFee < baseDeliveryFee && (
-                <Text style={styles.originalTotalText}>₹{baseDeliveryFee.toFixed(2)}</Text>
-              )}
-            </View>
-          </View>
-          {totalStoreFees > 0 && deliveryFee > 0 && (
-            <Text style={styles.deliveryDisclaimer}>
-              This delivery fee is only from store not having Free Delivery offer.
-            </Text>
-          )}
-
-          {isLargeVehicle && (
-            <View style={styles.vehicleAlertContainer}>
-              <TouchableOpacity 
-                style={[styles.helperToggle, hasHelper && styles.helperToggleActive]}
-                onPress={() => setHasHelper(!hasHelper)}
-              >
-                <View style={styles.helperInfo}>
-                  <Text style={styles.helperTitle}>Add Helper (₹300)</Text>
-                  <Text style={styles.helperSubtitle}>A professional to help load/unload large items.</Text>
-                </View>
-                <Icon 
-                  name={hasHelper ? "checkbox-marked" : "checkbox-blank-outline"} 
-                  size={24} 
-                  color={hasHelper ? Colors.primary : Colors.textSecondary} 
-                />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {hasHelper && (
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Helper Fee</Text>
-              <Text style={styles.billValue}>₹{helperFee.toFixed(2)}</Text>
-            </View>
-          )}
-
-          <View style={styles.billRow}>
-            <View style={styles.labelWithInfo}>
-              <Text style={styles.billLabel}>Platform Fee</Text>
-              <TouchableOpacity onPress={() => setInfoModal({
-                visible: true,
-                title: 'Platform Fee',
-                content: 'This fee is used to maintain the platform.\n\n• ₹5 for orders below ₹500\n• ₹10 for orders between ₹500 - ₹1000\n• ₹20 for orders above ₹1000'
-              })}>
-                <Icon name="information-outline" size={16} color={Colors.primary} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.billValue}>₹{platformFee.toFixed(2)}</Text>
-          </View>
-
-          <View style={[styles.billRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Grand Total</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={styles.totalValue}>₹{grandTotal.toFixed(2)}</Text>
-              {totalOfferDiscount > 0 && (
-                <Text style={styles.originalTotalText}>₹{baseGrandTotal.toFixed(2)}</Text>
-              )}
-            </View>
-          </View>
-        </View>
-        </View>
+        <BillingSection
+          subtotal={subtotal}
+          totalOfferDiscount={totalOfferDiscount}
+          isLargeVehicle={isLargeVehicle}
+          distance={distance}
+          deliveryFee={deliveryFee}
+          baseDeliveryFee={baseDeliveryFee}
+          totalStoreFees={totalStoreFees}
+          isAppOfferActive={isAppOfferActive}
+          hasHelper={hasHelper}
+          setHasHelper={setHasHelper}
+          helperFee={helperFee}
+          platformFee={platformFee}
+          grandTotal={grandTotal}
+          baseGrandTotal={baseGrandTotal}
+          setInfoModal={setInfoModal}
+        />
 
         <View style={styles.paymentSection}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
