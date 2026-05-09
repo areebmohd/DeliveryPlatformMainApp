@@ -789,6 +789,7 @@ const styles = StyleSheet.create({
   },
   filterWrapper: {
     paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
     backgroundColor: Colors.background,
   },
   filterScroll: {
@@ -823,7 +824,8 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   offersList: {
-    paddingVertical: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
   },
   storeSection: {
     marginBottom: Spacing.md,

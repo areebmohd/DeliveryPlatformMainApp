@@ -259,8 +259,10 @@ export const OrdersScreen = () => {
             <Text style={styles.orderNumber}>#{item.order_number}</Text>
             <Text style={styles.orderTime}>
               {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              {item.transport_type && ` • ${item.transport_type === 'heavy' ? 'Truck' : 'Bike'}`}
-              {item.delivery_type === 'batch' && item.delivery_slot && ` • Batch: ${item.delivery_slot}`}
+              {item.delivery_type === 'batch' 
+                ? (item.delivery_slot && ` • ${item.delivery_slot} Batch`)
+                : (item.transport_type === 'heavy' ? ` • Truck` : ` • Bike`)
+              }
             </Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
@@ -405,7 +407,7 @@ export const OrdersScreen = () => {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.promoTitle, { color: Colors.primary }]}>App Offer</Text>
-                    <Text style={[styles.promoDescription, { color: Colors.primary, opacity: 0.8 }]}>Free delivery above ₹99</Text>
+                    <Text style={[styles.promoDescription, { color: Colors.primary, opacity: 0.8 }]}>Free batch delivery above ₹49</Text>
                   </View>
                 </View>
               )}

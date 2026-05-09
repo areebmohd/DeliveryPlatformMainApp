@@ -828,12 +828,29 @@ export const CartScreen = ({ navigation }: any) => {
                          Object.keys(storeDistances).length > 0 &&
                          Object.values(storeDistances).every(d => d < 2);
 
+  const isSlotAvailable = useCallback((slot: string) => {
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    if (slot === '2-3 PM') {
+      // Ordering Cutoff: 1 PM (780 mins), Slot End: 3 PM (900 mins)
+      return currentMinutes < 780 || currentMinutes > 900;
+    }
+    
+    if (slot === '8-9 PM') {
+      // Ordering Cutoff: 7 PM (1140 mins), Slot End: 9 PM (1260 mins)
+      return currentMinutes < 1140 || currentMinutes > 1260;
+    }
+    
+    return true;
+  }, []);
+
   const isAppOfferActive = !!appliedOffers['app_offer'] && 
                            deliveryType === 'batch' &&
                            subtotal >= 49 && 
                            isBatchAllowed;
 
-  const platformFee = 10;
+  const platformFee = subtotal < 500 ? 5 : (subtotal <= 1000 ? 10 : 20);
   const baseDeliveryFee = items.length === 0 ? 0 : (
     isLargeVehicle 
       ? 300 + Math.max(0, distance - 1) * 30
@@ -1585,7 +1602,7 @@ export const CartScreen = ({ navigation }: any) => {
               />
               <View style={styles.deliveryTypeInfo}>
                 <Text style={[styles.deliveryTypeTitle, deliveryType === 'fast' && styles.deliveryTypeTitleActive]}>
-                  Fast Delivery
+                  {isLargeVehicle ? 'Truck Delivery' : 'Bike Delivery'}
                 </Text>
                 <Text style={styles.deliveryTypeDesc}>Delivered as soon as ready</Text>
               </View>
@@ -1721,7 +1738,7 @@ export const CartScreen = ({ navigation }: any) => {
               <TouchableOpacity onPress={() => setInfoModal({
                 visible: true,
                 title: 'Platform Fee',
-                content: 'This fee is temporary to maintain the platform.'
+                content: 'This fee is used to maintain the platform.\n\n• ₹5 for orders below ₹500\n• ₹10 for orders between ₹500 - ₹1000\n• ₹20 for orders above ₹1000'
               })}>
                 <Icon name="information-outline" size={16} color={Colors.primary} />
               </TouchableOpacity>
@@ -1982,33 +1999,53 @@ export const CartScreen = ({ navigation }: any) => {
             </View>
             <View style={styles.slotOptionsContainer}>
               <TouchableOpacity 
-                style={[styles.slotOption, deliverySlot === '2:00 PM' && styles.selectedSlotOption]}
+                disabled={!isSlotAvailable('2-3 PM')}
+                style={[
+                  styles.slotOption, 
+                  deliverySlot === '2-3 PM' && styles.selectedSlotOption,
+                  !isSlotAvailable('2-3 PM') && styles.disabledSlotOption
+                ]}
                 onPress={() => {
-                  setDeliverySlot('2:00 PM');
+                  setDeliverySlot('2-3 PM');
                   setSlotModalVisible(false);
                 }}
               >
                 <Icon 
-                  name={deliverySlot === '2:00 PM' ? "radiobox-marked" : "radiobox-blank"} 
+                  name={deliverySlot === '2-3 PM' ? "radiobox-marked" : "radiobox-blank"} 
                   size={24} 
-                  color={deliverySlot === '2:00 PM' ? Colors.primary : Colors.textSecondary} 
+                  color={!isSlotAvailable('2-3 PM') ? '#CBD5E1' : (deliverySlot === '2-3 PM' ? Colors.primary : Colors.textSecondary)} 
                 />
-                <Text style={styles.slotOptionText}>2:00 PM</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.slotOptionText, !isSlotAvailable('2-3 PM') && styles.disabledSlotText]}>2-3 PM Slot</Text>
+                  {!isSlotAvailable('2-3 PM') && (
+                    <Text style={styles.slotStatusHint}>Currently in progress. Available after 3 PM.</Text>
+                  )}
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={[styles.slotOption, deliverySlot === '8:00 PM' && styles.selectedSlotOption]}
+                disabled={!isSlotAvailable('8-9 PM')}
+                style={[
+                  styles.slotOption, 
+                  deliverySlot === '8-9 PM' && styles.selectedSlotOption,
+                  !isSlotAvailable('8-9 PM') && styles.disabledSlotOption
+                ]}
                 onPress={() => {
-                  setDeliverySlot('8:00 PM');
+                  setDeliverySlot('8-9 PM');
                   setSlotModalVisible(false);
                 }}
               >
                 <Icon 
-                  name={deliverySlot === '8:00 PM' ? "radiobox-marked" : "radiobox-blank"} 
+                  name={deliverySlot === '8-9 PM' ? "radiobox-marked" : "radiobox-blank"} 
                   size={24} 
-                  color={deliverySlot === '8:00 PM' ? Colors.primary : Colors.textSecondary} 
+                  color={!isSlotAvailable('8-9 PM') ? '#CBD5E1' : (deliverySlot === '8-9 PM' ? Colors.primary : Colors.textSecondary)} 
                 />
-                <Text style={styles.slotOptionText}>8:00 PM</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.slotOptionText, !isSlotAvailable('8-9 PM') && styles.disabledSlotText]}>8-9 PM Slot</Text>
+                  {!isSlotAvailable('8-9 PM') && (
+                    <Text style={styles.slotStatusHint}>Currently in progress. Available after 9 PM.</Text>
+                  )}
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -3087,5 +3124,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text,
     marginLeft: 12,
+  },
+  disabledSlotOption: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  disabledSlotText: {
+    color: '#94A3B8',
+  },
+  slotStatusHint: {
+    fontSize: 12,
+    color: Colors.error,
+    marginTop: 2,
+    fontWeight: '600',
   },
 });
