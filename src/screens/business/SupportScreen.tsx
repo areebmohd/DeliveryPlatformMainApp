@@ -16,6 +16,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 const { width } = Dimensions.get('window');
 const SUPPORT_EMAIL = 'zorodeliveryapp@gmail.com';
 const SUPPORT_PHONE = '+91 7534846938';
+const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/DKOZQlWaIOTAUYU1miYRuj';
 
 const SupportActionCard = ({ 
   icon, 
@@ -70,6 +71,10 @@ export const SupportScreen = ({ navigation }: any) => {
     Linking.openURL(`tel:${SUPPORT_PHONE}`);
   };
 
+  const handleJoinWhatsApp = () => {
+    Linking.openURL(WHATSAPP_GROUP_LINK);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
@@ -109,8 +114,16 @@ export const SupportScreen = ({ navigation }: any) => {
             title="Email Support"
             subtitle="Best for account, banking or payout issues"
             onPress={handleEmailSupport}
-            color={Colors.success}
-            secondaryColor={Colors.successLight}
+            color="#4F46E5"
+            secondaryColor="#E0E7FF"
+          />
+          <SupportActionCard 
+            icon="whatsapp"
+            title="WhatsApp Group"
+            subtitle="Join for latest updates and partner news"
+            onPress={handleJoinWhatsApp}
+            color="#25D366"
+            secondaryColor="#E7FFDB"
           />
         </View>
 
@@ -147,6 +160,7 @@ export const SupportScreen = ({ navigation }: any) => {
             number={4} 
             text="If still your product is not available when order arrives then it is better to buy that product from neighbour shop or give the money for buying the product to rider and ask him to buy it from other shop and deliver to customer so that your customer do not get disappointed with your service." 
           />
+
         </View>
 
         <View style={styles.infoBox}>
@@ -359,5 +373,9 @@ const styles = StyleSheet.create({
     color: Colors.text,
     lineHeight: 20,
     fontWeight: '500',
+  },
+  tipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

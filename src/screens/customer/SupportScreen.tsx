@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const SUPPORT_EMAIL = 'zorodeliveryapp@gmail.com';
 const SUPPORT_PHONE = '+91 7534846938';
+const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/DKOZQlWaIOTAUYU1miYRuj';
 
 const SupportActionCard = ({ 
   icon, 
@@ -58,6 +59,10 @@ export const SupportScreen = ({ navigation }: any) => {
     Linking.openURL(`tel:${SUPPORT_PHONE}`);
   }, []);
 
+  const handleJoinWhatsApp = useCallback(() => {
+    Linking.openURL(WHATSAPP_GROUP_LINK);
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
@@ -97,8 +102,16 @@ export const SupportScreen = ({ navigation }: any) => {
             title="Email Support"
             subtitle="Best for account or return inquiries"
             onPress={handleEmailSupport}
-            color={Colors.success}
-            secondaryColor={Colors.successLight}
+            color="#4F46E5"
+            secondaryColor="#E0E7FF"
+          />
+          <SupportActionCard 
+            icon="whatsapp"
+            title="WhatsApp Group"
+            subtitle="Join for latest updates and offers"
+            onPress={handleJoinWhatsApp}
+            color="#25D366"
+            secondaryColor="#E7FFDB"
           />
         </View>
 
@@ -119,6 +132,16 @@ export const SupportScreen = ({ navigation }: any) => {
           </View>
           <Text style={[styles.tipContent, { color: '#1E40AF' }]}>
             If getting any problem in the product then contact the store or apply return within 24 hours of delivery for exchange.
+          </Text>
+        </View>
+
+        <View style={[styles.tipBox, { marginTop: 16, backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}>
+          <View style={styles.tipHeader}>
+            <Icon name="close-circle" size={24} color="#DC2626" />
+            <Text style={[styles.tipTitle, { color: '#991B1B' }]}>Cancel Policy</Text>
+          </View>
+          <Text style={[styles.tipContent, { color: '#991B1B' }]}>
+            Order can only be cancelled before pickup by rider. Once the rider has picked up the order, cancellation is not possible.
           </Text>
         </View>
 
