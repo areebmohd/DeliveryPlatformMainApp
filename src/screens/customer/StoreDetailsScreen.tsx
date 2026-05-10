@@ -25,6 +25,7 @@ import { useCart, Offer } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../api/supabase';
+import { getHaversineDistance, parseWKT } from '../../utils/productUtils';
 
 const formatOpeningHours = (hoursJson: string) => {
   try {
@@ -45,6 +46,7 @@ const StoreHeaderSection = React.memo(({
   isFavourite, 
   favLoading, 
   toggleFavourite,
+  distance,
   insets
 }: any) => {
   return (
@@ -69,6 +71,11 @@ const StoreHeaderSection = React.memo(({
           {store.city && (
             <View style={styles.categoryBadge}>
               <Text style={styles.categoryText}>{store.city}</Text>
+            </View>
+          )}
+          {distance !== null && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{distance.toFixed(1)} km</Text>
             </View>
           )}
         </View>
@@ -271,6 +278,21 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const { showAlert } = useAlert();
   const { width } = Dimensions.get('window');
   const insets = useSafeAreaInsets();
+
+  const distance = useMemo(() => {
+    const userLocation = sessionAddress?.location_wkt || sessionAddress?.location || profile?.location;
+    const storeLocation = store?.location_wkt || store?.location;
+
+    if (!userLocation || !storeLocation) return null;
+
+    const userLoc = parseWKT(userLocation);
+    const storeLoc = parseWKT(storeLocation);
+
+    if (userLoc && storeLoc) {
+      return getHaversineDistance(userLoc.lat, userLoc.lng, storeLoc.lat, storeLoc.lng);
+    }
+    return null;
+  }, [sessionAddress, store, profile]);
 
   useEffect(() => {
     fetchProducts();
@@ -584,6 +606,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
           isFavourite={isFavourite}
           favLoading={favLoading}
           toggleFavourite={toggleFavourite}
+          distance={distance}
           insets={insets}
         />
 

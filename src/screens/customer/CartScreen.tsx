@@ -172,7 +172,7 @@ const DeliveryTypeSection = React.memo(({
           />
           <View style={styles.deliveryTypeInfo}>
             <Text style={[styles.deliveryTypeTitle, deliveryType === 'fast' && styles.deliveryTypeTitleActive]}>
-              {isLargeVehicle ? 'Truck Delivery' : 'Bike Delivery'}
+              Fast Delivery
             </Text>
             <Text style={styles.deliveryTypeDesc}>Delivered as soon as ready</Text>
           </View>
@@ -213,7 +213,7 @@ const DeliveryTypeSection = React.memo(({
               !isBatchAllowed && styles.deliveryTypeDescDisabled
             ]}>
               {!isBatchAllowed 
-                ? (isLargeVehicle ? 'Not available for Truck' : 'All shops must be under 1km') 
+                ? (isLargeVehicle ? 'Not available for Truck Delivery' : 'All shops must be under 1km') 
                 : 'Schedule for a time slot'}
             </Text>
             {deliveryType === 'batch' && deliverySlot && isBatchAllowed && (
