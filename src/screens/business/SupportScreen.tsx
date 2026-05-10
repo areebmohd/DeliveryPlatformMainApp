@@ -158,7 +158,7 @@ export const SupportScreen = ({ navigation }: any) => {
           />
           <TipItem 
             number={4} 
-            text="If still your product is not available when order arrives then it is better to buy that product from neighbour shop or give the money for buying the product to rider and ask him to buy it from other shop and deliver to customer so that your customer do not get disappointed with your service." 
+            text="If still your product is not available when order arrives then it is better to buy that product from neighbour shop or give the money for buying the product to rider and ask him to buy it from other shop so that your customer do not get disappointed with your service." 
           />
 
         </View>
