@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   ActivityIndicator,
   Dimensions,
   StatusBar,
@@ -19,7 +20,7 @@ import { CustomerProductCard } from '../../components/CustomerProductCard';
 import { ProductOptionsModal } from '../../components/ui/ProductOptionsModal';
 import { useCart } from '../../context/CartContext';
 import { useAlert } from '../../context/AlertContext';
-import { deduplicateProducts, parseWKT } from '../../utils/productUtils';
+import { deduplicateProducts, parseWKT, getHaversineDistance } from '../../utils/productUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -34,8 +35,14 @@ export const SearchScreen = ({ navigation, route }: any) => {
   const searchInputRef = useRef<TextInput>(null);
   const { addItem, updateQuantity, items, sessionAddress, getQuantity } = useCart();
   const { showAlert } = useAlert();
+  const [productSort, setProductSort] = useState<'all' | 'nearby' | 'price' | 'seller'>('all');
+  const [storeSort, setStoreSort] = useState<'all' | 'nearby' | 'trending'>('all');
+  const [sortedProducts, setSortedProducts] = useState<any[]>([]);
+  const [sortedStores, setSortedStores] = useState<any[]>([]);
 
-
+  const userCoords = useMemo(() => {
+    return sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
+  }, [sessionAddress]);
 
   const handleAddToCart = useCallback((product: any, store: any) => {
     if (!sessionAddress) {
@@ -67,6 +74,47 @@ export const SearchScreen = ({ navigation, route }: any) => {
       setStores([]);
     }
   }, [searchQuery]);
+
+  // Apply sorting whenever results or sort selection changes
+  useEffect(() => {
+    let p = [...products];
+    if (productSort === 'nearby' && userCoords) {
+      p.sort((a, b) => {
+        const storeA = a.stores || a.store;
+        const storeB = b.stores || b.store;
+        const locA = parseWKT(storeA?.location_wkt || storeA?.location);
+        const locB = parseWKT(storeB?.location_wkt || storeB?.location);
+        
+        const distA = locA ? getHaversineDistance(userCoords.lat, userCoords.lng, locA.lat, locA.lng) : 999999;
+        const distB = locB ? getHaversineDistance(userCoords.lat, userCoords.lng, locB.lat, locB.lng) : 999999;
+        
+        return distA - distB;
+      });
+    } else if (productSort === 'price') {
+      p.sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+    } else if (productSort === 'seller') {
+      p.sort((a, b) => (Number(b.sales_count || b.orders_count || 0)) - (Number(a.sales_count || a.orders_count || 0)));
+    }
+    setSortedProducts(p);
+  }, [products, productSort, userCoords]);
+
+  useEffect(() => {
+    let s = [...stores];
+    if (storeSort === 'nearby' && userCoords) {
+      s.sort((a, b) => {
+        const locA = parseWKT(a.location_wkt || a.location);
+        const locB = parseWKT(b.location_wkt || b.location);
+        
+        const distA = locA ? getHaversineDistance(userCoords.lat, userCoords.lng, locA.lat, locA.lng) : 999999;
+        const distB = locB ? getHaversineDistance(userCoords.lat, userCoords.lng, locB.lat, locB.lng) : 999999;
+        
+        return distA - distB;
+      });
+    } else if (storeSort === 'trending') {
+      s.sort((a, b) => (Number(b.sales_count || b.orders_count || 0)) - (Number(a.sales_count || a.orders_count || 0)));
+    }
+    setSortedStores(s);
+  }, [stores, storeSort, userCoords]);
 
   const handleSearch = async () => {
     const trimmedQuery = searchQuery.trim();
@@ -113,7 +161,6 @@ export const SearchScreen = ({ navigation, route }: any) => {
       if (productError) throw productError;
       if (storeError) throw storeError;
 
-      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
       setProducts(deduplicateProducts(productData || [], userCoords));
       setStores(storeData || []);
     } catch (e) {
@@ -172,7 +219,7 @@ export const SearchScreen = ({ navigation, route }: any) => {
         </View>
       </View>
 
-      {/* Tabs */}
+      {/* Tabs - Twitter Style */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'products' && styles.activeTab]}
@@ -192,6 +239,73 @@ export const SearchScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
       </View>
 
+      {/* Sort Options - Chips Style */}
+      <View>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sortContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          {activeTab === 'products' ? (
+            <>
+              <TouchableOpacity 
+                style={[styles.sortChip, productSort === 'all' && styles.activeSortChip]}
+                onPress={() => setProductSort('all')}
+              >
+                <Icon name="view-grid-outline" size={16} color={productSort === 'all' ? Colors.white : Colors.textSecondary} />
+                <Text style={[styles.sortChipText, productSort === 'all' && styles.activeSortChipText]}>All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.sortChip, productSort === 'nearby' && styles.activeSortChip]}
+                onPress={() => setProductSort('nearby')}
+              >
+                <Icon name="map-marker-radius-outline" size={16} color={productSort === 'nearby' ? Colors.white : Colors.textSecondary} />
+                <Text style={[styles.sortChipText, productSort === 'nearby' && styles.activeSortChipText]}>Nearby Stores</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.sortChip, productSort === 'price' && styles.activeSortChip]}
+                onPress={() => setProductSort('price')}
+              >
+                <Icon name="tag-outline" size={16} color={productSort === 'price' ? Colors.white : Colors.textSecondary} />
+                <Text style={[styles.sortChipText, productSort === 'price' && styles.activeSortChipText]}>Lowest Price</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.sortChip, productSort === 'seller' && styles.activeSortChip]}
+                onPress={() => setProductSort('seller')}
+              >
+                <Icon name="fire" size={16} color={productSort === 'seller' ? Colors.white : Colors.textSecondary} />
+                <Text style={[styles.sortChipText, productSort === 'seller' && styles.activeSortChipText]}>Best Seller</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity 
+                style={[styles.sortChip, storeSort === 'all' && styles.activeSortChip]}
+                onPress={() => setStoreSort('all')}
+              >
+                <Icon name="view-grid-outline" size={16} color={storeSort === 'all' ? Colors.white : Colors.textSecondary} />
+                <Text style={[styles.sortChipText, storeSort === 'all' && styles.activeSortChipText]}>All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.sortChip, storeSort === 'nearby' && styles.activeSortChip]}
+                onPress={() => setStoreSort('nearby')}
+              >
+                <Icon name="map-marker-radius-outline" size={16} color={storeSort === 'nearby' ? Colors.white : Colors.textSecondary} />
+                <Text style={[styles.sortChipText, storeSort === 'nearby' && styles.activeSortChipText]}>Nearby Stores</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.sortChip, storeSort === 'trending' && styles.activeSortChip]}
+                onPress={() => setStoreSort('trending')}
+              >
+                <Icon name="fire" size={16} color={storeSort === 'trending' ? Colors.white : Colors.textSecondary} />
+                <Text style={[styles.sortChipText, storeSort === 'trending' && styles.activeSortChipText]}>Trending</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </ScrollView>
+      </View>
+
       {/* Results */}
       {loading ? (
         <View style={styles.center}>
@@ -199,7 +313,8 @@ export const SearchScreen = ({ navigation, route }: any) => {
         </View>
       ) : (
         <FlatList
-          data={activeTab === 'products' ? products : stores}
+          data={activeTab === 'products' ? sortedProducts : sortedStores}
+          extraData={activeTab === 'products' ? productSort : storeSort}
           renderItem={activeTab === 'products' ? renderProduct : renderStore}
           keyExtractor={(item) => item.id}
           numColumns={activeTab === 'products' ? 2 : 1}
@@ -244,7 +359,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: 0,
     gap: 12,
   },
   backButton: {
@@ -280,28 +397,57 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.sm,
-    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.background,
   },
   tab: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
   },
   activeTab: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    borderBottomColor: Colors.primary,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: Colors.textSecondary,
   },
   activeTabText: {
+    color: Colors.primary,
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    gap: 10,
+    backgroundColor: Colors.background,
+  },
+  sortChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 25,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 8,
+    zIndex: 10,
+  },
+  activeSortChip: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  sortChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  activeSortChipText: {
     color: Colors.white,
   },
   listContent: {

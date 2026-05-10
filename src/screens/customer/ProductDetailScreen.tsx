@@ -30,7 +30,6 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   const [isFavourite, setIsFavourite] = React.useState(false);
   const [favLoading, setFavLoading] = React.useState(false);
   const [selectedOptions, setSelectedOptions] = React.useState<Record<string, string>>({});
-  const [storeCount, setStoreCount] = React.useState(0);
   const [returnPolicySummary, setReturnPolicySummary] = React.useState<string>('');
   const [currentStore, setCurrentStore] = React.useState(store);
   const { showAlert } = useAlert();
@@ -39,43 +38,22 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
   React.useEffect(() => {
     checkFavourite();
-    fetchStoreAvailability();
-  }, [product.id]);
-
-  const fetchStoreAvailability = async () => {
-    try {
-      let query = supabase
-        .from('products')
-        .select('id', { count: 'exact' })
-        .neq('is_deleted', true)
-        .eq('name', product.name)
-        .eq('price', product.price)
-        .eq('weight_kg', product.weight_kg);
-
-      if (product.barcode) {
-        query = query.eq('barcode', product.barcode);
-      }
-
-      const { count, error } = await query;
-      if (error) throw error;
-      setStoreCount(count || 1);
-
-      // Generate Return Policy Summary - Now standardized to Exchange only within 24 hours
-      setReturnPolicySummary('Available for Return with Exchange within 24 Hours');
-
-      if (!currentStore && product.store_id) {
-        const { data: st, error: stErr } = await supabase
+    setReturnPolicySummary('Available for Return with Exchange within 24 Hours');
+    
+    // Ensure we have store data
+    if (!currentStore && product.store_id) {
+      const fetchStore = async () => {
+        const { data: st } = await supabase
           .from('stores')
           .select('*')
           .eq('id', product.store_id)
-          .eq('is_approved', true)
           .single();
-        if (!stErr) setCurrentStore(st);
-      }
-    } catch (e) {
-      console.error('Error fetching store count:', e);
+        if (st) setCurrentStore(st);
+      };
+      fetchStore();
     }
-  };
+  }, [product.id]);
+
 
   const checkFavourite = async () => {
     try {
@@ -200,9 +178,9 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
           <View style={styles.divider} />
 
-          {product.options && Array.isArray(product.options) && product.options.length > 0 && (
+          {product.options && Array.isArray(product.options) && product.options.filter((o: any) => o && o.title && o.values && o.values.length > 0).length > 0 && (
             <>
-              {product.options.map((opt: any, idx: number) => (
+              {product.options.filter((o: any) => o && o.title && o.values && o.values.length > 0).map((opt: any, idx: number) => (
                 <View key={idx} style={styles.optionGroup}>
                   <View style={styles.optionHeader}>
                     <Text style={styles.optionTitle}>{opt.title}</Text>
@@ -295,18 +273,14 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           })()}
 
           <Text style={styles.sectionTitle}>Store</Text>
-          {storeCount > 1 ? (
-            <Text style={styles.storeNameText}>Available in {storeCount} Stores</Text>
-          ) : (
-            <TouchableOpacity 
-              activeOpacity={0.7}
-              onPress={() => currentStore && navigation.navigate('StoreDetails', { store: currentStore })}
-            >
-              <Text style={styles.storeLinkText}>
-                {currentStore?.name || 'Loading store...'}
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity 
+            activeOpacity={0.7}
+            onPress={() => currentStore && navigation.navigate('StoreDetails', { store: currentStore })}
+          >
+            <Text style={styles.storeLinkText}>
+              {currentStore?.name || 'Loading store...'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Return Policy Section */}
           <View style={styles.returnPolicyContainer}>

@@ -536,12 +536,28 @@ export const HomeScreen = ({ navigation }: any) => {
 
       setSuggestions(prev => {
         const combined = page === 0 ? processed : [...prev, ...processed];
-        const seen = new Set();
-        return combined.filter(item => {
-          if (seen.has(item.id)) return false;
-          seen.add(item.id);
-          return true;
+        const nameMap = new Map<string, any>();
+        
+        combined.forEach(item => {
+          const nameKey = (item.name || '').toLowerCase().trim();
+          const existing = nameMap.get(nameKey);
+          
+          // Calculate distance for the current item to use as a ranking factor
+          const storeLoc = item.stores?.location ? parseWKT(item.stores.location) : null;
+          const dist = (userCoords && storeLoc) 
+            ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLoc.lat, storeLoc.lng)
+            : Infinity;
+          
+          // Store distance temporarily on the item for comparison
+          item._tempDist = dist;
+
+          // Deduplication rule: Keep the version from the nearest store
+          if (!existing || dist < (existing._tempDist ?? Infinity)) {
+            nameMap.set(nameKey, item);
+          }
         });
+        
+        return Array.from(nameMap.values());
       });
 
       setHasMoreSuggestions(products?.length === PAGE_SIZE);
