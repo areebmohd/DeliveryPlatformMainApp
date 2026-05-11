@@ -32,6 +32,8 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   const [selectedOptions, setSelectedOptions] = React.useState<Record<string, string>>({});
   const [returnPolicySummary, setReturnPolicySummary] = React.useState<string>('');
   const [currentStore, setCurrentStore] = React.useState(store);
+  const [otherStores, setOtherStores] = React.useState<any[]>([]);
+  const [loadingOtherStores, setLoadingOtherStores] = React.useState(false);
   const { showAlert } = useAlert();
 
   const currentPrice = calculateProductPrice(product, selectedOptions);
@@ -52,7 +54,32 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
       };
       fetchStore();
     }
-  }, [product.id]);
+
+    if (product.master_product_id) {
+      fetchOtherStores();
+    }
+  }, [product.id, product.master_product_id]);
+
+  const fetchOtherStores = async () => {
+    try {
+      setLoadingOtherStores(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, stores:stores_view(*)')
+        .eq('master_product_id', product.master_product_id)
+        .eq('is_info_complete', true)
+        .eq('in_stock', true)
+        .eq('is_deleted', false)
+        .neq('id', product.id);
+
+      if (error) throw error;
+      setOtherStores(data || []);
+    } catch (e) {
+      console.error('Error fetching other stores:', e);
+    } finally {
+      setLoadingOtherStores(false);
+    }
+  };
 
 
   const checkFavourite = async () => {
@@ -272,7 +299,6 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
             );
           })()}
 
-          <Text style={styles.sectionTitle}>Store</Text>
           <TouchableOpacity 
             activeOpacity={0.7}
             onPress={() => currentStore && navigation.navigate('StoreDetails', { store: currentStore })}
@@ -281,6 +307,25 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
               {currentStore?.name || 'Loading store...'}
             </Text>
           </TouchableOpacity>
+
+          {otherStores.length > 0 && (
+            <View style={styles.otherStoresContainer}>
+              <Text style={styles.sectionTitle}>Also Available At</Text>
+              {otherStores.map((item, idx) => (
+                <TouchableOpacity 
+                  key={idx} 
+                  style={styles.otherStoreItem}
+                  onPress={() => navigation.push('ProductDetail', { product: item, store: item.stores, isFromStore: false })}
+                >
+                  <View style={styles.otherStoreInfo}>
+                    <Text style={styles.otherStoreName}>{item.stores?.name}</Text>
+                    <Text style={styles.otherStorePrice}>₹{formatPriceFull(item.price)}</Text>
+                  </View>
+                  <Icon name="chevron-right" size={20} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           {/* Return Policy Section */}
           <View style={styles.returnPolicyContainer}>
@@ -647,5 +692,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.textSecondary,
     fontWeight: '600',
+  },
+  otherStoresContainer: {
+    marginTop: Spacing.md,
+  },
+  otherStoreItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  otherStoreInfo: {
+    flex: 1,
+  },
+  otherStoreName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  otherStorePrice: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: '700',
+    marginTop: 2,
   },
 });

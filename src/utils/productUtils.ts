@@ -50,8 +50,55 @@ export const getHaversineDistance = (lat1: number, lon1: number, lat2: number, l
  * 3. Common: Same name, price, weight, description, options -> Keep nearest open store.
  * Priority: Open store > Closed store. Among same status, nearest wins. Fallback to cheapest.
  */
-export const deduplicateProducts = (products: any[], _userLocation?: { lat: number, lng: number } | null): any[] => {
+export const deduplicateProducts = (products: any[], userLocation?: { lat: number, lng: number } | null): any[] => {
   if (!products || products.length === 0) return [];
-  // Return all products separately (no global deduplication)
-  return products;
+  
+  const deduplicatedMap = new Map<string, any>();
+
+  products.forEach(product => {
+    // 1. Determine the deduplication key
+    let key = product.id; // Default: No deduplication (Personal)
+    
+    if (product.product_type === 'common' && product.master_product_id) {
+      key = `master_${product.master_product_id}`;
+    } else if (product.product_type === 'barcode' && product.barcode) {
+      key = `barcode_${product.barcode}`;
+    } else if (product.product_type === 'personal') {
+      key = `personal_${product.id}`;
+    }
+
+    const existing = deduplicatedMap.get(key);
+    if (!existing) {
+      deduplicatedMap.set(key, product);
+      return;
+    }
+
+    // 2. Conflict resolution: Keep the "best" one
+    // Priority: Open Store > Nearest Store > Cheapest
+    const storeA = existing.stores;
+    const storeB = product.stores;
+
+    const isOpenA = storeA?.is_currently_open;
+    const isOpenB = storeB?.is_currently_open;
+
+    if (isOpenB && !isOpenA) {
+      deduplicatedMap.set(key, product);
+      return;
+    }
+
+    if (isOpenA === isOpenB && userLocation) {
+      const locA = parseWKT(storeA?.location_wkt || storeA?.location);
+      const locB = parseWKT(storeB?.location_wkt || storeB?.location);
+      
+      const distA = locA ? getHaversineDistance(userLocation.lat, userLocation.lng, locA.lat, locA.lng) : Infinity;
+      const distB = locB ? getHaversineDistance(userLocation.lat, userLocation.lng, locB.lat, locB.lng) : Infinity;
+
+      if (distB < distA) {
+        deduplicatedMap.set(key, product);
+        return;
+      }
+    }
+  });
+
+  return Array.from(deduplicatedMap.values());
 };

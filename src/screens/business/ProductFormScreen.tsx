@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextInput,
+  PermissionsAndroid,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -71,12 +72,22 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [isLoading, setIsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [masterSuggestions, setMasterSuggestions] = useState<any[]>([]);
+  const [isSearchingMaster, setIsSearchingMaster] = useState(false);
+  const [selectedMasterId, setSelectedMasterId] = useState<string | null>(product?.master_product_id || null);
+  const [hasMadeCommonChoice, setHasMadeCommonChoice] = useState(!!product);
 
   // Mode calculations (moved up before state usage)
+  // Mode calculations
   const isEditing = !!product;
-  const isBarcodeMode = productType === 'barcode';
-  const isCommonMode = productType === 'common';
-  const isPersonalMode = productType === 'personal';
+  const isBarcode = productType === 'barcode';
+  const isCommon = productType === 'common';
+  const isPersonal = productType === 'personal';
+  
+  // For backward compatibility with existing code using 'Mode' suffix
+  const isBarcodeMode = isBarcode;
+  const isCommonMode = isCommon;
+  const isPersonalMode = isPersonal;
 
   // Barcode & Stock states
   const [barcode, setBarcode] = useState(product?.barcode || '');
@@ -218,11 +229,15 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         setIsBarcodeMatched(false);
         showAlert({ 
           title: 'Product Not Found', 
-          message: 'We will soon add product details. Click and submit a clear picture of product from front side.', 
+          message: 'We will soon add product details. Please submit a clear picture of product from front side.', 
           type: 'info',
+          showCancel: false,
           primaryAction: {
             text: 'OK',
-            onPress: takeRawPhoto,
+            onPress: () => {
+              // Delay camera trigger slightly to ensure modal is closed
+              setTimeout(takeRawPhoto, 500);
+            },
           }
         });
       }
@@ -233,49 +248,153 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
     }
   };
 
-  // Only personal products can have images uploaded by stores.
-  // Common and Barcode images are managed by admin.
-  const canUploadImage = isPersonalMode;
+  const searchMasterCatalog = async (text: string) => {
+    if (text.length < 2) {
+      setMasterSuggestions([]);
+      return;
+    }
 
-  // Stores can only edit stock and barcode for "barcode" products.
-  // For "common", they can edit details but not image.
-  // For "personal", they can edit everything.
-  const canEditDetails = isPersonalMode || isCommonMode;
-  const canEditBaseInfo = isPersonalMode || isCommonMode || isBarcodeMode;
+    try {
+      setIsSearchingMaster(true);
+      console.log('Searching catalog for:', text);
+      
+      // Search for products that are "common" and have been "accepted" by admin
+      // Search for products that are "common" and have been "accepted" by admin
+      // Using PostgREST syntax for .or() - searching name, description and tags_search_text
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, category, image_url, tags')
+        .eq('product_type', 'common')
+        .eq('is_info_complete', true)
+        .eq('is_deleted', false)
+        .or(`name.ilike.*${text}*,description.ilike.*${text}*,tags_search_text.ilike.*${text}*`)
+        .limit(30);
+
+      if (error) {
+        console.error('Supabase error searching catalog:', error);
+        throw error;
+      }
+      
+      // Filter unique products by name to avoid duplicates from different stores
+      const uniqueResults = data ? data.reduce((acc: any[], curr: any) => {
+        if (!acc.find(item => item.name.toLowerCase() === curr.name.toLowerCase())) {
+          acc.push(curr);
+        }
+        return acc;
+      }, []).slice(0, 8) : [];
+
+      console.log(`Found ${uniqueResults.length} unique suggestions for "${text}"`);
+      setMasterSuggestions(uniqueResults);
+    } catch (e) {
+      console.error('Catch error searching catalog:', e);
+    } finally {
+      setIsSearchingMaster(false);
+    }
+  };
+
+  const handleSelectMasterProduct = (master: any) => {
+    setSelectedMasterId(master.id);
+    setName(master.name);
+    setCategory(master.category);
+    setTags(master.tags || []);
+    setImageUrl(master.image_url || '');
+    setMasterSuggestions([]);
+    setHasMadeCommonChoice(true);
+    showToast('Master product selected', 'success');
+  };
+
+  const handleAddNewCommonProduct = () => {
+      // Check for an exact name match
+      const hasExact = masterSuggestions.some(m => 
+        m.name.toLowerCase() === name.trim().toLowerCase()
+      );
+
+      if (hasExact) {
+        showAlert({
+          title: 'Product Already Exists',
+          message: 'A product with this exact name is already available in our catalog. Please select it from the suggestions above to avoid duplicate entries.',
+          type: 'info'
+        });
+        return;
+      }
+    
+    setSelectedMasterId(null);
+    setMasterSuggestions([]);
+    setHasMadeCommonChoice(true);
+  };
+
+
+  // Admin details: category, image, tags, delivery vehicle
+  const canEditAdminDetails = isPersonal;
+  
+  // Name field
+  const canEditName = isPersonal || (isBarcode && !isBarcodeMatched) || (isCommon && !hasMadeCommonChoice);
+  
+  // Store specific fields: price, weight, description, options
+  const canEditPriceWeight = isPersonal || (isCommon && hasMadeCommonChoice);
+  
+  // Stock field
+  const canEditStock = isPersonal || (isBarcode && isBarcodeMatched) || (isCommon && hasMadeCommonChoice);
+
+  // Visibility flags
+  const showAdminDetails = isPersonal || (isBarcode && isBarcodeMatched) || (isCommon && hasMadeCommonChoice);
 
   const takeRawPhoto = async () => {
-    const result = await launchCamera({
-      mediaType: 'photo',
-      quality: 0.8,
-      includeBase64: true,
-      includeExtra: true,
-    });
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: "Camera Permission",
+            message: "App needs access to your camera to take product photos.",
+            buttonPositive: "OK"
+          }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          showAlert({ title: 'Permission Denied', message: 'Camera permission is required to take product photos.', type: 'warning' });
+          return;
+        }
+      }
 
-    if (result.assets && result.assets[0].uri && user) {
-      try {
+      showToast('Opening camera...', 'info');
+      const result = await launchCamera({
+        mediaType: 'photo',
+        quality: 0.8,
+        includeBase64: true,
+        saveToPhotos: false,
+      });
+
+      if (result.didCancel) {
+        return;
+      }
+
+      if (result.errorCode) {
+        showAlert({ title: 'Camera Error', message: result.errorMessage || 'Unknown camera error', type: 'error' });
+        return;
+      }
+
+      if (result.assets && result.assets[0].uri && user) {
         setCapturingRaw(true);
-        const fileName = `raw_images/${user.id}/${barcode}_${Date.now()}.jpg`;
+        const fileName = `raw_images/${user.id}/${barcode || 'unknown'}_${Date.now()}.jpg`;
         
-        // Passing base64 data instead of URI
         const publicUrl = await uploadImage('products', fileName, result.assets[0].base64!);
         
-        // If there was an old raw image, delete it now
         if (rawImageUrl) {
           await deleteFile('products', rawImageUrl);
         }
         
         setRawImageUrl(publicUrl);
         showToast('Raw image captured successfully!', 'success');
-      } catch (error: any) {
-        showAlert({ title: 'Error', message: error.message, type: 'error' });
-      } finally {
-        setCapturingRaw(false);
       }
+    } catch (error: any) {
+      showAlert({ title: 'Camera Error', message: error.message, type: 'error' });
+    } finally {
+      setCapturingRaw(false);
     }
   };
 
   const pickImage = async () => {
-    if (!canUploadImage) {
+    if (!canEditAdminDetails) {
       showToast('Images for this product type are managed by Admin', 'info');
       return;
     }
@@ -304,20 +423,39 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
   const handleSaveProduct = async () => {
     // For barcode products, name and price are not strictly required from store
-    if (!isBarcodeMode) {
-      if (!name) {
+    // Validation for Personal and Common products
+    if (isPersonal || isCommon) {
+      if (!name.trim()) {
         showAlert({ title: 'Required Fields', message: 'Please enter product name.', type: 'warning' });
         return;
       }
-      if (!price) {
-        showAlert({ title: 'Required Fields', message: 'Please enter a price.', type: 'warning' });
+      if (!price || parseFloat(price) <= 0) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a valid price.', type: 'warning' });
+        return;
+      }
+      if (!weight || parseFloat(weight) <= 0) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a valid weight.', type: 'warning' });
+        return;
+      }
+      if (stockQuantity === '' || isNaN(parseInt(stockQuantity))) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a valid stock amount.', type: 'warning' });
         return;
       }
     }
     
-    if (isBarcodeMode && !barcode) {
-      showAlert({ title: 'Required Fields', message: 'Please enter a barcode.', type: 'warning' });
-      return;
+    if (isBarcodeMode) {
+      if (!barcode) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a barcode.', type: 'warning' });
+        return;
+      }
+      if (!rawImageUrl) {
+        showAlert({ title: 'Required Fields', message: 'Please capture a raw photo of the product.', type: 'warning' });
+        return;
+      }
+      if (!stockQuantity || parseInt(stockQuantity) <= 0) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a valid stock quantity.', type: 'warning' });
+        return;
+      }
     }
 
     try {
@@ -402,6 +540,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         is_info_complete: isComplete, // Mark as complete once saved with details
         raw_image_url: rawImageUrl,
         preparation_time: parseInt(preparationTime) || 0,
+        master_product_id: selectedMasterId,
         updated_at: new Date().toISOString(),
       };
 
@@ -552,7 +691,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          {isBarcodeMode && (
+          {isBarcode && (
             <View style={[styles.inputContainer, { marginTop: Spacing.md }]}>
               <Text style={styles.label}>Raw Image</Text>
               <TouchableOpacity 
@@ -580,17 +719,18 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          {showAllFields && (
+
+          {showAdminDetails && (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Product Image</Text>
               <TouchableOpacity 
                 style={[
                   styles.imagePreviewContainer, 
-                  !canUploadImage && styles.disabledInput,
+                  !canEditAdminDetails && styles.disabledInput,
                   uploading && styles.uploadingContainer
                 ]}
                 onPress={pickImage}
-                disabled={!canUploadImage || uploading}
+                disabled={!canEditAdminDetails || uploading}
               >
                 {uploading ? (
                   <ActivityIndicator size="large" color={Colors.primary} />
@@ -599,14 +739,14 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                 ) : (
                   <View style={styles.placeholderContainer}>
                     <Icon 
-                      name={isPersonalMode ? "camera-plus" : "image-search"} 
+                      name={isPersonal ? "camera-plus" : "image-search"} 
                       size={40} 
                       color={Colors.textSecondary} 
                     />
                     <Text style={styles.placeholderText}>
-                      {isPersonalMode 
+                      {isPersonal 
                         ? "Tap to upload product photo" 
-                        : isCommonMode ? "Image will be added by Admin" : "No image available"}
+                        : isCommon ? "Image will be added by Admin" : "No image available"}
                     </Text>
                   </View>
                 )}
@@ -627,32 +767,99 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               Product details and image will be added by admin. You can only add stock amount.
             </Text>
           )}
+          {isCommon && !isEditing && (
+            <Text style={styles.barcodeHelperText}>
+              You can only fill some details and rest will be filled by admin.
+            </Text>
+          )}
           {showAllFields && (
             <>
-              <Input
-                label="Product Name"
-                placeholder="Product name"
-                value={name}
-                onChangeText={setName}
-                editable={canEditDetails}
-                containerStyle={styles.inputSpacing}
-              />
+              <View style={{ zIndex: 1000 }}>
+                <Input
+                  label="Product Name"
+                  placeholder="Type product name (e.g. Tomato)"
+                  value={name}
+                  onChangeText={(text) => {
+                    setName(text);
+                    if (isCommon) {
+                      setHasMadeCommonChoice(false);
+                      searchMasterCatalog(text);
+                    }
+                  }}
+                  editable={canEditName}
+                  containerStyle={styles.inputSpacing}
+                  rightIcon={
+                    selectedMasterId ? (
+                      <TouchableOpacity onPress={() => {
+                        setSelectedMasterId(null);
+                        setHasMadeCommonChoice(false);
+                      }}>
+                        <Icon name="close-circle" size={20} color={Colors.textSecondary} />
+                      </TouchableOpacity>
+                    ) : null
+                  }
+                />
+                
+                {isCommon && name.length >= 2 && !hasMadeCommonChoice && (
+                  <View style={[styles.suggestionsContainer, { zIndex: 9999 }]}>
+                    {isSearchingMaster && masterSuggestions.length === 0 ? (
+                      <View style={{ padding: 15, alignItems: 'center' }}>
+                        <ActivityIndicator size="small" color={Colors.primary} />
+                      </View>
+                    ) : (
+                      <>
+                        {masterSuggestions.map((master) => (
+                          <TouchableOpacity 
+                            key={master.id} 
+                            style={styles.suggestionItem}
+                            onPress={() => handleSelectMasterProduct(master)}
+                          >
+                            {master.image_url && (
+                              <Image source={{ uri: master.image_url }} style={styles.suggestionImage} />
+                            )}
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.suggestionName}>{master.name}</Text>
+                              <Text style={styles.suggestionCategory}>{master.category}</Text>
+                            </View>
+                            <Icon name="plus-circle" size={20} color={Colors.primary} />
+                          </TouchableOpacity>
+                        ))}
+                        <TouchableOpacity 
+                          style={[styles.suggestionItem, { borderBottomWidth: 0 }]}
+                          onPress={handleAddNewCommonProduct}
+                        >
+                          <View style={styles.addNewIconContainer}>
+                            <Icon name="plus" size={20} color={Colors.white} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.suggestionName, { color: Colors.primary, fontWeight: '700' }]}>Add New Product</Text>
+                            <Text style={styles.suggestionCategory}>Click here if product is not in list</Text>
+                          </View>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                )}
+              </View>
 
-              <TouchableOpacity 
-                style={styles.categoryTrigger}
-                onPress={() => canEditDetails && setCategoryModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.label}>Category</Text>
-                <View style={styles.categoryValueRow}>
-                  <Text style={[styles.categoryValueText, !category && { color: Colors.textSecondary }]}>
-                    {category || 'Select a category'}
-                  </Text>
-                  <Icon name="chevron-down" size={20} color={Colors.textSecondary} />
-                </View>
-              </TouchableOpacity>
+              {showAdminDetails && (
+                <TouchableOpacity 
+                  style={[styles.categoryTrigger, isBarcode && styles.disabledInput]}
+                  onPress={() => !isBarcode && setCategoryModalVisible(true)}
+                  activeOpacity={0.7}
+                  disabled={isBarcode}
+                >
+                  <Text style={styles.label}>Category</Text>
+                  <View style={styles.categoryValueRow}>
+                    <Text style={[styles.categoryValueText, !category && { color: Colors.textSecondary }]}>
+                      {category || 'Select a category'}
+                    </Text>
+                    <Icon name="chevron-down" size={20} color={Colors.textSecondary} />
+                  </View>
+                </TouchableOpacity>
+              )}
 
-              {category === 'Food' && (productType === 'common' || productType === 'personal') && (
+              {category === 'Food' && (isCommon || isPersonal) && (
                 <Input
                   label="Preparation Time (minutes)"
                   placeholder="0"
@@ -660,7 +867,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                   onChangeText={setPreparationTime}
                   keyboardType="numeric"
                   containerStyle={styles.inputSpacing}
-                  editable={canEditDetails}
+                  editable={canEditPriceWeight}
                   leftIcon={<Icon name="clock-outline" size={20} color={Colors.textSecondary} style={{marginRight: 8}} />}
                 />
               )}
@@ -683,7 +890,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                             setDescriptionPairs(next);
                           }}
                           style={styles.pairInput}
-                          editable={canEditDetails}
+                          editable={canEditPriceWeight}
                         />
                       </View>
                       <View style={styles.pairTextCol}>
@@ -697,12 +904,11 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                             setDescriptionPairs(next);
                           }}
                           multiline
-                          style={styles.pairInput}
-                          editable={canEditDetails}
+                          editable={canEditPriceWeight}
                         />
                       </View>
                     </View>
-                    {canEditDetails && descriptionPairs.length > 1 && (
+                    {canEditPriceWeight && descriptionPairs.length > 1 && (
                       <TouchableOpacity 
                         onPress={() => setDescriptionPairs(descriptionPairs.filter((_, i) => i !== index))}
                         style={styles.removePairBtn}
@@ -712,7 +918,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                     )}
                   </View>
                 ))}
-                {canEditDetails && (
+                {canEditPriceWeight && (
                   <TouchableOpacity 
                     style={styles.addPairBtn}
                     onPress={() => setDescriptionPairs([...descriptionPairs, { title: '', text: '' }])}
@@ -744,9 +950,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                                 });
                               }}
                               style={styles.optionTitleInput}
-                              editable={canEditDetails}
+                              editable={canEditPriceWeight}
                             />
-                            {canEditDetails && productOptions.length > 1 && (
+                            {canEditPriceWeight && productOptions.length > 1 && (
                               <TouchableOpacity 
                                 onPress={() => setProductOptions(prev => prev.filter((_, i) => i !== oIdx))}
                                 style={styles.deleteOptionBtn}
@@ -777,7 +983,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                                       });
                                     }}
                                     style={[styles.optionValueInput, { width: '100%' }]}
-                                    editable={canEditDetails}
+                                    editable={canEditPriceWeight}
                                   />
                                 </View>
                                 <View style={{ width: 85, marginRight: 4 }}>
@@ -801,51 +1007,50 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                                       }}
                                       keyboardType="numeric"
                                       style={[styles.optionValueInput, { textAlign: 'center' }]}
-                                      editable={canEditDetails}
+                                      editable={canEditPriceWeight}
                                     />
                                   )}
                                 </View>
-                                {canEditDetails && (
-                                  vIdx === 0 ? (
-                                    <TouchableOpacity 
-                                      onPress={() => {
-                                        setProductOptions(prev => {
-                                          const next = [...prev];
-                                          const updatedValues = [...next[oIdx].values, { value: '', price_adjustment: 0 }];
-                                          next[oIdx] = { ...next[oIdx], values: updatedValues };
-                                          return next;
-                                        });
-                                      }}
-                                      style={styles.deleteOptionBtn}
-                                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                    >
-                                      <Icon name="plus-circle-outline" size={20} color={Colors.primary} />
-                                    </TouchableOpacity>
-                                  ) : (
-                                    <TouchableOpacity 
-                                      onPress={() => {
-                                        setProductOptions(prev => {
-                                          const next = [...prev];
-                                          const updatedValues = next[oIdx].values.filter((_: any, i: number) => i !== vIdx);
-                                          next[oIdx] = { ...next[oIdx], values: updatedValues };
-                                          return next;
-                                        });
-                                      }}
-                                      style={styles.deleteOptionBtn}
-                                    >
-                                      <Icon name="trash-can-outline" size={20} color={Colors.error} />
-                                    </TouchableOpacity>
-                                  )
+                                {canEditPriceWeight && opt.values.length > 1 && (
+                                  <TouchableOpacity 
+                                    onPress={() => {
+                                      setProductOptions(prev => {
+                                        const next = [...prev];
+                                        next[oIdx].values = next[oIdx].values.filter((_: any, i: number) => i !== vIdx);
+                                        return next;
+                                      });
+                                    }}
+                                    style={styles.deleteValueBtn}
+                                  >
+                                    <Icon name="trash-can-outline" size={20} color={Colors.error} />
+                                  </TouchableOpacity>
                                 )}
                               </View>
                             ))}
                           </View>
+                          {canEditPriceWeight && (
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <TouchableOpacity 
+                                onPress={() => {
+                                  setProductOptions(prev => {
+                                    const next = [...prev];
+                                    next[oIdx].values = [...next[oIdx].values, { value: '', price_adjustment: 0 }];
+                                    return next;
+                                  });
+                                }}
+                                style={styles.addValueSmallBtn}
+                              >
+                                <Icon name="plus-circle-outline" size={16} color="#0284C7" />
+                                <Text style={styles.addValueSmallText}>Add Value</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
                         </View>
                       </View>
                     ))}
                   </View>
 
-                  {canEditDetails && (
+                  {canEditPriceWeight && (
                     <TouchableOpacity 
                       style={styles.addPairBtn}
                       onPress={() => setProductOptions(prev => [...prev, { title: '', values: [{ value: '', price_adjustment: 0 }], currentInput: '' }])}
@@ -860,48 +1065,55 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           )}
         </View>
 
-
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pricing & Inventory</Text>
           {showAllFields && (
-            <View style={styles.row}>
+            <Input
+              label="Price (₹)"
+              placeholder="0.00"
+              value={price}
+              onChangeText={setPrice}
+              keyboardType="numeric"
+              containerStyle={styles.inputSpacing}
+              editable={canEditPriceWeight}
+              leftIcon={<Text style={{fontSize: 16, color: Colors.textSecondary, fontWeight: '700'}}>₹</Text>}
+            />
+          )}
+          
+          <View style={styles.row}>
+            {showAllFields && (
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Input
+                  label="Weight (kg)"
+                  placeholder="0.00"
+                  value={weight}
+                  onChangeText={setWeight}
+                  keyboardType="numeric"
+                  editable={canEditPriceWeight}
+                  leftIcon={<Icon name="weight-kilogram" size={20} color={Colors.textSecondary} />}
+                />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
               <Input
-                label="Price (₹)"
-                placeholder="0.00"
-                value={price}
-                onChangeText={setPrice}
+                label="Stock"
+                placeholder="0"
+                value={stockQuantity}
+                editable={canEditStock}
                 keyboardType="numeric"
-                containerStyle={{ flex: 1, marginRight: Spacing.sm }}
-                editable={canEditDetails}
-              />
-              <Input
-                label="Weight (kg) *"
-                placeholder="0.5"
-                value={weight}
-                onChangeText={setWeight}
-                keyboardType="numeric"
-                containerStyle={{ flex: 1 }}
-                editable={canEditDetails}
               />
             </View>
-          )}
-          <Input
-            label="Stock"
-            placeholder="0"
-            value={stockQuantity}
-            onChangeText={setStockQuantity}
-            keyboardType="numeric"
-          />
+          </View>
 
-          {showAllFields && (
+          {showAdminDetails && (
             <View style={styles.logisticsSection}>
               <Text style={styles.logisticsTitle}>Delivery Details</Text>
               <View style={styles.deliveryOptionsRow}>
                 <TouchableOpacity 
                   style={[styles.deliveryOptionCard, !isOversized && styles.deliveryOptionActive]}
-                  onPress={() => setIsOversized(false)}
+                  onPress={() => canEditAdminDetails && setIsOversized(false)}
                   activeOpacity={0.7}
+                  disabled={!canEditAdminDetails}
                 >
                   <Icon 
                     name="motorbike" 
@@ -914,8 +1126,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
                 <TouchableOpacity 
                   style={[styles.deliveryOptionCard, isOversized && styles.deliveryOptionActive]}
-                  onPress={() => setIsOversized(true)}
+                  onPress={() => canEditAdminDetails && setIsOversized(true)}
                   activeOpacity={0.7}
+                  disabled={!canEditAdminDetails}
                 >
                   <Icon 
                     name="truck-delivery" 
@@ -942,7 +1155,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         )}
 
         {/* Tags Section */}
-        {(isPersonalMode || isCommonMode) && (
+        {showAdminDetails && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tags (Synonyms)</Text>
             <Text style={styles.helperText}>
@@ -953,8 +1166,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               placeholder="Type a tag..."
               value={tagInput}
               onChangeText={setTagInput}
+              editable={canEditAdminDetails}
               onSubmitEditing={() => {
-                if (tagInput.trim()) {
+                if (tagInput.trim() && canEditAdminDetails) {
                   setTags(prev => [...new Set([...prev, tagInput.trim().toLowerCase()])]);
                   setTagInput('');
                 }
@@ -962,12 +1176,13 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               rightIcon={
                 <TouchableOpacity 
                   onPress={() => {
-                    if (tagInput.trim()) {
+                    if (tagInput.trim() && canEditAdminDetails) {
                       setTags(prev => [...new Set([...prev, tagInput.trim().toLowerCase()])]);
                       setTagInput('');
                     }
                   }}
-                  style={styles.inlineAddBtn}
+                  disabled={!canEditAdminDetails}
+                  style={[styles.inlineAddBtn, !canEditAdminDetails && { opacity: 0.5 }]}
                 >
                   <Text style={styles.inlineAddBtnText}>Add</Text>
                 </TouchableOpacity>
@@ -978,12 +1193,14 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               {tags.map((tag, index) => (
                 <View key={index} style={styles.tagChip}>
                   <Text style={styles.tagText}>{tag}</Text>
-                  <TouchableOpacity 
-                    onPress={() => setTags(prev => prev.filter((_, i) => i !== index))}
-                    style={styles.removeTagBtn}
-                  >
-                    <Icon name="close-circle" size={18} color={Colors.textSecondary} />
-                  </TouchableOpacity>
+                  {canEditAdminDetails && (
+                    <TouchableOpacity 
+                      onPress={() => setTags(prev => prev.filter((_, i) => i !== index))}
+                      style={styles.removeTagBtn}
+                    >
+                      <Icon name="close-circle" size={18} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
             </View>
@@ -1487,13 +1704,22 @@ const styles = StyleSheet.create({
   addValueSmallBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
+    gap: 6,
+    marginTop: 12,
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
   },
   addValueSmallText: {
-    color: Colors.primary,
-    fontWeight: '700',
-    fontSize: 13,
+    color: '#0284C7',
+    fontWeight: '800',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   emptyOptionsPlaceholder: {
     paddingVertical: 30,
@@ -1646,5 +1872,114 @@ const styles = StyleSheet.create({
   checkboxCheckedNoReturn: {
     backgroundColor: Colors.error,
     borderColor: Colors.error,
+  },
+  addNewIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 75,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.white,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    zIndex: 2000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  suggestionImage: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.sm,
+    marginRight: Spacing.md,
+  },
+  suggestionName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    letterSpacing: -0.2,
+  },
+  suggestionCategory: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  catalogBadge: {
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  catalogBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0369A1',
+    textTransform: 'uppercase',
+  },
+  masterNoticeCard: {
+    backgroundColor: '#EFF6FF', // Light blue background
+    borderRadius: 20,
+    padding: Spacing.lg,
+    marginTop: Spacing.md,
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE', // Soft blue border
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  masterNoticeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  masterNoticeTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#1E40AF', // Deep blue
+    letterSpacing: -0.3,
+  },
+  masterNoticeDescription: {
+    fontSize: 14,
+    color: '#1E3A8A', // Dark blue text
+    lineHeight: 20,
+    opacity: 0.85,
+    marginBottom: 14,
+  },
+  masterNoticeFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#DBEAFE',
+  },
+  masterNoticeFooterText: {
+    fontSize: 12,
+    color: '#3B82F6', // Vibrant blue
+    fontWeight: '700',
+    flex: 1,
   },
 });

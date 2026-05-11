@@ -138,7 +138,7 @@ export const SearchScreen = ({ navigation, route }: any) => {
 
       // Add a filter for each term (AND logic between terms)
       searchTerms.forEach((term: string) => {
-        productQuery = productQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%,tags_search_text.ilike.%${term}%`);
+        productQuery = productQuery.or(`name.ilike.*${term}*,description.ilike.*${term}*,tags_search_text.ilike.*${term}*`);
       });
 
       const { data: productData, error: productError } = await productQuery;
@@ -153,7 +153,7 @@ export const SearchScreen = ({ navigation, route }: any) => {
 
       // Add a filter for each term (AND logic between terms)
       searchTerms.forEach((term: string) => {
-        storeQuery = storeQuery.or(`name.ilike.%${term}%,city.ilike.%${term}%,address.ilike.%${term}%,category.ilike.%${term}%,description.ilike.%${term}%`);
+        storeQuery = storeQuery.or(`name.ilike.*${term}*,city.ilike.*${term}*,address.ilike.*${term}*,category.ilike.*${term}*,description.ilike.*${term}*`);
       });
 
       const { data: storeData, error: storeError } = await storeQuery;

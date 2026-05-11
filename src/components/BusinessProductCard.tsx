@@ -29,7 +29,7 @@ interface ProductCardProps {
   };
   onToggleStock: (id: string, currentStatus: boolean) => void;
   onEdit: (product: any) => void;
-  onDelete: (id: string) => void;
+  onDelete: (product: any) => void;
 }
 
 export const BusinessProductCard = React.memo(({ 
@@ -100,7 +100,7 @@ export const BusinessProductCard = React.memo(({
             <Icon name="pencil-outline" size={20} color={Colors.primary} />
             <Text style={styles.actionButtonText}>Edit</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => onDelete(product.id)} style={[styles.actionButton, styles.deleteButton]}>
+          <TouchableOpacity onPress={() => onDelete(product)} style={[styles.actionButton, styles.deleteButton]}>
             <Icon name="trash-can-outline" size={20} color={Colors.error} />
           </TouchableOpacity>
         </View>
