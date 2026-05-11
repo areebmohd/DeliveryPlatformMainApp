@@ -58,7 +58,7 @@ export const BusinessProductCard = React.memo(({
               {product.name || `Barcode: ${product.barcode}`}
             </Text>
             <Text style={styles.category}>
-              {product.product_type === 'barcode' ? `Barcode: ${product.barcode}` : (product.category || 'General')}
+              {product.category || (product.product_type === 'barcode' ? `Barcode: ${product.barcode}` : 'General')}
             </Text>
           </View>
           

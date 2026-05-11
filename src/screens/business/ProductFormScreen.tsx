@@ -94,7 +94,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [isBarcodeMatched, setIsBarcodeMatched] = useState(!!product?.name);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(product?.raw_image_url || null);
-  const showAllFields = !isBarcodeMode || isBarcodeMatched;
+  const showAllFields = !isBarcodeMode || isBarcodeMatched || !!category;
   
   const [capturingRaw, setCapturingRaw] = useState(false);
   const [searchingBarcode, setSearchingBarcode] = useState(false);
@@ -334,10 +334,10 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const canEditPriceWeight = isPersonal || (isCommon && hasMadeCommonChoice);
   
   // Stock field
-  const canEditStock = isPersonal || (isBarcode && isBarcodeMatched) || (isCommon && hasMadeCommonChoice);
+  const canEditStock = isPersonal || isBarcode || (isCommon && hasMadeCommonChoice);
 
   // Visibility flags
-  const showAdminDetails = isPersonal || (isBarcode && isBarcodeMatched) || (isCommon && hasMadeCommonChoice);
+  const showAdminDetails = isPersonal || (isBarcode && (isBarcodeMatched || !!category)) || (isCommon && hasMadeCommonChoice);
 
   const takeRawPhoto = async () => {
     try {
@@ -844,7 +844,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
               {showAdminDetails && (
                 <TouchableOpacity 
-                  style={[styles.categoryTrigger, isBarcode && styles.disabledInput]}
+                  style={styles.categoryTrigger}
                   onPress={() => !isBarcode && setCategoryModalVisible(true)}
                   activeOpacity={0.7}
                   disabled={isBarcode}
@@ -1099,6 +1099,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                 label="Stock"
                 placeholder="0"
                 value={stockQuantity}
+                onChangeText={setStockQuantity}
                 editable={canEditStock}
                 keyboardType="numeric"
               />
