@@ -54,6 +54,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [category, setCategory] = useState(product?.category || '');
   const [imageUrl, setImageUrl] = useState(product?.image_url || '');
   const [stockQuantity, setStockQuantity] = useState(product?.stock_quantity?.toString() || '0');
+  const [initialStockQuantity, setInitialStockQuantity] = useState<number>(product?.initial_stock_quantity || 0);
   const [productOptions, setProductOptions] = useState<any[]>(
     product?.options?.length 
       ? product.options.map((opt: any) => ({ 
@@ -133,6 +134,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             setCategory(data.category || '');
             setImageUrl(data.image_url || '');
             setStockQuantity(data.stock_quantity?.toString() || '0');
+            setInitialStockQuantity(data.initial_stock_quantity || 0);
             setInStock(data.in_stock !== false);
             setPreparationTime(data.preparation_time?.toString() || '0');
             setRawImageUrl(data.raw_image_url || null);
@@ -541,6 +543,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         raw_image_url: rawImageUrl,
         preparation_time: parseInt(preparationTime) || 0,
         master_product_id: selectedMasterId,
+        initial_stock_quantity: (!isEditing || parseInt(stockQuantity) > initialStockQuantity) ? parseInt(stockQuantity) : initialStockQuantity,
         updated_at: new Date().toISOString(),
       };
 
