@@ -448,7 +448,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         showAlert({ title: 'Required Fields', message: 'Please enter a barcode.', type: 'warning' });
         return;
       }
-      if (!rawImageUrl) {
+      if (!isBarcodeMatched && !rawImageUrl) {
         showAlert({ title: 'Required Fields', message: 'Please capture a raw photo of the product.', type: 'warning' });
         return;
       }
@@ -691,7 +691,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          {isBarcode && (
+          {isBarcode && !isBarcodeMatched && (
             <View style={[styles.inputContainer, { marginTop: Spacing.md }]}>
               <Text style={styles.label}>Raw Image</Text>
               <TouchableOpacity 
@@ -762,9 +762,12 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Product Details</Text>
-          {isBarcodeMode && !isBarcodeMatched && (
+          {isBarcodeMode && (
             <Text style={styles.barcodeHelperText}>
-              Product details and image will be added by admin. You can only add stock amount.
+              {isBarcodeMatched 
+                ? "You can only set stock amount and rest will be filled by admin."
+                : "Product details and image will be added by admin. You can only add stock amount."
+              }
             </Text>
           )}
           {isCommon && !isEditing && (
@@ -789,7 +792,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                   editable={canEditName}
                   containerStyle={styles.inputSpacing}
                   rightIcon={
-                    selectedMasterId ? (
+                    (selectedMasterId || (isCommon && hasMadeCommonChoice)) ? (
                       <TouchableOpacity onPress={() => {
                         setSelectedMasterId(null);
                         setHasMadeCommonChoice(false);
