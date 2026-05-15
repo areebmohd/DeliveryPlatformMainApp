@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -23,6 +24,7 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
   const { storeId } = route.params;
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
 
   const { showAlert, showToast } = useAlert();
@@ -76,6 +78,12 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
       setLoading(false);
     }
   };
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchProducts();
+    setRefreshing(false);
+  }, [storeId]);
 
   const handleNavigateToForm = (product?: any) => {
     navigation.navigate('ProductForm', { 
@@ -169,6 +177,14 @@ export const ManageProductsScreen = ({ route, navigation }: any) => {
           data={products}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={[Colors.primary]}
+              tintColor={Colors.primary}
+            />
+          }
           renderItem={({ item }) => (
             <BusinessProductCard
               product={item}

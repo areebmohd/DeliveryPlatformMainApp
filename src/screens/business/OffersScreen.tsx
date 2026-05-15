@@ -12,6 +12,7 @@ import {
   Switch,
   Platform,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
@@ -57,6 +58,7 @@ export const OffersScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [store, setStore] = useState<any>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [showTypeModal, setShowTypeModal] = useState(false);
@@ -138,8 +140,14 @@ export const OffersScreen = ({ navigation }: any) => {
       console.error('Error fetching data:', e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchStoreAndOffers();
+  }, [user?.id]);
 
   const handleAddOffer = () => {
     setEditingOffer(null);
@@ -436,7 +444,18 @@ export const OffersScreen = ({ navigation }: any) => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       <View style={{ height: insets.top, backgroundColor: Colors.background }} />
       
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+      >
         <View style={styles.headerTitleContainer}>
           <View style={styles.headerTitleRow}>
             <Text style={styles.headerTitle}>Offers</Text>

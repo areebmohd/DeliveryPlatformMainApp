@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   SectionList,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
@@ -21,6 +22,7 @@ export const NotificationsScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -76,6 +78,12 @@ export const NotificationsScreen = ({ navigation }: any) => {
     }
   };
 
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await fetchNotifications();
+    setRefreshing(false);
+  }, [user]);
+
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.notificationCard}>
       <View style={styles.iconContainer}>
@@ -125,6 +133,14 @@ export const NotificationsScreen = ({ navigation }: any) => {
           renderSectionHeader={renderSectionHeader}
           contentContainerStyle={styles.listContent}
           stickySectionHeadersEnabled={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={[Colors.primary]}
+              tintColor={Colors.primary}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="bell-off-outline" size={80} color={Colors.border} />

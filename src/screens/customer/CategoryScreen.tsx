@@ -7,6 +7,7 @@ import {
   FlatList,
   ActivityIndicator,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -25,6 +26,7 @@ export const CategoryScreen = ({ navigation, route }: any) => {
   const [products, setProducts] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const insets = useSafeAreaInsets();
   const { addItem, updateQuantity, items, sessionAddress, getQuantity } = useCart();
@@ -93,6 +95,12 @@ export const CategoryScreen = ({ navigation, route }: any) => {
       setLoading(false);
     }
   };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchResults();
+    setRefreshing(false);
+  }, [categoryName]);
 
   const renderProduct = useCallback(({ item }: { item: any }) => (
     <View style={styles.productItemWrapper}>
@@ -165,6 +173,14 @@ export const CategoryScreen = ({ navigation, route }: any) => {
           maxToRenderPerBatch={10}
           windowSize={10}
           removeClippedSubviews={true}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={[Colors.primary]}
+              tintColor={Colors.primary}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="package-variant" size={64} color={Colors.border} />

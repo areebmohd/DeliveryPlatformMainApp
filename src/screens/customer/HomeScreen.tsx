@@ -13,6 +13,7 @@ import {
   Modal,
   Image,
   Animated,
+  RefreshControl,
 } from 'react-native';
 const { width } = Dimensions.get('window');
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -121,6 +122,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const [categoryImages, setCategoryImages] = useState<{ [key: string]: string }>({});
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
   const [isGPSEnabled, setIsGPSEnabled] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { addItem, items, updateQuantity, sessionAddress, setSessionAddress, getQuantity } = useCart();
   const { user } = useAuth();
   const { showAlert } = useAlert();
@@ -201,6 +203,20 @@ export const HomeScreen = ({ navigation }: any) => {
 
     return unsubscribe;
   }, [user, navigation]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchStores(),
+      fetchBestSellers(),
+      initSuggestions(),
+      fetchHomeBanners(),
+      fetchCategoryImages(),
+      user ? fetchAddresses() : Promise.resolve(),
+      user ? checkNotifications() : Promise.resolve()
+    ]);
+    setRefreshing(false);
+  }, [user]);
 
   // Refresh data when delivery address changes, but ONLY if we have an address
   useEffect(() => {
@@ -863,6 +879,14 @@ export const HomeScreen = ({ navigation }: any) => {
         onEndReached={handleLoadMoreSuggestions}
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
         contentContainerStyle={[
           styles.scrollContent, 
           { paddingBottom: insets.bottom + 100 }

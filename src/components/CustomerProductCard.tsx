@@ -25,9 +25,9 @@ interface CustomerProductCardProps {
   };
   onAdd?: (product: any) => void;
   quantity?: number;
-  onIncrease?: () => void;
-  onDecrease?: () => void;
-  onPress?: () => void;
+  onIncrease?: (product: any) => void;
+  onDecrease?: (product: any) => void;
+  onPress?: (product: any) => void;
   width?: any;
 }
 

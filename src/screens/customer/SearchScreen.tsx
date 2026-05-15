@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Dimensions,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -325,6 +326,14 @@ export const SearchScreen = ({ navigation, route }: any) => {
           maxToRenderPerBatch={10}
           windowSize={10}
           removeClippedSubviews={true}
+          refreshControl={
+            <RefreshControl 
+              refreshing={loading} 
+              onRefresh={handleSearch}
+              colors={[Colors.primary]}
+              tintColor={Colors.primary}
+            />
+          }
           ListEmptyComponent={
             searchQuery.length < 2 ? (
               <View style={styles.emptyContainer}>

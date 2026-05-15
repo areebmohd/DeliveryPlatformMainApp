@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -20,7 +21,8 @@ import { useBusinessStore } from '../../context/BusinessStoreContext';
 export const BusinessAccountScreen = ({ navigation }: any) => {
   const { profile, signOut, user } = useAuth();
   const insets = useSafeAreaInsets();
-  const { stores, activeStore, setActiveStore } = useBusinessStore();
+  const { stores, activeStore, setActiveStore, loading: storeLoading, refreshStores } = useBusinessStore();
+  const [refreshing, setRefreshing] = useState(false);
 
   const { showAlert } = useAlert();
 
@@ -60,6 +62,18 @@ export const BusinessAccountScreen = ({ navigation }: any) => {
       <ScrollView 
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refreshStores();
+              setRefreshing(false);
+            }}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
       >
         <Text style={styles.headerTitle}>Business Account</Text>
 

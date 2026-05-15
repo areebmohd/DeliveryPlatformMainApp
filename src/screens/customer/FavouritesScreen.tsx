@@ -428,6 +428,14 @@ export const FavouritesScreen = ({ navigation }: any) => {
               numColumns={2}
               columnWrapperStyle={styles.row}
               contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl 
+                  refreshing={loading} 
+                  onRefresh={fetchFavourites}
+                  colors={[Colors.primary]}
+                  tintColor={Colors.primary}
+                />
+              }
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Icon name="heart-outline" size={64} color={Colors.border} />
@@ -442,6 +450,14 @@ export const FavouritesScreen = ({ navigation }: any) => {
               renderItem={renderStoreItem}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl 
+                  refreshing={loading} 
+                  onRefresh={fetchFavourites}
+                  colors={[Colors.primary]}
+                  tintColor={Colors.primary}
+                />
+              }
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Icon name="heart-outline" size={64} color={Colors.border} />

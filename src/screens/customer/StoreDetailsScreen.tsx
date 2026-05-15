@@ -13,6 +13,7 @@ import {
   Platform,
   Dimensions,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -264,6 +265,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const [storeOffers, setStoreOffers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [offersLoading, setOffersLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'products' | 'offers' | 'info'>('products');
   const [isFavourite, setIsFavourite] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
@@ -295,10 +297,20 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   }, [sessionAddress, store, profile]);
 
   useEffect(() => {
-    fetchProducts();
     fetchStoreOffers();
     checkFavourite();
     fetchFavouriteOfferIds();
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchProducts(),
+      fetchStoreOffers(),
+      checkFavourite(),
+      fetchFavouriteOfferIds()
+    ]);
+    setRefreshing(false);
   }, []);
 
   const fetchFavouriteOfferIds = async () => {
@@ -454,12 +466,12 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
     }
   }, [sessionAddress, showAlert, navigation, addItem, store]);
 
-  const handleIncrease = useCallback((productId: string) => {
-    updateQuantity(productId, 1, undefined, store.id);
+  const handleIncrease = useCallback((product: any) => {
+    updateQuantity(product.id, 1, undefined, store.id);
   }, [updateQuantity, store.id]);
 
-  const handleDecrease = useCallback((productId: string) => {
-    updateQuantity(productId, -1, undefined, store.id);
+  const handleDecrease = useCallback((product: any) => {
+    updateQuantity(product.id, -1, undefined, store.id);
   }, [updateQuantity, store.id]);
 
   const handleProductPress = useCallback((product: any) => {
@@ -598,6 +610,14 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         stickyHeaderIndices={[1]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: totalItems > 0 ? 120 : insets.bottom + 20 }}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
       >
         <StoreHeaderSection
           store={store}
