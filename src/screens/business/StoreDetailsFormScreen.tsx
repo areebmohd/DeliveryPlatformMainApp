@@ -61,6 +61,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [verificationImages, setVerificationImages] = useState<string[]>(store?.verification_images || []);
   const [isUploadingVerification, setIsUploadingVerification] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [isFetchingLiveLocation, setIsFetchingLiveLocation] = useState(false);
 
   const [bankAccountNumber, setBankAccountNumber] = useState(store?.bank_account_number || '');
   const [bankIfscCode, setBankIfscCode] = useState(store?.bank_ifsc_code || '');
@@ -134,6 +135,40 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
       navigation.setParams({ selectedLocation: undefined });
     }
   }, [route.params?.selectedLocation]);
+
+  const fetchLiveLocation = async () => {
+    setIsFetchingLiveLocation(true);
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          showAlert({ title: 'Permission Denied', message: 'Please enable location permissions in settings.', type: 'error' });
+          setIsFetchingLiveLocation(false);
+          return;
+        }
+      }
+
+      Geolocation.getCurrentPosition(
+        (info) => {
+          const { latitude, longitude } = info.coords;
+          setLocation({ latitude, longitude });
+          setIsFetchingLiveLocation(false);
+          showToast('Live location fetched successfully!', 'success');
+        },
+        (error) => {
+          console.error('Geolocation Error:', error);
+          showAlert({ title: 'Location Error', message: 'Could not get your current location. Please check your GPS.', type: 'error' });
+          setIsFetchingLiveLocation(false);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      );
+    } catch (e) {
+      console.error('Location Error:', e);
+      setIsFetchingLiveLocation(false);
+    }
+  };
 
 
 
@@ -415,8 +450,8 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Store Location *</Text>
-          <Text style={styles.subtitle}>Pinpoint your store's exact location on given map for riders and customers.</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 1 }]}>Store Location *</Text>
+          <Text style={styles.subtitle}>Provide store's coordinates for riders and customers.</Text>
           
           <MapPickerView 
             location={location}
@@ -433,6 +468,41 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
               }
             })}
           />
+
+          <View style={styles.orContainer}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.orLine} />
+          </View>
+
+          {/* Live Location Button */}
+          <TouchableOpacity 
+            style={styles.liveLocationButton}
+            onPress={fetchLiveLocation}
+            disabled={isFetchingLiveLocation}
+            activeOpacity={0.7}
+          >
+            <View style={styles.liveLocationLeft}>
+              <View style={styles.liveLocationIconBox}>
+                <Icon name="crosshairs-gps" size={22} color={Colors.white} />
+              </View>
+              <View style={styles.liveLocationInfo}>
+                <Text style={styles.liveLocationLabel}>Use Live Location</Text>
+                <Text style={styles.liveLocationCoords}>
+                  {isFetchingLiveLocation ? 'Fetching current position...' : 
+                   location ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}` : 
+                   'Get coordinates via GPS'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.liveLocationRight}>
+              {isFetchingLiveLocation ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                location && <Icon name="refresh" size={24} color={Colors.primary} />
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -644,6 +714,75 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  liveLocationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.white,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.primaryLight,
+    marginBottom: 8,
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  liveLocationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  liveLocationIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  liveLocationInfo: {
+    flex: 1,
+  },
+  liveLocationLabel: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: Colors.text,
+    letterSpacing: 0.3,
+  },
+  liveLocationCoords: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  liveLocationRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  orContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  orText: {
+    marginHorizontal: 12,
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    letterSpacing: 1,
   },
   inputLabel: {
     fontSize: 14,

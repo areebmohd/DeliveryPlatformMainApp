@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  PermissionsAndroid,
 } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../theme/colors';
 import { supabase } from '../../api/supabase';
@@ -41,13 +43,12 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
   const { showAlert, showToast } = useAlert();
   const [editingAddress] = useState(route.params?.address);
   const isEditing = !!editingAddress;
+  const [isFetchingLiveLocation, setIsFetchingLiveLocation] = useState(false);
 
   // Parse initial location if editing
   const parseLocation = (loc: any) => {
     if (!loc) return null;
     try {
-      // Handle WKB HEX format (Supabase returns geography as HEX)
-      // Example: 0101000020E6100000... (50 chars for Point with SRID)
       if (typeof loc === 'string' && /^[0-9A-F]{50}$/i.test(loc)) {
         try {
           const xHex = loc.substring(loc.length - 32, loc.length - 16);
@@ -68,15 +69,12 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
         }
       }
 
-      // Handle String formats: "POINT(lng lat)", "POINT(lng, lat)", "SRID=4326;POINT(lng lat)", etc.
       if (typeof loc === 'string' && loc.toUpperCase().includes('POINT')) {
-        // Strip out SRID part if present, and handle both spaces or commas as separators
         const match = loc.match(/POINT\s*\(([-\d.]+)\s*[, \s]\s*([-\d.]+)\)/i);
         if (match) {
           const v1 = parseFloat(match[1]);
           const v2 = parseFloat(match[2]);
           
-          // Heuristic for India (same as before but more robust)
           if (v1 > 50 && v1 < 100) {
             return { longitude: v1, latitude: v2 };
           } else if (v2 > 50 && v2 < 100) {
@@ -85,14 +83,12 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
           return { longitude: v1, latitude: v2 };
         }
       } else if (typeof loc === 'object') {
-        // Handle GeoJSON: { type: 'Point', coordinates: [lng, lat] }
         if (loc.type === 'Point' && Array.isArray(loc.coordinates)) {
           return {
             longitude: loc.coordinates[0],
             latitude: loc.coordinates[1],
           };
         }
-        // Handle any object with lat/lng key variations
         const lat = loc.latitude ?? loc.lat ?? loc.latitude_deg ?? loc.y ?? null;
         const lng = loc.longitude ?? loc.lng ?? loc.longitude_deg ?? loc.x ?? null;
         
@@ -117,6 +113,43 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
     location: initialLocation,
   });
 
+  const fetchLiveLocation = async () => {
+    setIsFetchingLiveLocation(true);
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          showAlert({ title: 'Permission Denied', message: 'Please enable location permissions in settings.', type: 'error' });
+          setIsFetchingLiveLocation(false);
+          return;
+        }
+      }
+
+      Geolocation.getCurrentPosition(
+        (info) => {
+          const { latitude, longitude } = info.coords;
+          setFormData({
+            ...formData,
+            location: { latitude, longitude }
+          });
+          setIsFetchingLiveLocation(false);
+          showToast('Live location fetched successfully!', 'success');
+        },
+        (error) => {
+          console.error('Geolocation Error:', error);
+          showAlert({ title: 'Location Error', message: 'Could not get your current location. Please check your GPS.', type: 'error' });
+          setIsFetchingLiveLocation(false);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      );
+    } catch (e) {
+      console.error('Location Error:', e);
+      setIsFetchingLiveLocation(false);
+    }
+  };
+
   // Listen for location from MapSelectionScreen
   React.useEffect(() => {
     if (route.params?.selectedLocation) {
@@ -129,13 +162,11 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
         state: details?.state || (preservedFormData || prev).state || '',
       }));
       
-      // Fields are now read-only and filled from map details
       navigation.setParams({ selectedLocation: undefined });
     }
   }, [route.params?.selectedLocation]);
 
   const handleSave = async () => {
-    // Basic validation
     if (!formData.address_line || !formData.city || !formData.state || !formData.location) {
       showAlert({ title: 'Error', message: 'Please fill all required fields and select map location', type: 'warning' });
       return;
@@ -151,14 +182,12 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
       };
 
       if (addressId) {
-        // Explicitly update existing record
         const { error } = await supabase
           .from('addresses')
           .update(dataToSave)
           .eq('id', addressId);
         if (error) throw error;
       } else {
-        // Check if this is the first address for the user
         const { count, error: countError } = await supabase
           .from('addresses')
           .select('*', { count: 'exact', head: true })
@@ -229,7 +258,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
         <View style={styles.form}>
 
           <View style={styles.labelSection}>
-            <Text style={styles.sectionTitle}>Address Label</Text>
+            <Text style={[styles.sectionTitle, { marginTop: 0 }]}>Address Label</Text>
             <View style={styles.labelPicker}>
               {['Home', 'Work', 'Other'].map((l) => (
                 <TouchableOpacity
@@ -257,7 +286,7 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
           <Text style={styles.sectionTitle}>Address Details</Text>
           <InputField 
             label="Address Line 1" 
-            placeholder="Flat No, House Name, Street" 
+            placeholder="House No, Landmark, Sector" 
             value={formData.address_line}
             onChangeText={(t: string) => setFormData({ ...formData, address_line: t })}
           />
@@ -266,19 +295,17 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
             placeholder="City Name" 
             value={formData.city}
             onChangeText={(t: string) => setFormData({ ...formData, city: t })}
-            editable={false}
           />
           <InputField 
             label="State" 
             placeholder="State Name" 
             value={formData.state}
             onChangeText={(t: string) => setFormData({ ...formData, state: t })}
-            editable={false}
           />
 
           <View style={{ marginVertical: 12 }}>
             <Text style={styles.inputLabel}>
-              Pin Location on Map <Text style={styles.required}>*</Text>
+              Coordinates <Text style={styles.required}>*</Text>
             </Text>
             <MapPickerView 
               location={formData.location}
@@ -291,6 +318,40 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
                 fromHome: route.params?.fromHome,
               })}
             />
+
+            <View style={styles.orContainer}>
+              <View style={styles.orLine} />
+              <Text style={styles.orText}>OR</Text>
+              <View style={styles.orLine} />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.liveLocationButton}
+              onPress={fetchLiveLocation}
+              disabled={isFetchingLiveLocation}
+              activeOpacity={0.7}
+            >
+              <View style={styles.liveLocationLeft}>
+                <View style={styles.liveLocationIconBox}>
+                  <Icon name="crosshairs-gps" size={22} color={Colors.white} />
+                </View>
+                <View style={styles.liveLocationInfo}>
+                  <Text style={styles.liveLocationLabel}>Use Live Location</Text>
+                  <Text style={styles.liveLocationCoords}>
+                    {isFetchingLiveLocation ? 'Fetching current position...' : 
+                    formData.location ? `${formData.location.latitude.toFixed(6)}, ${formData.location.longitude.toFixed(6)}` : 
+                    'Get coordinates via GPS'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.liveLocationRight}>
+                {isFetchingLiveLocation ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  formData.location && <Icon name="refresh" size={24} color={Colors.primary} />
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
 
           <Button
@@ -403,5 +464,74 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+  },
+  liveLocationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.white,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.primaryLight,
+    marginBottom: 20,
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  liveLocationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  liveLocationIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  liveLocationInfo: {
+    flex: 1,
+  },
+  liveLocationLabel: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: Colors.text,
+    letterSpacing: 0.3,
+  },
+  liveLocationCoords: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  liveLocationRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  orContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  orText: {
+    marginHorizontal: 12,
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    letterSpacing: 1,
   },
 });

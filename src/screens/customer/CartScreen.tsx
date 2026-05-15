@@ -23,7 +23,6 @@ import { Input } from '../../components/ui/Input';
 import { supabase } from '../../api/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
-import Geolocation from '@react-native-community/geolocation';
 import { notificationService } from '../../utils/notificationService';
 import { getHaversineDistance } from '../../utils/performanceUtils';
 
@@ -512,7 +511,6 @@ export const CartScreen = ({ navigation }: any) => {
   const [storeDeliveryFees, setStoreDeliveryFees] = useState<Record<string, number>>({});
   const [totalStoreFees, setTotalStoreFees] = useState(0);
   const [offerProductDetails, setOfferProductDetails] = useState<Record<string, any>>({});
-  const [isGPSEnabled, setIsGPSEnabled] = useState(true);
   const [sortedStoreList, setSortedStoreList] = useState<any[]>([]);
   const [deliveryType, setDeliveryType] = useState<'fast' | 'batch'>('fast');
   const [deliverySlot, setDeliverySlot] = useState<string | null>(null);
@@ -605,37 +603,7 @@ export const CartScreen = ({ navigation }: any) => {
     }
   }, [appliedOffers]);
 
-  // Check GPS status when using live location
-  useEffect(() => {
-    let interval: any;
-    
-    const checkGPS = () => {
-      if (sessionAddress && !sessionAddress.id) {
-        Geolocation.getCurrentPosition(
-          () => setIsGPSEnabled(true),
-          (error) => {
-            if (error.code === 2 || error.code === 1) {
-              setIsGPSEnabled(false);
-            }
-          },
-          { enableHighAccuracy: false, timeout: 5000, maximumAge: 10000 }
-        );
-      } else {
-        setIsGPSEnabled(true);
-      }
-    };
 
-    if (sessionAddress && !sessionAddress.id) {
-      checkGPS();
-      interval = setInterval(checkGPS, 10000);
-    } else {
-      setIsGPSEnabled(true);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [sessionAddress]);
 
   // Sync manuallyRemovedStores with cart items
   useEffect(() => {
@@ -1829,19 +1797,19 @@ export const CartScreen = ({ navigation }: any) => {
             onPress={() => setAddressModalVisible(true)}
           >
             <Icon 
-              name={sessionAddress ? "crosshairs-gps" : (selectedAddress?.label.toLowerCase().includes('home') ? 'home-outline' : 'map-marker-outline')} 
+              name={selectedAddress?.label.toLowerCase().includes('home') ? 'home-outline' : 'map-marker-outline'} 
               size={24} 
               color={Colors.primary} 
             />
             <View style={styles.addressInfo}>
               <Text style={styles.addressLabel}>
                 {sessionAddress 
-                  ? (sessionAddress.id ? sessionAddress.label : (isGPSEnabled ? sessionAddress.label : "GPS Disabled")) 
+                  ? sessionAddress.label
                   : (selectedAddress?.label || 'Select Address')}
               </Text>
               <Text style={styles.addressText} numberOfLines={1}>
                 {sessionAddress 
-                  ? (sessionAddress.id ? sessionAddress.address_line : (isGPSEnabled ? 'Live GPS Location' : 'Location services are off'))
+                  ? sessionAddress.address_line
                   : (selectedAddress ? selectedAddress.address_line : 'Where should we deliver?')}
               </Text>
             </View>
@@ -1939,19 +1907,7 @@ export const CartScreen = ({ navigation }: any) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalScroll}>
-              <TouchableOpacity 
-                style={styles.modalOption} 
-                onPress={() => {
-                  setAddressModalVisible(false);
-                  navigation.navigate('AddLiveLocation');
-                }}
-              >
-                <Icon name="crosshairs-gps" size={24} color={sessionAddress && !sessionAddress.id ? Colors.primary : Colors.primary} />
-                <Text style={[styles.modalOptionText, sessionAddress && !sessionAddress.id && { color: Colors.primary, fontWeight: '900' }]}>
-                  {sessionAddress && !sessionAddress.id ? "Live Location Active" : "Live Location"}
-                </Text>
-                {sessionAddress && !sessionAddress.id && <Icon name="check-circle" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
-              </TouchableOpacity>
+
               
               <TouchableOpacity 
                 style={styles.modalOption} 

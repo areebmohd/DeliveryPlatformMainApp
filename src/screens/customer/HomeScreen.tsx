@@ -29,7 +29,6 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
-import Geolocation from '@react-native-community/geolocation';
 import { deduplicateProducts, parseWKT, getHaversineDistance } from '../../utils/productUtils';
 
 const CATEGORIES = PRODUCT_CATEGORIES;
@@ -121,7 +120,6 @@ export const HomeScreen = ({ navigation }: any) => {
   const [homeBanners, setHomeBanners] = useState<any[]>([]);
   const [categoryImages, setCategoryImages] = useState<{ [key: string]: string }>({});
   const [selectedProductOptions, setSelectedProductOptions] = useState<any>(null);
-  const [isGPSEnabled, setIsGPSEnabled] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { addItem, items, updateQuantity, sessionAddress, setSessionAddress, getQuantity } = useCart();
   const { user } = useAuth();
@@ -229,37 +227,7 @@ export const HomeScreen = ({ navigation }: any) => {
     }
   }, [sessionAddress?.id, sessionAddress?.address_line]); // Stable dependency
 
-  // Check GPS status when using live location
-  useEffect(() => {
-    let interval: any;
-    
-    const checkGPS = () => {
-      if (sessionAddress && !sessionAddress.id) {
-        Geolocation.getCurrentPosition(
-          () => setIsGPSEnabled(true),
-          (error) => {
-            if (error.code === 2 || error.code === 1) { // 2: Location provider not available, 1: Permission denied
-              setIsGPSEnabled(false);
-            }
-          },
-          { enableHighAccuracy: false, timeout: 5000, maximumAge: 10000 }
-        );
-      } else {
-        setIsGPSEnabled(true);
-      }
-    };
 
-    if (sessionAddress && !sessionAddress.id) {
-      checkGPS();
-      interval = setInterval(checkGPS, 10000); // Check every 10 seconds
-    } else {
-      setIsGPSEnabled(true);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [sessionAddress]);
 
   useEffect(() => {
     if (homeBanners.length > 1) {
@@ -823,9 +791,6 @@ export const HomeScreen = ({ navigation }: any) => {
             <Text style={styles.locationTitle} numberOfLines={1}>
               {sessionAddress 
                 ? (() => {
-                    if (!sessionAddress.id && sessionAddress.label) {
-                      return isGPSEnabled ? sessionAddress.label : "GPS Disabled";
-                    }
                     const fullAddress = `${sessionAddress.address_line}${sessionAddress.city ? `, ${sessionAddress.city}` : ''}`;
                     return fullAddress.length > 25 ? `${fullAddress.substring(0, 30)}...` : fullAddress;
                   })()
@@ -914,19 +879,7 @@ export const HomeScreen = ({ navigation }: any) => {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalScroll}>
-              <TouchableOpacity 
-                style={styles.modalOption} 
-                onPress={() => {
-                  setAddressModalVisible(false);
-                  navigation.navigate('AddLiveLocation');
-                }}
-              >
-                <Icon name="crosshairs-gps" size={24} color={sessionAddress && !sessionAddress.id ? Colors.primary : Colors.primary} />
-                <Text style={[styles.modalOptionText, sessionAddress && !sessionAddress.id && { color: Colors.primary, fontWeight: '900' }]}>
-                  {sessionAddress && !sessionAddress.id ? "Live Location Active" : "Use Live Location"}
-                </Text>
-                {sessionAddress && !sessionAddress.id && <Icon name="check-circle" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />}
-              </TouchableOpacity>
+
 
               <TouchableOpacity 
                 style={styles.modalOption} 

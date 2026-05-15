@@ -40,30 +40,13 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
   );
   const [address, setAddress] = useState<string>('');
   const [addressDetails, setAddressDetails] = useState<any>(null);
-  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
   const [hasLocationPermission, setHasLocationPermission] = useState(false);
 
-  // Reverse Geocoding whenever map movement stops
-  const fetchAddress = async (lng: number, lat: number) => {
-    try {
-      setIsReverseGeocoding(true);
-      const res = await RestApi.reverseGeocode({ latitude: lat, longitude: lng });
-      if (res && res.results && res.results.length > 0) {
-        const result = res.results[0];
-        setAddress(result.formatted_address || '');
-        setAddressDetails(result);
-      }
-    } catch (e) {
-      console.error('Reverse Geocode failed:', e);
-    } finally {
-      setIsReverseGeocoding(false);
-    }
-  };
+
 
   const onRegionDidChange = async (feature: any) => {
     const [lng, lat] = feature.geometry.coordinates;
     setMapCenter([lng, lat]);
-    fetchAddress(lng, lat);
   };
 
   const getCurrentLocation = async () => {
@@ -106,8 +89,9 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
       zoomLevel: 16,
       animationDuration: 1000,
     });
-    fetchAddress(lng, lat);
   };
+
+
 
   const handleSearchPress = async () => {
     try {
@@ -125,9 +109,6 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
           zoomLevel: 16,
           animationDuration: 1000,
         });
-        
-        // After search, also fetch granular details for that location
-        fetchAddress(longitude, latitude);
       }
     } catch (e) {
       console.error('Search Widget Error:', e);
@@ -169,11 +150,7 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
     };
 
     initLocation();
-    
-    if (mapCenter) {
-      fetchAddress(mapCenter[0], mapCenter[1]);
-    }
-  }, [mapCenter]);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -233,13 +210,7 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
         </View>
       </View>
 
-      {/* Location Badge (Loading Indicator) */}
-      {isReverseGeocoding && (
-        <View style={styles.geocodingBadge}>
-          <ActivityIndicator size="small" color={Colors.primary} />
-          <Text style={styles.geocodingText}>Getting address...</Text>
-        </View>
-      )}
+
 
       {/* Footer Actions */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md }]}>

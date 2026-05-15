@@ -16,7 +16,6 @@ import { CustomerOrdersScreen } from '../screens/customer/CustomerOrdersScreen';
 import { ProductDetailScreen } from '../screens/customer/ProductDetailScreen';
 import { AddressesScreen } from '../screens/customer/AddressesScreen';
 import { AddAddressScreen } from '../screens/customer/AddAddressScreen';
-import { AddLiveLocationScreen } from '../screens/customer/AddLiveLocationScreen';
 import { SearchScreen } from '../screens/customer/SearchScreen';
 import { CategoryScreen } from '../screens/customer/CategoryScreen';
 import { NotificationsScreen } from '../screens/customer/NotificationsScreen';
@@ -39,7 +38,7 @@ const HomeStack = () => {
       <HomeStackNav.Screen name="StoreDetails" component={StoreDetailsScreen} />
       <HomeStackNav.Screen name="ProductDetail" component={ProductDetailScreen} />
       <HomeStackNav.Screen name="AddAddress" component={AddAddressScreen} />
-      <HomeStackNav.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
+
       <HomeStackNav.Screen name="Search" component={SearchScreen} />
       <HomeStackNav.Screen name="Category" component={CategoryScreen} />
       <HomeStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
@@ -56,7 +55,7 @@ const AccountStack = () => {
       <AccountStackNav.Screen name="CustomerOrders" component={CustomerOrdersScreen} />
       <AccountStackNav.Screen name="Addresses" component={AddressesScreen} />
       <AccountStackNav.Screen name="AddAddress" component={AddAddressScreen} />
-      <AccountStackNav.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
+
       <AccountStackNav.Screen name="StoreDetails" component={StoreDetailsScreen} />
       <AccountStackNav.Screen name="ProductDetail" component={ProductDetailScreen} />
       <AccountStackNav.Screen name="Notifications" component={NotificationsScreen} />
@@ -73,7 +72,7 @@ const CartStack = () => {
     <CartStackNav.Navigator screenOptions={{ headerShown: false }}>
       <CartStackNav.Screen name="CartMain" component={CartScreen} />
       <CartStackNav.Screen name="AddAddress" component={AddAddressScreen} />
-      <CartStackNav.Screen name="AddLiveLocation" component={AddLiveLocationScreen} />
+
       <CartStackNav.Screen name="StoreDetails" component={StoreDetailsScreen} />
       <CartStackNav.Screen name="ProductDetail" component={ProductDetailScreen} />
       <CartStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
@@ -99,7 +98,7 @@ export const CustomerNavigator = () => {
       screenOptions={({ route }) => {
         const routeName = getFocusedRouteNameFromRoute(route);
         const hideOnScreens = [
-          'StoreDetails', 'ProductDetail', 'AddAddress', 'AddLiveLocation', 
+          'StoreDetails', 'ProductDetail', 'AddAddress', 
           'Search', 'Category', 'MapSelection', 'Notifications', 
           'Favourites', 'CustomerOrders', 'Addresses', 'CustomerSupport', 'ApplyReturn', 'Returns'
         ];
