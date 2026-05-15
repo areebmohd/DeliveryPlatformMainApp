@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -481,6 +481,7 @@ const CartStoreSection = React.memo(({
 export const CartScreen = ({ navigation }: any) => {
   const { items, setItems, updateQuantity, subtotal, totalItems, clearCart, sessionAddress, setSessionAddress, appliedOffers, setAppliedOffers } = useCart();
   const { user, profile } = useAuth();
+  const orderProcessingRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
@@ -1640,11 +1641,16 @@ export const CartScreen = ({ navigation }: any) => {
   };
 
   const processOrder = async () => {
+    if (orderProcessingRef.current || loading) return;
+    
     try {
+      orderProcessingRef.current = true;
       await finalizeOrderCreation('pending');
     } catch (e: any) {
       setLoading(false);
       showAlert({ title: 'Error', message: e.message, type: 'error' });
+    } finally {
+      orderProcessingRef.current = false;
     }
   };
 

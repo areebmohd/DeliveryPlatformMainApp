@@ -50,6 +50,7 @@ export const AlertModal = ({
 }: AlertModalProps) => {
   const [loadingIdx, setLoadingIdx] = React.useState<number | null>(null);
   const scaleValue = useRef(new Animated.Value(0)).current;
+  const isActionExecuting = useRef(false);
 
   useEffect(() => {
     if (!visible) {
@@ -116,11 +117,14 @@ export const AlertModal = ({
           loadingIdx !== null && { opacity: 0.7 },
         ]} 
         onPress={async () => {
+          if (isActionExecuting.current) return;
+          isActionExecuting.current = true;
           setLoadingIdx(index);
           try {
             await action.onPress();
           } finally {
             onClose();
+            isActionExecuting.current = false;
           }
         }}
       >
