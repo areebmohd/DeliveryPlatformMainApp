@@ -84,7 +84,7 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
           event: '*',
           schema: 'public',
           table: 'orders',
-          filter: `customer_id=eq.${user?.id}`,
+          // Removed manual filter as RLS already handles privacy and filtering
         },
         () => {
           fetchOrders();
@@ -99,6 +99,7 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
 
   useFocusEffect(
     React.useCallback(() => {
+      fetchOrders();
       const onBackPress = () => {
         navigation.navigate('AccountMain');
         return true;
@@ -107,7 +108,7 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
 
       return () => subscription.remove();
-    }, [navigation])
+    }, [navigation, fetchOrders])
   );
 
   const groupedOrders = React.useMemo(() => {
@@ -162,6 +163,22 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
         text: 'Yes, Cancel', 
         onPress: async () => {
           try {
+            // First check the latest status from server
+            const { data: currentOrder } = await supabase
+              .from('orders')
+              .select('status')
+              .eq('id', orderId)
+              .single();
+
+            if (currentOrder && (currentOrder.status === 'picked_up' || currentOrder.status === 'delivered')) {
+              fetchOrders(); // Sync local state
+              return showAlert({
+                title: 'Cannot Cancel Order',
+                message: `This order has already been ${currentOrder.status === 'picked_up' ? 'picked up' : 'delivered'} and cannot be cancelled.`,
+                type: 'error'
+              });
+            }
+
             const { error } = await supabase
               .from('orders')
               .update({ status: 'cancelled' })
@@ -199,9 +216,12 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
             }
 
             fetchOrders();
-          } catch (error) {
-            // Silent error
-            showAlert({ title: 'Error', message: 'Failed to cancel order. Please try again.', type: 'error' });
+          } catch (error: any) {
+            showAlert({ 
+              title: 'Cancellation Failed', 
+              message: error.message || 'Failed to cancel order. Please try again.', 
+              type: 'error' 
+            });
           }
         },
         variant: 'destructive',
