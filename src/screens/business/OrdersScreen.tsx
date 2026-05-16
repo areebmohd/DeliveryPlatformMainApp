@@ -413,7 +413,7 @@ export const OrdersScreen = () => {
             if (delOffer) storeOffers.push(delOffer);
           }
 
-          const hasAppOffer = !!item.applied_offers?.app_offer;
+          const hasAppOffer = !!item.applied_offers?.app_fast_offer || !!item.applied_offers?.app_batch_offer || !!item.applied_offers?.app_offer;
           
           if (storeOffers.length === 0 && !hasAppOffer) return null;
 
@@ -439,17 +439,27 @@ export const OrdersScreen = () => {
               ))}
 
               {/* App Offer */}
-              {hasAppOffer && (
-                <View style={[styles.promoBadge, { backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '20', borderWidth: 1, marginBottom: 0 }]}>
-                  <View style={[styles.promoIconCircle, { backgroundColor: Colors.primary }]}>
-                    <Icon name="ticket-percent" size={14} color={Colors.white} />
+              {hasAppOffer && (() => {
+                const isFast = !!item.applied_offers?.app_fast_offer;
+                const isLegacy = !!item.applied_offers?.app_offer;
+                return (
+                  <View style={[styles.promoBadge, { backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '20', borderWidth: 1, marginBottom: 0 }]}>
+                    <View style={[styles.promoIconCircle, { backgroundColor: Colors.primary }]}>
+                      <Icon name={isFast ? "flash" : "ticket-percent"} size={14} color={Colors.white} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.promoTitle, { color: Colors.primary }]}>
+                        {isFast ? 'Free Fast Delivery' : 'Free Batch Delivery'}
+                      </Text>
+                      <Text style={[styles.promoDescription, { color: Colors.primary, opacity: 0.8 }]}>
+                        {isFast 
+                          ? 'Free fast delivery above ₹149' 
+                          : (isLegacy ? 'Free batch delivery above ₹29' : 'Free batch delivery above ₹49')}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.promoTitle, { color: Colors.primary }]}>App Offer</Text>
-                    <Text style={[styles.promoDescription, { color: Colors.primary, opacity: 0.8 }]}>Free batch delivery above ₹29</Text>
-                  </View>
-                </View>
-              )}
+                );
+              })()}
             </View>
           );
         })()}
@@ -594,7 +604,7 @@ export const OrdersScreen = () => {
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Delivery Fee</Text>
                       <Text style={styles.breakdownValue}>
-                        {breakdownModal.order.applied_offers?.app_offer ? '₹0' : `₹${breakdownModal.order.delivery_fee}`}
+                        { (breakdownModal.order.applied_offers?.app_fast_offer || breakdownModal.order.applied_offers?.app_batch_offer || breakdownModal.order.applied_offers?.app_offer) ? '₹0' : `₹${breakdownModal.order.delivery_fee}`}
                       </Text>
                     </View>
                   )}

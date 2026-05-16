@@ -350,17 +350,32 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
         })()}
 
         {/* App Offer Display */}
-        {item.applied_offers?.app_offer && (
-          <View style={styles.appOfferBadge}>
-            <View style={styles.appOfferIconBox}>
-              <Icon name="ticket-percent" size={14} color={Colors.white} />
+        {/* App Offer Display */}
+        {(() => {
+          const appOffer = item.applied_offers?.app_fast_offer || item.applied_offers?.app_batch_offer || item.applied_offers?.app_offer;
+          if (!appOffer) return null;
+          
+          const isFast = !!item.applied_offers?.app_fast_offer;
+          const isLegacy = !!item.applied_offers?.app_offer;
+          
+          return (
+            <View style={styles.appOfferBadge}>
+              <View style={[styles.appOfferIconBox, isFast && { backgroundColor: Colors.primary }]}>
+                <Icon name={isFast ? "flash" : "ticket-percent"} size={14} color={Colors.white} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.appOfferTitle}>
+                  {isFast ? 'Free Fast Delivery' : 'Free Batch Delivery'}
+                </Text>
+                <Text style={styles.appOfferDesc}>
+                  {isFast 
+                    ? 'Free fast delivery above ₹149' 
+                    : (isLegacy ? 'Free batch delivery above ₹29' : 'Free batch delivery above ₹49')}
+                </Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.appOfferTitle}>App Offer</Text>
-              <Text style={styles.appOfferDesc}>Free batch delivery above ₹29</Text>
-            </View>
-          </View>
-        )}
+          );
+        })()}
 
         <View style={styles.cardFooter}>
           {item.transport_type === 'heavy' && item.has_helper && (
@@ -496,7 +511,7 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>Delivery Fee</Text>
                       <Text style={styles.breakdownValue}>
-                        {breakdownModal.order.applied_offers?.app_offer ? '₹0' : `₹${breakdownModal.order.delivery_fee}`}
+                        {(breakdownModal.order.applied_offers?.app_fast_offer || breakdownModal.order.applied_offers?.app_batch_offer || breakdownModal.order.applied_offers?.app_offer) ? '₹0' : `₹${breakdownModal.order.delivery_fee}`}
                       </Text>
                     </View>
                   )}

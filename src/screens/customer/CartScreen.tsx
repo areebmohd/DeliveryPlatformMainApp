@@ -1203,11 +1203,35 @@ export const CartScreen = ({ navigation }: any) => {
       }
 
       // 4. App Offer specific restrictions
-      if (offerKey === 'app_offer') {
+      if (offerKey === 'app_batch_offer') {
         if (deliveryType === 'fast') {
           delete newOffers[offerKey];
           changed = true;
           showToast('App offer removed: Only applicable for Batch Delivery.', 'info');
+          return;
+        }
+
+        if (isLargeVehicle) {
+          delete newOffers[offerKey];
+          changed = true;
+          showToast('App offer removed: Only applicable for bike deliveries.', 'info');
+          return;
+        }
+
+        const isTooFar = Object.values(storeDistances).some(d => d >= 1);
+        if (isTooFar) {
+          delete newOffers[offerKey];
+          changed = true;
+          showToast('App offer removed: Only applicable for shops under 1km.', 'info');
+          return;
+        }
+      }
+
+      if (offerKey === 'app_fast_offer') {
+        if (deliveryType === 'batch') {
+          delete newOffers[offerKey];
+          changed = true;
+          showToast('App offer removed: Only applicable for Fast Delivery.', 'info');
           return;
         }
 
@@ -1274,11 +1298,19 @@ export const CartScreen = ({ navigation }: any) => {
   }, [isLargeVehicle, storeDistances]);
 
   const isAppOfferActive = React.useMemo(() => {
-    return !!appliedOffers['app_offer'] && 
-           deliveryType === 'batch' &&
-           subtotal >= 29 && 
-           isBatchAllowed;
-  }, [appliedOffers, deliveryType, subtotal, isBatchAllowed]);
+    const isBatchActive = !!appliedOffers['app_batch_offer'] && 
+                         deliveryType === 'batch' &&
+                         subtotal >= 49 && 
+                         isBatchAllowed;
+    
+    const isFastActive = !!appliedOffers['app_fast_offer'] && 
+                        deliveryType === 'fast' &&
+                        subtotal >= 149 && 
+                        !isLargeVehicle &&
+                        Object.values(storeDistances).every(d => d < 1);
+                        
+    return isBatchActive || isFastActive;
+  }, [appliedOffers, deliveryType, subtotal, isBatchAllowed, isLargeVehicle, storeDistances]);
 
   const billingData = React.useMemo(() => {
     const pFee = subtotal < 500 ? 5 : (subtotal <= 1000 ? 10 : 20);
@@ -1626,7 +1658,7 @@ export const CartScreen = ({ navigation }: any) => {
 
       const appliedOfferIds = Object.values(appliedOffers as Record<string, any>)
         .map(o => o.id)
-        .filter(id => id && id !== 'app_free_delivery');
+        .filter(id => id && id !== 'app_free_delivery' && id !== 'app_fast_delivery');
       if (appliedOfferIds.length > 0) {
         await Promise.all(appliedOfferIds.map(oid => supabase.rpc('increment_offer_used_count', { offer_id: oid })));
       }
@@ -1718,36 +1750,38 @@ export const CartScreen = ({ navigation }: any) => {
         {/* App Offers Section */}
         <View style={styles.appOfferSection}>
           <Text style={styles.sectionTitle}>App Offers</Text>
-          <View style={[styles.appOfferCard, appliedOffers['app_offer'] && styles.appOfferCardActive]}>
+          <View style={styles.appOfferContainer}>
+            {/* Free Fast Delivery Offer */}
+            <View style={[styles.appOfferCard, appliedOffers['app_fast_offer'] && styles.appOfferCardActive]}>
             <View style={styles.appOfferHeader}>
-              <View style={[styles.appOfferIconBox, appliedOffers['app_offer'] && { backgroundColor: '#d0e4ff' }]}>
-                <Icon name="ticket-percent" size={24} color={Colors.primary} />
+              <View style={[styles.appOfferIconBox, appliedOffers['app_fast_offer'] && { backgroundColor: '#d0e4ff' }]}>
+                <Icon name="flash" size={24} color={Colors.primary} />
               </View>
               <View style={styles.appOfferInfo}>
-                <Text style={styles.appOfferTitle}>App Offer</Text>
-                <Text style={styles.appOfferDesc}>Free batch delivery above ₹29</Text>
+                <Text style={styles.appOfferTitle}>Free Fast Delivery</Text>
+                <Text style={styles.appOfferDesc}>Free fast delivery above ₹149</Text>
               </View>
               <TouchableOpacity 
-                style={[styles.appOfferBtn, appliedOffers['app_offer'] ? styles.appOfferRemoveBtn : styles.appOfferAddBtn]}
+                style={[styles.appOfferBtn, appliedOffers['app_fast_offer'] ? styles.appOfferRemoveBtn : styles.appOfferAddBtn]}
                 onPress={() => {
                   const newOffers = { ...appliedOffers };
-                  if (appliedOffers['app_offer']) {
-                    delete newOffers['app_offer'];
-                    showToast('App offer removed', 'info');
+                  if (appliedOffers['app_fast_offer']) {
+                    delete newOffers['app_fast_offer'];
+                    showToast('Fast delivery offer removed', 'info');
                   } else {
-                    if (deliveryType !== 'batch') {
+                    if (deliveryType !== 'fast') {
                       showAlert({
-                        title: 'Batch Only Offer',
-                        message: 'This offer is only available for Batch Delivery. Please switch your delivery type first.',
+                        title: 'Fast Only Offer',
+                        message: 'This offer is only available for Fast Delivery. Please switch your delivery type first.',
                         type: 'warning'
                       });
                       return;
                     }
 
-                    if (subtotal < 29) {
+                    if (subtotal < 149) {
                       showAlert({
                         title: 'Min. Order Not Met',
-                        message: 'App offer requires a minimum order of ₹29.',
+                        message: 'Free fast delivery requires a minimum order of ₹149.',
                         type: 'warning'
                       });
                       return;
@@ -1773,28 +1807,113 @@ export const CartScreen = ({ navigation }: any) => {
                       return;
                     }
 
-                    newOffers['app_offer'] = {
-                      id: 'app_free_delivery',
-                      name: 'App Offer',
+                    // Remove other app offer if active
+                    delete newOffers['app_batch_offer'];
+
+                    newOffers['app_fast_offer'] = {
+                      id: 'app_fast_delivery',
+                      name: 'Free Fast Delivery',
                       type: 'free_delivery' as any,
                       amount: 0,
-                      conditions: { min_price: 29, max_distance: 1 },
+                      conditions: { min_price: 149, max_distance: 1 },
                       status: 'active',
                       store_id: 'platform',
                       created_at: new Date().toISOString()
                     };
-                    showToast('App offer applied!', 'success');
+                    showToast('Fast delivery offer applied!', 'success');
                   }
                   setAppliedOffers(newOffers);
                 }}
               >
-                <Text style={[styles.appOfferBtnText, appliedOffers['app_offer'] && styles.appOfferRemoveBtnText]}>
-                  {appliedOffers['app_offer'] ? 'Remove' : 'Add'}
+                <Text style={[styles.appOfferBtnText, appliedOffers['app_fast_offer'] && styles.appOfferRemoveBtnText]}>
+                  {appliedOffers['app_fast_offer'] ? 'Remove' : 'Add'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Free Batch Delivery Offer */}
+          <View style={[styles.appOfferCard, appliedOffers['app_batch_offer'] && styles.appOfferCardActive]}>
+            <View style={styles.appOfferHeader}>
+              <View style={[styles.appOfferIconBox, appliedOffers['app_batch_offer'] && { backgroundColor: '#d0e4ff' }]}>
+                <Icon name="truck-delivery" size={24} color={Colors.primary} />
+              </View>
+              <View style={styles.appOfferInfo}>
+                <Text style={styles.appOfferTitle}>Free Batch Delivery</Text>
+                <Text style={styles.appOfferDesc}>Free batch delivery above ₹49</Text>
+              </View>
+              <TouchableOpacity 
+                style={[styles.appOfferBtn, appliedOffers['app_batch_offer'] ? styles.appOfferRemoveBtn : styles.appOfferAddBtn]}
+                onPress={() => {
+                  const newOffers = { ...appliedOffers };
+                  if (appliedOffers['app_batch_offer']) {
+                    delete newOffers['app_batch_offer'];
+                    showToast('Batch delivery offer removed', 'info');
+                  } else {
+                    if (deliveryType !== 'batch') {
+                      showAlert({
+                        title: 'Batch Only Offer',
+                        message: 'This offer is only available for Batch Delivery. Please switch your delivery type first.',
+                        type: 'warning'
+                      });
+                      return;
+                    }
+
+                    if (subtotal < 49) {
+                      showAlert({
+                        title: 'Min. Order Not Met',
+                        message: 'Free batch delivery requires a minimum order of ₹49.',
+                        type: 'warning'
+                      });
+                      return;
+                    }
+
+                    if (isLargeVehicle) {
+                      showAlert({
+                        title: 'Bike Only Offer',
+                        message: 'Only applicable for bike deliveries',
+                        type: 'warning'
+                      });
+                      return;
+                    }
+
+                    const distances = Object.values(storeDistances);
+                    const isTooFar = distances.some(d => d >= 1);
+                    if (isTooFar || distances.length === 0) {
+                      showAlert({
+                        title: 'Distance Restriction',
+                        message: 'Only applicable for shops under 1km distance from delivery location',
+                        type: 'warning'
+                      });
+                      return;
+                    }
+
+                    // Remove other app offer if active
+                    delete newOffers['app_fast_offer'];
+
+                    newOffers['app_batch_offer'] = {
+                      id: 'app_free_delivery',
+                      name: 'Free Batch Delivery',
+                      type: 'free_delivery' as any,
+                      amount: 0,
+                      conditions: { min_price: 49, max_distance: 1 },
+                      status: 'active',
+                      store_id: 'platform',
+                      created_at: new Date().toISOString()
+                    };
+                    showToast('Batch delivery offer applied!', 'success');
+                  }
+                  setAppliedOffers(newOffers);
+                }}
+              >
+                <Text style={[styles.appOfferBtnText, appliedOffers['app_batch_offer'] && styles.appOfferRemoveBtnText]}>
+                  {appliedOffers['app_batch_offer'] ? 'Remove' : 'Add'}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
+      </View>
 
         <View style={styles.addressSection}>
           <Text style={styles.sectionTitle}>Delivery Address</Text>
@@ -3046,6 +3165,9 @@ const styles = StyleSheet.create({
   appOfferSection: {
     marginTop: Spacing.sm,
     marginBottom: Spacing.lg,
+  },
+  appOfferContainer: {
+    gap: 12,
   },
   appOfferCard: {
     backgroundColor: Colors.white,
