@@ -1395,7 +1395,7 @@ export const CartScreen = ({ navigation }: any) => {
     });
 
     const dFee = isAppOfferActive ? 0 : Math.max(0, actualTravelFee - totalStoreSponsorship);
-    const rFee = Math.max(actualTravelFee, totalStoreSponsorship);
+    const rFee = isAppOfferActive ? totalStoreSponsorship : Math.max(actualTravelFee, totalStoreSponsorship);
     
     const baseGTotal = subtotal + actualTravelFee + pFee + hFee;
     const gTotal = Math.max(0, subtotal + dFee + pFee + hFee - totalOfferDisc);
