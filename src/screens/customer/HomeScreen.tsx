@@ -113,6 +113,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const [hasMoreSuggestions, setHasMoreSuggestions] = useState(true);
   const [rankedBoughtIds, setRankedBoughtIds] = useState<string[]>([]);
   const [allTimeBoughtIds, setAllTimeBoughtIds] = useState<Set<string>>(new Set());
+  const [historyIdentities, setHistoryIdentities] = useState<any>(null);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
@@ -355,44 +356,66 @@ export const HomeScreen = ({ navigation }: any) => {
       setBestSellersLoading(true);
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // Get top 10 products sold in last 24h
+      // Get top identities sold in last 24h
       const { data: recentSales, error: salesError } = await supabase
         .from('order_items')
-        .select('product_id, quantity, orders!inner(created_at, status)')
+        .select('product_id, products(barcode, master_product_id, product_type), quantity, orders!inner(created_at, status)')
         .gte('orders.created_at', twentyFourHoursAgo)
         .neq('orders.status', 'cancelled');
 
       if (salesError) throw salesError;
 
-      const salesMap = new Map<string, number>();
+      const identitySalesMap = new Map<string, number>();
       recentSales?.forEach((item: any) => {
-        salesMap.set(item.product_id, (salesMap.get(item.product_id) || 0) + item.quantity);
+        let key = `id_${item.product_id}`;
+        if (item.products?.product_type === 'barcode' && item.products.barcode) {
+          key = `barcode_${item.products.barcode}`;
+        } else if (item.products?.product_type === 'common' && item.products.master_product_id) {
+          key = `master_${item.products.master_product_id}`;
+        }
+        identitySalesMap.set(key, (identitySalesMap.get(key) || 0) + item.quantity);
       });
 
-      const topProductIds = Array.from(salesMap.entries())
+      const topIdentities = Array.from(identitySalesMap.entries())
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([id]) => id);
 
-      let baseQuery = supabase
-        .from('products')
-        .select('*, stores:stores_view!inner(*)')
-        .eq('stores.is_active', true)
-        .eq('stores.is_approved', true)
-        .eq('is_deleted', false)
-        .eq('is_info_complete', true)
-        .eq('in_stock', true);
-
       let productData: any[] = [];
       
-      if (topProductIds.length > 0) {
-        const { data: topProducts } = await baseQuery.in('id', topProductIds);
-        productData = topProducts || [];
+      if (topIdentities.length > 0) {
+        // Build query for top identities
+        const ids = topIdentities.filter(id => id.startsWith('id_')).map(id => id.replace('id_', ''));
+        const barcodes = topIdentities.filter(id => id.startsWith('barcode_')).map(id => id.replace('barcode_', ''));
+        const masterIds = topIdentities.filter(id => id.startsWith('master_')).map(id => id.replace('master_', ''));
+
+        let query = supabase
+          .from('products')
+          .select('*, stores:stores_view!inner(*)')
+          .eq('stores.is_active', true)
+          .eq('stores.is_approved', true)
+          .eq('is_deleted', false)
+          .eq('is_info_complete', true)
+          .eq('in_stock', true);
+
+        // This is a bit complex for a single query, so we'll use OR logic
+        const orConditions = [];
+        if (ids.length > 0) orConditions.push(`id.in.(${ids.join(',')})`);
+        if (barcodes.length > 0) orConditions.push(`barcode.in.(${barcodes.join(',')})`);
+        if (masterIds.length > 0) orConditions.push(`master_product_id.in.(${masterIds.join(',')})`);
+
+        if (orConditions.length > 0) {
+          const { data: topProducts } = await query.or(orConditions.join(','));
+          productData = topProducts || [];
+        }
       }
 
-      // If less than 10, fill with latest products
-      if (productData.length < 10) {
-        const excludeIds = productData.map(p => p.id).filter(id => !!id);
+      // If less than 10 unique identities after deduplication, fill with latest products
+      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
+      let processed = deduplicateProducts(productData, userCoords);
+
+      if (processed.length < 10) {
+        const excludeIds = processed.map(p => p.id).filter(id => !!id);
         let fallbackQuery = supabase
           .from('products')
           .select('*, stores:stores_view!inner(*)')
@@ -402,7 +425,7 @@ export const HomeScreen = ({ navigation }: any) => {
           .eq('is_info_complete', true)
           .eq('in_stock', true)
           .order('created_at', { ascending: false })
-          .limit(10 - productData.length);
+          .limit(15); // Fetch a few more to allow for deduplication
         
         if (excludeIds.length > 0) {
           fallbackQuery = fallbackQuery.not('id', 'in', `(${excludeIds.join(',')})`);
@@ -410,12 +433,11 @@ export const HomeScreen = ({ navigation }: any) => {
         
         const { data: fallbackData } = await fallbackQuery;
         if (fallbackData) {
-          productData = [...productData, ...fallbackData];
+          processed = [...processed, ...deduplicateProducts(fallbackData, userCoords)];
         }
       }
 
-      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
-      setBestSellers(deduplicateProducts(productData, userCoords).slice(0, 10));
+      setBestSellers(processed.slice(0, 10));
     } catch (e) {
       // Silent
     } finally {
@@ -429,15 +451,21 @@ export const HomeScreen = ({ navigation }: any) => {
     try {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Fetch all-time bought products
+      // Fetch all-time bought products with identity info
       const { data: allTimeData } = await supabase
         .from('order_items')
-        .select('product_id, orders!inner(customer_id, status)')
+        .select('product_id, products(barcode, master_product_id), orders!inner(customer_id, status)')
         .eq('orders.customer_id', user.id)
         .neq('orders.status', 'cancelled')
         .eq('is_removed', false);
 
       const allTimeSet = new Set((allTimeData || []).map((item: any) => item.product_id).filter(Boolean));
+      
+      const historyIdentities = {
+        productIds: allTimeSet,
+        barcodes: new Set((allTimeData || []).map((item: any) => item.products?.barcode).filter(Boolean)),
+        masterIds: new Set((allTimeData || []).map((item: any) => item.products?.master_product_id).filter(Boolean))
+      };
 
       // Fetch last 7 days bought products with quantity for ranking
       const { data: recentData } = await supabase
@@ -465,9 +493,9 @@ export const HomeScreen = ({ navigation }: any) => {
       // Optionally sort these by all-time quantity too, but for now we'll just append them
       const finalRankedIds = [...rankedIds, ...otherBoughtIds];
 
-      return { rankedIds: finalRankedIds, allTimeSet };
+      return { rankedIds: finalRankedIds, allTimeSet, historyIdentities };
     } catch (e) {
-      return { rankedIds: [], allTimeSet: new Set<string>() };
+      return { rankedIds: [], allTimeSet: new Set<string>(), historyIdentities: { productIds: new Set(), barcodes: new Set(), masterIds: new Set() } };
     }
   };
 
@@ -475,23 +503,27 @@ export const HomeScreen = ({ navigation }: any) => {
     setSuggestionsPage(0);
     setHasMoreSuggestions(true);
     // DO NOT clear suggestions here to avoid image flickering
-    const { rankedIds } = await fetchUserHistory();
+    const { rankedIds, historyIdentities } = await fetchUserHistory();
     setRankedBoughtIds(rankedIds);
-    fetchSuggestions(0, rankedIds);
+    setHistoryIdentities(historyIdentities);
+    fetchSuggestions(0, rankedIds, historyIdentities);
   };
 
-  const fetchSuggestions = async (page: number, currentRankedIds?: string[]) => {
+  const fetchSuggestions = async (page: number, currentRankedIds?: string[], currentHistoryIdentities?: any) => {
     try {
       if (page === 0) setSuggestionsLoading(true);
       else setIsMoreSuggestionsLoading(true);
 
       const activeRankedIds = currentRankedIds || rankedBoughtIds;
+      const activeHistoryIdentities = currentHistoryIdentities || historyIdentities;
       const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
 
       const PAGE_SIZE = 15;
       const offset = page * PAGE_SIZE;
 
       // Simple approach: Fetch products, and sort them in memory if they match user history
+      // Fetch products. We increase the limit on page 0 to ensure we have enough candidates for deduplication
+      const FETCH_PAGE_SIZE = page === 0 ? 50 : PAGE_SIZE;
       const { data: products, error } = await supabase
         .from('products')
         .select('*, stores:stores_view!inner(*)')
@@ -500,14 +532,36 @@ export const HomeScreen = ({ navigation }: any) => {
         .eq('is_deleted', false)
         .eq('is_info_complete', true)
         .eq('in_stock', true)
-        .range(offset, offset + PAGE_SIZE - 1);
+        .range(offset, offset + FETCH_PAGE_SIZE - 1);
 
       if (error) throw error;
 
       let processed = deduplicateProducts(products || [], userCoords);
 
-      // Sort by user's 7-day history
-      if (activeRankedIds.length > 0) {
+      // Sort by identity-based history (Ranked if ID, Barcode, or Master ID matches)
+      if (activeHistoryIdentities) {
+        processed.sort((a, b) => {
+          const isRankedA = activeHistoryIdentities.productIds.has(a.id) || 
+                           (a.barcode && activeHistoryIdentities.barcodes.has(a.barcode)) || 
+                           (a.master_product_id && activeHistoryIdentities.masterIds.has(a.master_product_id));
+          
+          const isRankedB = activeHistoryIdentities.productIds.has(b.id) || 
+                           (b.barcode && activeHistoryIdentities.barcodes.has(b.barcode)) || 
+                           (b.master_product_id && activeHistoryIdentities.masterIds.has(b.master_product_id));
+          
+          if (isRankedA && !isRankedB) return -1;
+          if (!isRankedA && isRankedB) return 1;
+          
+          // If both or neither are ranked, sort by proximity for the "suggested" feel
+          const storeLocA = a.stores?.location ? parseWKT(a.stores.location) : null;
+          const storeLocB = b.stores?.location ? parseWKT(b.stores.location) : null;
+          const distA = (userCoords && storeLocA) ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLocA.lat, storeLocA.lng) : Infinity;
+          const distB = (userCoords && storeLocB) ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLocB.lat, storeLocB.lng) : Infinity;
+          
+          return distA - distB;
+        });
+      } else if (activeRankedIds.length > 0) {
+        // Fallback for subsequent pages where we might only have IDs
         processed.sort((a, b) => {
           const indexA = activeRankedIds.indexOf(a.id);
           const indexB = activeRankedIds.indexOf(b.id);

@@ -59,8 +59,10 @@ export const deduplicateProducts = (products: any[], userLocation?: { lat: numbe
     // 1. Determine the deduplication key
     let key = product.id; // Default: No deduplication (Personal)
     
-    if (product.product_type === 'common' && product.master_product_id) {
-      key = `master_${product.master_product_id}`;
+    if (product.product_type === 'common') {
+      key = product.master_product_id 
+        ? `master_${product.master_product_id}` 
+        : `common_${(product.name || '').toLowerCase()}_${product.weight_kg || 0}`;
     } else if (product.product_type === 'barcode' && product.barcode) {
       key = `barcode_${product.barcode}`;
     } else if (product.product_type === 'personal') {

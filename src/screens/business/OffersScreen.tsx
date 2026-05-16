@@ -732,7 +732,7 @@ export const OffersScreen = ({ navigation }: any) => {
               </View>
 
               <Button 
-                title="Create Offer" 
+                title={editingOffer ? "Edit Offer" : "Create Offer"} 
                 onPress={saveOffer} 
                 loading={formLoading} 
                 style={styles.saveBtn} 

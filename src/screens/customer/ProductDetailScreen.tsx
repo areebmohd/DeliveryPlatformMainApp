@@ -299,6 +299,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
             );
           })()}
 
+          <Text style={styles.sectionTitle}>Shop</Text>
           <TouchableOpacity 
             activeOpacity={0.7}
             onPress={() => currentStore && navigation.navigate('StoreDetails', { store: currentStore })}
@@ -518,12 +519,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: '500',
     marginBottom: Spacing.md,
-  },
-  storeNameText: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-    marginBottom: Spacing.lg,
   },
   storeLinkText: {
     fontSize: 15,
