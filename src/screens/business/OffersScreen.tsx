@@ -183,12 +183,12 @@ export const OffersScreen = ({ navigation }: any) => {
   };
 
   const selectType = (type: OfferType) => {
-    // Check if store already has an offer of this type
-    const existingOffer = offers.find(o => o.type === type);
-    if (existingOffer) {
+    // Check if store already has 5 offers of this type
+    const typeOffers = offers.filter(o => o.type === type);
+    if (typeOffers.length >= 5) {
       showAlert({
         title: 'Limit Reached',
-        message: `You already have a ${type.replace('_', ' ')} offer. Please delete the existing one before creating a new one of same type.`,
+        message: `You already have 5 ${type.replace('_', ' ')} offers. Please delete an existing one before creating a new one of same type.`,
         type: 'warning'
       });
       return;
