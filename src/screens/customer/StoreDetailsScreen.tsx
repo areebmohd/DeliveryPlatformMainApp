@@ -42,13 +42,7 @@ const formatOpeningHours = (hoursJson: string) => {
 
 const StoreHeaderSection = React.memo(({ 
   store, 
-  activeTab, 
-  setActiveTab, 
-  isFavourite, 
-  favLoading, 
-  toggleFavourite,
   distance,
-  insets
 }: any) => {
   return (
     <View>
@@ -88,50 +82,57 @@ const StoreHeaderSection = React.memo(({
           <Text style={styles.closedText}>Store is currently closed for online orders</Text>
         </View>
       )}
+    </View>
+  );
+});
 
-      <View style={styles.tabWrapper}>
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'products' && styles.activeTab]}
-            onPress={() => setActiveTab('products')}
-          >
-            <Icon
-              name="package-variant-closed"
-              size={20}
-              color={activeTab === 'products' ? Colors.white : Colors.primary}
-            />
-            <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
-              Products
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'offers' && styles.activeTab]}
-            onPress={() => setActiveTab('offers')}
-          >
-            <Icon
-              name={activeTab === 'offers' ? 'tag' : 'tag-outline'}
-              size={20}
-              color={activeTab === 'offers' ? Colors.white : Colors.primary}
-            />
-            <Text style={[styles.tabText, activeTab === 'offers' && styles.activeTabText]}>
-              Offers
-            </Text>
-          </TouchableOpacity>
+const StoreTabs = React.memo(({ 
+  activeTab, 
+  setActiveTab 
+}: any) => {
+  return (
+    <View style={styles.tabWrapper}>
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'products' && styles.activeTab]}
+          onPress={() => setActiveTab('products')}
+        >
+          <Icon
+            name="package-variant-closed"
+            size={20}
+            color={activeTab === 'products' ? Colors.white : Colors.primary}
+          />
+          <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
+            Products
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'offers' && styles.activeTab]}
+          onPress={() => setActiveTab('offers')}
+        >
+          <Icon
+            name={activeTab === 'offers' ? 'tag' : 'tag-outline'}
+            size={20}
+            color={activeTab === 'offers' ? Colors.white : Colors.primary}
+          />
+          <Text style={[styles.tabText, activeTab === 'offers' && styles.activeTabText]}>
+            Offers
+          </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'info' && styles.activeTab]}
-            onPress={() => setActiveTab('info')}
-          >
-            <Icon
-              name={activeTab === 'info' ? 'information' : 'information-outline'}
-              size={20}
-              color={activeTab === 'info' ? Colors.white : Colors.primary}
-            />
-            <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>
-              Info
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'info' && styles.activeTab]}
+          onPress={() => setActiveTab('info')}
+        >
+          <Icon
+            name={activeTab === 'info' ? 'information' : 'information-outline'}
+            size={20}
+            color={activeTab === 'info' ? Colors.white : Colors.primary}
+          />
+          <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>
+            Info
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -297,6 +298,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   }, [sessionAddress, store, profile]);
 
   useEffect(() => {
+    fetchProducts();
     fetchStoreOffers();
     checkFavourite();
     fetchFavouriteOfferIds();
@@ -609,7 +611,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
       <ScrollView 
         stickyHeaderIndices={[1]}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: totalItems > 0 ? 120 : insets.bottom + 20 }}
+        contentContainerStyle={{ paddingBottom: totalItems > 0 ? 180 : insets.bottom + 100 }}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -621,13 +623,12 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
       >
         <StoreHeaderSection
           store={store}
+          distance={distance}
+        />
+
+        <StoreTabs
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          isFavourite={isFavourite}
-          favLoading={favLoading}
-          toggleFavourite={toggleFavourite}
-          distance={distance}
-          insets={insets}
         />
 
         <View style={styles.tabContent}>

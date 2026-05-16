@@ -243,8 +243,8 @@ const BillingSection = React.memo(({
   isLargeVehicle,
   distance,
   deliveryFee,
-  baseDeliveryFee,
-  totalStoreFees,
+  actualTravelFee,
+  totalStoreSponsorship,
   isAppOfferActive,
   hasHelper,
   setHasHelper,
@@ -283,14 +283,14 @@ const BillingSection = React.memo(({
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text style={styles.billValue}>₹{deliveryFee.toFixed(2)}</Text>
-            {(totalStoreFees > 0 || isAppOfferActive) && deliveryFee < baseDeliveryFee && (
-              <Text style={styles.originalTotalText}>₹{baseDeliveryFee.toFixed(2)}</Text>
+            {(totalStoreSponsorship > 0 || isAppOfferActive) && deliveryFee < actualTravelFee && (
+              <Text style={styles.originalTotalText}>₹{actualTravelFee.toFixed(2)}</Text>
             )}
           </View>
         </View>
-        {totalStoreFees > 0 && deliveryFee > 0 && (
+        {totalStoreSponsorship > 0 && deliveryFee > 0 && (
           <Text style={styles.deliveryDisclaimer}>
-            This delivery fee is only from store not having Free Delivery offer.
+            This delivery fee is adjusted based on store-sponsored free delivery offers.
           </Text>
         )}
 
@@ -509,8 +509,6 @@ export const CartScreen = ({ navigation }: any) => {
   const [lastAutoAppliedId, setLastAutoAppliedId] = useState<string | null>(null);
   const [storeDistances, setStoreDistances] = useState<Record<string, number>>({});
   const [manuallyRemovedStores, setManuallyRemovedStores] = useState<string[]>([]);
-  const [storeDeliveryFees, setStoreDeliveryFees] = useState<Record<string, number>>({});
-  const [totalStoreFees, setTotalStoreFees] = useState(0);
   const [offerProductDetails, setOfferProductDetails] = useState<Record<string, any>>({});
   const [sortedStoreList, setSortedStoreList] = useState<any[]>([]);
   const [deliveryType, setDeliveryType] = useState<'fast' | 'batch'>('fast');
@@ -1314,27 +1312,27 @@ export const CartScreen = ({ navigation }: any) => {
 
   const billingData = React.useMemo(() => {
     const pFee = subtotal < 500 ? 5 : (subtotal <= 1000 ? 10 : 20);
-    const baseDFee = items.length === 0 ? 0 : (
+    const actualTravelFee = items.length === 0 ? 0 : (
       isLargeVehicle 
-        ? 300 + Math.max(0, distance - 1) * 30
-        : 30 + Math.max(0, distance - 1) * 10
+        ? 300 + Math.ceil(Math.max(0, distance - 1)) * 30
+        : 30 + Math.ceil(Math.max(0, distance - 1)) * 10
     );
     const hFee = hasHelper ? 300 : 0;
     
     let totalOfferDisc = 0;
     let storeContribs: Record<string, number> = {};
-    let totalStoreContrib = 0;
+    let totalStoreSponsorship = 0;
 
     Object.values(appliedOffers).forEach(offer => {
       let offerDiscount = 0;
       if (offer.type === 'free_delivery') {
         const dist = storeDistances[offer.store_id] || 0;
         const storeFee = isLargeVehicle 
-          ? 300 + Math.max(0, dist - 1) * 30
-          : 30 + Math.max(0, dist - 1) * 10;
+          ? 300 + Math.ceil(Math.max(0, dist - 1)) * 30
+          : 30 + Math.ceil(Math.max(0, dist - 1)) * 10;
         
         storeContribs[offer.store_id] = storeFee;
-        totalStoreContrib += storeFee;
+        totalStoreSponsorship += storeFee;
       } else if (offer.type === 'free_cash') {
         offerDiscount = offer.amount;
       } else if (offer.type === 'discount') {
@@ -1396,54 +1394,37 @@ export const CartScreen = ({ navigation }: any) => {
       totalOfferDisc += offerDiscount;
     });
 
-    let extraDist = 0;
-    const firstFreeIdx = sortedStoreList.findIndex(s => !!appliedOffers[`${s.id}_delivery`]);
-
-    if (firstFreeIdx === -1) {
-      extraDist = distance;
-    } else if (firstFreeIdx === 0) {
-      extraDist = 0;
-    } else {
-      for (let i = 0; i < firstFreeIdx; i++) {
-        const current = sortedStoreList[i];
-        const next = sortedStoreList[i+1];
-        if (current && next) {
-          extraDist += getHaversineDistance(current.lat, current.lng, next.lat, next.lng);
-        }
-      }
-    }
-
-    const pf = isLargeVehicle ? 300 : 30;
-    const kr = isLargeVehicle ? 30 : 10;
-    const extraDFee = extraDist > 0 ? (pf + Math.max(0, extraDist - 1) * kr) : 0;
-    const dFee = isAppOfferActive ? 0 : extraDFee;
+    const dFee = isAppOfferActive ? 0 : Math.max(0, actualTravelFee - totalStoreSponsorship);
+    const rFee = Math.max(actualTravelFee, totalStoreSponsorship);
     
-    const baseGTotal = subtotal + baseDFee + pFee + hFee;
+    const baseGTotal = subtotal + actualTravelFee + pFee + hFee;
     const gTotal = Math.max(0, subtotal + dFee + pFee + hFee - totalOfferDisc);
 
     return {
       platformFee: pFee,
-      baseDeliveryFee: baseDFee,
+      actualTravelFee,
       helperFee: hFee,
       baseGrandTotal: baseGTotal,
       totalOfferDiscount: totalOfferDisc,
       deliveryFee: dFee,
+      riderDeliveryFee: rFee,
       grandTotal: gTotal,
       storeContributions: storeContribs,
-      totalStoreContribution: totalStoreContrib
+      totalStoreSponsorship
     };
   }, [subtotal, items, isLargeVehicle, distance, hasHelper, appliedOffers, storeDistances, offerProductDetails, sortedStoreList, isAppOfferActive]);
 
   const {
     platformFee,
-    baseDeliveryFee,
+    actualTravelFee,
     helperFee,
     baseGrandTotal,
     totalOfferDiscount,
     deliveryFee,
+    riderDeliveryFee,
     grandTotal,
     storeContributions,
-    totalStoreContribution
+    totalStoreSponsorship
   } = billingData;
 
   const handleCheckout = async () => {
@@ -1596,7 +1577,7 @@ export const CartScreen = ({ navigation }: any) => {
           subtotal: subtotal,
           total_amount: grandTotal, 
           delivery_fee: deliveryFee,
-          rider_delivery_fee: isAppOfferActive ? totalStoreContribution : (deliveryFee + totalStoreContribution),
+          rider_delivery_fee: riderDeliveryFee,
           platform_fee: platformFee,
           status: 'waiting_for_pickup',
           payment_method: paymentMethod,
@@ -1608,8 +1589,8 @@ export const CartScreen = ({ navigation }: any) => {
           has_helper: hasHelper,
           helper_fee: helperFee,
           applied_offers: appliedOffers,
-          total_store_delivery_fees: totalStoreFees,
-          store_delivery_fees: storeDeliveryFees,
+          total_store_delivery_fees: totalStoreSponsorship,
+          store_delivery_fees: storeContributions,
           ready_at: readyAt,
           delivery_type: deliveryType,
           delivery_slot: deliverySlot
@@ -1958,8 +1939,8 @@ export const CartScreen = ({ navigation }: any) => {
           isLargeVehicle={isLargeVehicle}
           distance={distance}
           deliveryFee={deliveryFee}
-          baseDeliveryFee={baseDeliveryFee}
-          totalStoreFees={totalStoreFees}
+          actualTravelFee={actualTravelFee}
+          totalStoreSponsorship={totalStoreSponsorship}
           isAppOfferActive={isAppOfferActive}
           hasHelper={hasHelper}
           setHasHelper={setHasHelper}
@@ -2002,7 +1983,7 @@ export const CartScreen = ({ navigation }: any) => {
         <View style={styles.checkoutInfo}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={styles.checkoutTotal}>₹{grandTotal.toFixed(2)}</Text>
-            {(totalOfferDiscount > 0 || totalStoreFees > 0) && (
+            {(totalOfferDiscount > 0 || totalStoreSponsorship > 0) && (
               <Text style={[styles.originalTotalText, { marginBottom: 0 }]}>₹{baseGrandTotal.toFixed(2)}</Text>
             )}
           </View>
