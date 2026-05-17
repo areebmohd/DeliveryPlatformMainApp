@@ -1105,20 +1105,16 @@ export const CartScreen = ({ navigation }: any) => {
 
     try {
       let totalWeight = 0;
-      let oversized = false;
       let forcedLarge = false;
 
       items.forEach(item => {
         totalWeight += (item.weight_kg || 0) * item.quantity;
-        if (item.length_cm > 40 || item.width_cm > 40 || item.height_cm > 40) {
-          oversized = true;
-        }
         if (item.needs_large_vehicle) {
           forcedLarge = true;
         }
       });
 
-      const needsLarge = totalWeight > 20 || oversized || forcedLarge;
+      const needsLarge = totalWeight > 20 || forcedLarge;
       setIsLargeVehicle(needsLarge);
       if (!needsLarge) setHasHelper(false);
 
