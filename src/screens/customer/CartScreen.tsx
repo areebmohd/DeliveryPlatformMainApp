@@ -1319,9 +1319,19 @@ export const CartScreen = ({ navigation }: any) => {
     );
     const hFee = hasHelper ? 300 : 0;
     
-    let totalOfferDisc = 0;
     let storeContribs: Record<string, number> = {};
     let totalStoreSponsorship = 0;
+
+    // Identify unique stores in cart and their subtotals
+    const storesInCart = [...new Set(items.map(item => item.store_id))];
+    const storeSubtotals: Record<string, number> = {};
+    const storeDiscounts: Record<string, number> = {};
+
+    storesInCart.forEach(storeId => {
+      const storeItems = items.filter(i => i.store_id === storeId);
+      storeSubtotals[storeId] = storeItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+      storeDiscounts[storeId] = 0;
+    });
 
     Object.values(appliedOffers).forEach(offer => {
       let offerDiscount = 0;
@@ -1333,65 +1343,83 @@ export const CartScreen = ({ navigation }: any) => {
         
         storeContribs[offer.store_id] = storeFee;
         totalStoreSponsorship += storeFee;
-      } else if (offer.type === 'free_cash') {
-        offerDiscount = offer.amount;
-      } else if (offer.type === 'discount') {
-        const eligibleItems = items.filter(i => {
-          if (i.store_id === offer.store_id) return true;
-          if (!i.is_store_specific) return true;
-          return false;
-        });
-        const storeSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-        offerDiscount = (storeSubtotal * offer.amount) / 100;
-      } else if (offer.type === 'cheap_product') {
-        const eligibleItems = items.filter(item => {
-          const productIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
-          if (productIds.includes(item.id)) return true;
-          const hasEquivalent = productIds.some((pid: string) => {
-            const rp = offerProductDetails[pid];
-            if (!rp) return false;
-            if (item.is_store_specific || item.product_type === 'personal') return false;
-            if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-            return item.name === rp.name && item.weight_kg === rp.weight_kg;
+      } else {
+        const storeId = offer.store_id;
+        if (!storeId || !storesInCart.includes(storeId)) return;
+
+        const storeItems = items.filter(i => i.store_id === storeId);
+        const storeSubtotal = storeSubtotals[storeId] || 0;
+
+        if (offer.type === 'free_cash') {
+          offerDiscount = offer.amount;
+        } else if (offer.type === 'discount') {
+          const eligibleItems = items.filter(i => {
+            if (i.store_id === offer.store_id) return true;
+            if (!i.is_store_specific) return true;
+            return false;
           });
-          return hasEquivalent;
-        });
-        const eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-        offerDiscount = (eligibleSubtotal * offer.amount) / 100;
-      } else if (offer.type === 'combo') {
-        const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
-        const comboItems = items.filter(item => {
-          if (rewardIds.includes(item.id)) return true;
-          const hasEquivalent = rewardIds.some((pid: string) => {
-            const rp = offerProductDetails[pid];
-            if (!rp) return false;
-            if (item.is_store_specific || item.product_type === 'personal') return false;
-            if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-            return item.name === rp.name && item.weight_kg === rp.weight_kg;
+          const eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+          offerDiscount = (eligibleSubtotal * offer.amount) / 100;
+        } else if (offer.type === 'cheap_product') {
+          const eligibleItems = items.filter(item => {
+            const productIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
+            if (productIds.includes(item.id)) return true;
+            const hasEquivalent = productIds.some((pid: string) => {
+              const rp = offerProductDetails[pid];
+              if (!rp) return false;
+              if (item.is_store_specific || item.product_type === 'personal') return false;
+              if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+              return item.name === rp.name && item.weight_kg === rp.weight_kg;
+            });
+            return hasEquivalent;
           });
-          return hasEquivalent;
-        });
-        const comboSubtotal = comboItems.reduce((sum, i) => sum + i.price, 0);
-        offerDiscount = Math.max(0, comboSubtotal - offer.amount);
-      } else if (offer.type === 'fixed_price') {
-        const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
-        const eligibleItems = items.filter(item => {
-          if (rewardIds.includes(item.id)) return true;
-          const hasEquivalent = rewardIds.some((pid: string) => {
-            const rp = offerProductDetails[pid];
-            if (!rp) return false;
-            if (item.is_store_specific || item.product_type === 'personal') return false;
-            if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-            return item.name === rp.name && item.weight_kg === rp.weight_kg;
+          const eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+          offerDiscount = (eligibleSubtotal * offer.amount) / 100;
+        } else if (offer.type === 'combo') {
+          const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
+          const comboItems = items.filter(item => {
+            if (rewardIds.includes(item.id)) return true;
+            const hasEquivalent = rewardIds.some((pid: string) => {
+              const rp = offerProductDetails[pid];
+              if (!rp) return false;
+              if (item.is_store_specific || item.product_type === 'personal') return false;
+              if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+              return item.name === rp.name && item.weight_kg === rp.weight_kg;
+            });
+            return hasEquivalent;
           });
-          return hasEquivalent;
-        });
-        offerDiscount = eligibleItems.reduce((sum, item) => {
-          const diff = item.price - offer.amount;
-          return sum + (diff > 0 ? diff * item.quantity : 0);
-        }, 0);
+          const comboSubtotal = comboItems.reduce((sum, i) => sum + i.price, 0);
+          offerDiscount = Math.max(0, comboSubtotal - offer.amount);
+        } else if (offer.type === 'fixed_price') {
+          const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
+          const eligibleItems = items.filter(item => {
+            if (rewardIds.includes(item.id)) return true;
+            const hasEquivalent = rewardIds.some((pid: string) => {
+              const rp = offerProductDetails[pid];
+              if (!rp) return false;
+              if (item.is_store_specific || item.product_type === 'personal') return false;
+              if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+              return item.name === rp.name && item.weight_kg === rp.weight_kg;
+            });
+            return hasEquivalent;
+          });
+          offerDiscount = eligibleItems.reduce((sum, item) => {
+            const diff = item.price - offer.amount;
+            return sum + (diff > 0 ? diff * item.quantity : 0);
+          }, 0);
+        }
+
+        storeDiscounts[storeId] = (storeDiscounts[storeId] || 0) + offerDiscount;
       }
-      totalOfferDisc += offerDiscount;
+    });
+
+    // Calculate total effective discount by capping each store's discount at its items subtotal
+    let totalOfferDisc = 0;
+    storesInCart.forEach(storeId => {
+      const sub = storeSubtotals[storeId] || 0;
+      const disc = storeDiscounts[storeId] || 0;
+      const effectiveDisc = Math.min(sub, disc);
+      totalOfferDisc += effectiveDisc;
     });
 
     const dFee = isAppOfferActive ? 0 : Math.max(0, actualTravelFee - totalStoreSponsorship);
