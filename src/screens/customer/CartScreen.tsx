@@ -12,6 +12,8 @@ import {
   Dimensions,
   Linking,
   Alert,
+  Platform,
+  NativeModules,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -514,6 +516,38 @@ export const CartScreen = ({ navigation }: any) => {
   const [deliveryType, setDeliveryType] = useState<'fast' | 'batch'>('fast');
   const [deliverySlot, setDeliverySlot] = useState<string | null>(null);
   const [slotModalVisible, setSlotModalVisible] = useState(false);
+  const [isOfferAlreadyUsedOnDevice, setIsOfferAlreadyUsedOnDevice] = useState(false);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [isCheckingOffer, setIsCheckingOffer] = useState(false);
+
+  // Fetch device ID and check if Free Fast Delivery has been used on this device
+  useEffect(() => {
+    const checkDeviceOfferStatus = async () => {
+      try {
+        if (Platform.OS === 'android') {
+          const id = await NativeModules.DeviceModule.getAndroidId();
+          setDeviceId(id);
+          
+          if (id) {
+            const { data, error } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('device_id', id)
+              .not('applied_offers->app_fast_offer', 'is', null)
+              .limit(1);
+
+            if (!error && data && data.length > 0) {
+              setIsOfferAlreadyUsedOnDevice(true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching device ID or offer status:', err);
+      }
+    };
+
+    checkDeviceOfferStatus();
+  }, []);
 
   // Background fetch for reward product details (if missing)
   useEffect(() => {
@@ -1617,6 +1651,7 @@ export const CartScreen = ({ navigation }: any) => {
           has_helper: hasHelper,
           helper_fee: helperFee,
           applied_offers: appliedOffers,
+          device_id: deviceId,
           total_store_delivery_fees: totalStoreSponsorship,
           store_delivery_fees: storeContributions,
           ready_at: readyAt,
@@ -1761,83 +1796,141 @@ export const CartScreen = ({ navigation }: any) => {
           <Text style={styles.sectionTitle}>App Offers</Text>
           <View style={styles.appOfferContainer}>
             {/* Free Fast Delivery Offer */}
-            <View style={[styles.appOfferCard, appliedOffers['app_fast_offer'] && styles.appOfferCardActive]}>
+            <View style={[
+              styles.appOfferCard, 
+              appliedOffers['app_fast_offer'] && styles.appOfferCardActive,
+              isOfferAlreadyUsedOnDevice && { opacity: 0.6, backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' }
+            ]}>
             <View style={styles.appOfferHeader}>
-              <View style={[styles.appOfferIconBox, appliedOffers['app_fast_offer'] && { backgroundColor: '#d0e4ff' }]}>
-                <Icon name="flash" size={24} color={Colors.primary} />
+              <View style={[
+                styles.appOfferIconBox, 
+                appliedOffers['app_fast_offer'] && { backgroundColor: '#d0e4ff' },
+                isOfferAlreadyUsedOnDevice && { backgroundColor: '#E2E8F0' }
+              ]}>
+                <Icon name="flash" size={24} color={isOfferAlreadyUsedOnDevice ? '#64748B' : Colors.primary} />
               </View>
               <View style={styles.appOfferInfo}>
-                <Text style={styles.appOfferTitle}>Free Fast Delivery</Text>
-                <Text style={styles.appOfferDesc}>Free fast delivery above ₹149</Text>
-              </View>
-              <TouchableOpacity 
-                style={[styles.appOfferBtn, appliedOffers['app_fast_offer'] ? styles.appOfferRemoveBtn : styles.appOfferAddBtn]}
-                onPress={() => {
-                  const newOffers = { ...appliedOffers };
-                  if (appliedOffers['app_fast_offer']) {
-                    delete newOffers['app_fast_offer'];
-                    showToast('Fast delivery offer removed', 'info');
-                  } else {
-                    if (deliveryType !== 'fast') {
-                      showAlert({
-                        title: 'Fast Only Offer',
-                        message: 'This offer is only available for Fast Delivery. Please switch your delivery type first.',
-                        type: 'warning'
-                      });
-                      return;
-                    }
-
-                    if (subtotal < 149) {
-                      showAlert({
-                        title: 'Min. Order Not Met',
-                        message: 'Free fast delivery requires a minimum order of ₹149.',
-                        type: 'warning'
-                      });
-                      return;
-                    }
-
-                    if (isLargeVehicle) {
-                      showAlert({
-                        title: 'Bike Only Offer',
-                        message: 'Only applicable for bike deliveries',
-                        type: 'warning'
-                      });
-                      return;
-                    }
-
-                    const distances = Object.values(storeDistances);
-                    const isTooFar = distances.some(d => d >= 1);
-                    if (isTooFar || distances.length === 0) {
-                      showAlert({
-                        title: 'Distance Restriction',
-                        message: 'Only applicable for shops under 1km distance from delivery location',
-                        type: 'warning'
-                      });
-                      return;
-                    }
-
-                    // Remove other app offer if active
-                    delete newOffers['app_batch_offer'];
-
-                    newOffers['app_fast_offer'] = {
-                      id: 'app_fast_delivery',
-                      name: 'Free Fast Delivery',
-                      type: 'free_delivery' as any,
-                      amount: 0,
-                      conditions: { min_price: 149, max_distance: 1 },
-                      status: 'active',
-                      store_id: 'platform',
-                      created_at: new Date().toISOString()
-                    };
-                    showToast('Fast delivery offer applied!', 'success');
-                  }
-                  setAppliedOffers(newOffers);
-                }}
-              >
-                <Text style={[styles.appOfferBtnText, appliedOffers['app_fast_offer'] && styles.appOfferRemoveBtnText]}>
-                  {appliedOffers['app_fast_offer'] ? 'Remove' : 'Add'}
+                <Text style={[
+                  styles.appOfferTitle,
+                  isOfferAlreadyUsedOnDevice && { color: '#64748B' }
+                ]}>Free Fast Delivery</Text>
+                <Text style={[
+                  styles.appOfferDesc,
+                  isOfferAlreadyUsedOnDevice && { color: '#64748B' }
+                ]}>
+                  {isOfferAlreadyUsedOnDevice ? 'Already used for this device' : 'Free fast delivery above ₹149'}
                 </Text>
-              </TouchableOpacity>
+              </View>
+              {!isOfferAlreadyUsedOnDevice && (
+                <TouchableOpacity 
+                  style={[styles.appOfferBtn, appliedOffers['app_fast_offer'] ? styles.appOfferRemoveBtn : styles.appOfferAddBtn]}
+                  disabled={isCheckingOffer}
+                  onPress={async () => {
+                    const newOffers = { ...appliedOffers };
+                    if (appliedOffers['app_fast_offer']) {
+                      delete newOffers['app_fast_offer'];
+                      showToast('Fast delivery offer removed', 'info');
+                      setAppliedOffers(newOffers);
+                    } else {
+                      if (deliveryType !== 'fast') {
+                        showAlert({
+                          title: 'Fast Only Offer',
+                          message: 'This offer is only available for Fast Delivery. Please switch your delivery type first.',
+                          type: 'warning'
+                        });
+                        return;
+                      }
+
+                      if (subtotal < 149) {
+                        showAlert({
+                          title: 'Min. Order Not Met',
+                          message: 'Free fast delivery requires a minimum order of ₹149.',
+                          type: 'warning'
+                        });
+                        return;
+                      }
+
+                      if (isLargeVehicle) {
+                        showAlert({
+                          title: 'Bike Only Offer',
+                          message: 'Only applicable for bike deliveries',
+                          type: 'warning'
+                        });
+                        return;
+                      }
+
+                      const distances = Object.values(storeDistances);
+                      const isTooFar = distances.some(d => d >= 1);
+                      if (isTooFar || distances.length === 0) {
+                        showAlert({
+                          title: 'Distance Restriction',
+                          message: 'Only applicable for shops under 1km distance from delivery location',
+                          type: 'warning'
+                        });
+                        return;
+                      }
+
+                      // Check Device ID before applying
+                      setIsCheckingOffer(true);
+                      try {
+                        let activeDeviceId = deviceId;
+                        if (!activeDeviceId && Platform.OS === 'android') {
+                          activeDeviceId = await NativeModules.DeviceModule.getAndroidId();
+                          setDeviceId(activeDeviceId);
+                        }
+
+                        if (activeDeviceId) {
+                          const { data, error } = await supabase
+                            .from('orders')
+                            .select('id')
+                            .eq('device_id', activeDeviceId)
+                            .not('applied_offers->app_fast_offer', 'is', null)
+                            .limit(1);
+
+                          if (!error && data && data.length > 0) {
+                            setIsOfferAlreadyUsedOnDevice(true);
+                            showAlert({
+                              title: 'Already Used',
+                              message: 'This offer has already been used for this device.',
+                              type: 'warning'
+                            });
+                            setIsCheckingOffer(false);
+                            return;
+                          }
+                        }
+                      } catch (err) {
+                        console.error('Error verifying offer eligibility:', err);
+                      }
+                      
+                      setIsCheckingOffer(false);
+
+                      // Remove other app offer if active
+                      delete newOffers['app_batch_offer'];
+
+                      newOffers['app_fast_offer'] = {
+                        id: 'app_fast_delivery',
+                        name: 'Free Fast Delivery',
+                        type: 'free_delivery' as any,
+                        amount: 0,
+                        conditions: { min_price: 149, max_distance: 1 },
+                        status: 'active',
+                        store_id: 'platform',
+                        created_at: new Date().toISOString()
+                      };
+                      showToast('Fast delivery offer applied!', 'success');
+                      setAppliedOffers(newOffers);
+                    }
+                  }}
+                >
+                  {isCheckingOffer ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={[styles.appOfferBtnText, appliedOffers['app_fast_offer'] && styles.appOfferRemoveBtnText]}>
+                      {appliedOffers['app_fast_offer'] ? 'Remove' : 'Add'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
