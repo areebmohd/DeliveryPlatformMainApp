@@ -138,7 +138,13 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
     setRefreshing(false);
   };
 
-  const getStatusInfo = (status: string) => {
+  const getStatusInfo = (status: string, readyAt?: string | null) => {
+    if (status === 'waiting_for_pickup' && readyAt) {
+      const isPreparing = new Date(readyAt).getTime() > Date.now();
+      if (isPreparing) {
+        return { label: 'Preparing', color: '#FF9800', icon: 'pot-steam' };
+      }
+    }
     switch (status) {
       case 'waiting_for_pickup':
         return { label: 'Waiting for Pickup', color: Colors.warning, icon: 'clock-outline' };
@@ -153,7 +159,14 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
     }
   };
 
-  const handleCancelOrder = useCallback((orderId: string, orderNumber: string) => {
+  const handleCancelOrder = useCallback((orderId: string, orderNumber: string, readyAt?: string | null) => {
+    if (readyAt) {
+      return showAlert({
+        title: 'Cancellation Policy',
+        message: 'This order contains items with preparation time and cannot be cancelled to prevent store effort and ingredient waste.',
+        type: 'warning'
+      });
+    }
     showAlert({
       title: 'Cancel Order',
       message: `Are you sure you want to cancel order #${orderNumber}?`,
@@ -166,11 +179,19 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
             // First check the latest status from server
             const { data: currentOrder } = await supabase
               .from('orders')
-              .select('status, rider_id')
+              .select('status, rider_id, ready_at')
               .eq('id', orderId)
               .single();
 
             if (currentOrder) {
+              if (currentOrder.ready_at) {
+                fetchOrders(); // Sync local state
+                return showAlert({
+                  title: 'Cannot Cancel Order',
+                  message: 'This order contains items with preparation time and cannot be cancelled.',
+                  type: 'error'
+                });
+              }
               if (currentOrder.rider_id) {
                 fetchOrders(); // Sync local state
                 return showAlert({
@@ -241,7 +262,7 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
   }, [orders, fetchOrders, showAlert]);
 
   const renderOrderItem = useCallback(({ item }: { item: any }) => {
-    const statusInfo = getStatusInfo(item.status);
+    const statusInfo = getStatusInfo(item.status, item.ready_at);
     const date = new Date(item.created_at);
     // Can cancel if status is "waiting_for_pickup" and no rider has accepted the order
     const canCancel = item.status === 'waiting_for_pickup' && !item.rider_id;
@@ -387,6 +408,20 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
           );
         })()}
 
+        {(() => {
+          const isPreparing = item.status === 'waiting_for_pickup' && item.ready_at && new Date(item.ready_at).getTime() > Date.now();
+          if (!isPreparing) return null;
+          const remainingMinutes = Math.ceil((new Date(item.ready_at).getTime() - Date.now()) / (60 * 1000));
+          return (
+            <View style={styles.preparingSection}>
+              <Icon name="pot-steam" size={18} color="#E65100" />
+              <Text style={styles.preparingText}>
+                Store is preparing your items. Ready in {remainingMinutes} min{remainingMinutes > 1 ? 's' : ''}.
+              </Text>
+            </View>
+          );
+        })()}
+
         <View style={styles.cardFooter}>
           {item.transport_type === 'heavy' && item.has_helper && (
             <View style={styles.helperRow}>
@@ -431,13 +466,22 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
           </View>
           
           {canCancel && (
-            <TouchableOpacity 
-              style={styles.cancelBtn} 
-              onPress={() => handleCancelOrder(item.id, item.order_number)}
-            >
-              <Icon name="close-circle-outline" size={18} color={Colors.error} />
-              <Text style={styles.cancelBtnText}>Cancel Order</Text>
-            </TouchableOpacity>
+            <View>
+              <TouchableOpacity 
+                style={styles.cancelBtn} 
+                onPress={() => handleCancelOrder(item.id, item.order_number, item.ready_at)}
+              >
+                <Icon name="close-circle-outline" size={18} color={Colors.error} />
+                <Text style={styles.cancelBtnText}>Cancel Order</Text>
+              </TouchableOpacity>
+              
+              {item.ready_at && (
+                <View style={styles.policyNotice}>
+                  <Icon name="information-outline" size={14} color="#64748B" />
+                  <Text style={styles.policyNoticeText}>Contains prep items. Cannot be cancelled.</Text>
+                </View>
+              )}
+            </View>
           )}
 
           {['waiting_for_pickup', 'picked_up'].includes(item.status) && (
@@ -1030,5 +1074,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.primary,
     opacity: 0.8,
+  },
+  preparingSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF9C4',
+    padding: 10,
+    borderRadius: 14,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+    gap: 8,
+  },
+  preparingText: {
+    fontSize: 13,
+    color: '#E65100',
+    fontWeight: '700',
+    flex: 1,
+  },
+  policyNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  policyNoticeText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
   },
 });

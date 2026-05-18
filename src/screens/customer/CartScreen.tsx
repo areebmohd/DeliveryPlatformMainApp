@@ -1668,9 +1668,16 @@ export const CartScreen = ({ navigation }: any) => {
         return;
       }
 
+      const maxPrepTime = Math.max(0, ...items.map(i => i.preparation_time || 0));
+      const readyTimeText = maxPrepTime > 0 
+        ? new Date(Date.now() + maxPrepTime * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '';
+
       showAlert({
         title: 'Place Order?',
-        message: `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
+        message: maxPrepTime > 0
+          ? `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?\n\n⚠️ IMPORTANT: This order has item(s) with ${maxPrepTime} minutes of preparation time. It will be ready around ${readyTimeText} and CANNOT be cancelled at all after placing.`
+          : `Are you sure you want to place this order for ₹${grandTotal.toFixed(2)}?`,
         type: 'info',
         primaryAction: {
           text: 'Place',
