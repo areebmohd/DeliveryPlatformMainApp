@@ -30,6 +30,11 @@ import { getHaversineDistance } from '../../utils/performanceUtils';
 
 const { width, height } = Dimensions.get('window');
 
+const SLOT_PICKUP_WINDOWS: Record<string, { start: string; end: string; startMins: number; endMins: number }> = {
+  '2-3 PM': { start: '1:00 PM', end: '2:00 PM', startMins: 780, endMins: 840 },
+  '8-9 PM': { start: '7:00 PM', end: '8:00 PM', startMins: 1140, endMins: 1200 },
+};
+
 const CartItemRow = React.memo(({ 
   item, 
   storeId, 
@@ -148,7 +153,7 @@ const CartItemRow = React.memo(({
 
 const DeliveryTypeSection = React.memo(({
   deliveryType,
-  setDeliveryType,
+  onSelectDeliveryType,
   isLargeVehicle,
   isBatchAllowed,
   deliverySlot,
@@ -162,8 +167,7 @@ const DeliveryTypeSection = React.memo(({
         <TouchableOpacity 
           style={[styles.deliveryTypeCard, deliveryType === 'fast' && styles.deliveryTypeCardActive]}
           onPress={() => {
-            setDeliveryType('fast');
-            setDeliverySlot(null);
+            onSelectDeliveryType('fast');
           }}
         >
           <Icon 
@@ -192,8 +196,7 @@ const DeliveryTypeSection = React.memo(({
             !isBatchAllowed && styles.deliveryTypeCardDisabled
           ]}
           onPress={() => {
-            setDeliveryType('batch');
-            if (!deliverySlot) setSlotModalVisible(true);
+            onSelectDeliveryType('batch');
           }}
         >
           <Icon 
@@ -1302,6 +1305,82 @@ export const CartScreen = ({ navigation }: any) => {
     return true;
   }, []);
 
+  const checkStoresOpenForBatchSlot = async (slot: string): Promise<{ success: boolean; closedStoreName?: string; pickupWindowText?: string }> => {
+    const windowInfo = SLOT_PICKUP_WINDOWS[slot];
+    if (!windowInfo) return { success: true };
+
+    const storesInCart = [...new Set(items.map(i => i.store_id))];
+    
+    for (const stId of storesInCart) {
+      const { data: store, error } = await supabase
+        .from('stores')
+        .select('opening_hours, name')
+        .eq('id', stId)
+        .single();
+
+      if (error || !store) continue;
+
+      if (store.opening_hours) {
+        try {
+          const slots = JSON.parse(store.opening_hours);
+          if (Array.isArray(slots) && slots.length > 0) {
+            const timeToMinutes = (timeStr: string) => {
+              const cleaned = timeStr.trim().replace(/\s+/g, ' ');
+              const [time, period] = cleaned.split(' ');
+              let [h, m] = time.split(':').map(Number);
+              if (isNaN(m)) m = 0;
+              if (period === 'PM' && h !== 12) h += 12;
+              if (period === 'AM' && h === 12) h = 0;
+              return h * 60 + m;
+            };
+
+            const isOpen = slots.some(s => {
+              const startMins = timeToMinutes(s.start);
+              const endMins = timeToMinutes(s.end);
+              return startMins <= windowInfo.startMins && endMins >= windowInfo.endMins;
+            });
+
+            if (!isOpen) {
+              return {
+                success: false,
+                closedStoreName: store.name,
+                pickupWindowText: `${windowInfo.start} - ${windowInfo.end}`
+              };
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing store hours for batch slot validation:', e);
+        }
+      }
+    }
+    return { success: true };
+  };
+
+  const handleSelectDeliveryType = async (type: 'fast' | 'batch') => {
+    if (type === 'fast') {
+      setDeliveryType('fast');
+      setDeliverySlot(null);
+    } else {
+      if (deliverySlot) {
+        setLoading(true);
+        const check = await checkStoresOpenForBatchSlot(deliverySlot);
+        setLoading(false);
+        if (!check.success) {
+          showAlert({
+            title: 'Store Closed at Pickup Time',
+            message: `${check.closedStoreName} is closed during the batch delivery pickup time (${check.pickupWindowText}).`,
+            type: 'warning'
+          });
+          return;
+        }
+      }
+      setDeliveryType('batch');
+      if (!deliverySlot) {
+        setSlotModalVisible(true);
+      }
+    }
+  };
+
   const groupedItems = React.useMemo(() => {
     return items.reduce((groups: Record<string, any>, item: any) => {
       const storeId = item.store_id;
@@ -1494,6 +1573,21 @@ export const CartScreen = ({ navigation }: any) => {
 
     try {
       setLoading(true);
+      
+      // Check batch delivery store hours
+      if (deliveryType === 'batch' && deliverySlot) {
+        const check = await checkStoresOpenForBatchSlot(deliverySlot);
+        if (!check.success) {
+          setLoading(false);
+          showAlert({
+            title: 'Store Closed at Pickup Time',
+            message: `${check.closedStoreName} is closed during the batch delivery pickup time (${check.pickupWindowText}).`,
+            type: 'warning'
+          });
+          return;
+        }
+      }
+
       const storesInCart = [...new Set(items.map(i => i.store_id))];
       
       for (const stId of storesInCart) {
@@ -1515,7 +1609,7 @@ export const CartScreen = ({ navigation }: any) => {
           return;
         }
 
-        if (store.opening_hours) {
+        if (deliveryType !== 'batch' && store.opening_hours) {
           try {
             const slots = JSON.parse(store.opening_hours);
             if (Array.isArray(slots) && slots.length > 0) {
@@ -2042,7 +2136,7 @@ export const CartScreen = ({ navigation }: any) => {
 
         <DeliveryTypeSection
           deliveryType={deliveryType}
-          setDeliveryType={setDeliveryType}
+          onSelectDeliveryType={handleSelectDeliveryType}
           isLargeVehicle={isLargeVehicle}
           isBatchAllowed={isBatchAllowed}
           deliverySlot={deliverySlot}
@@ -2303,7 +2397,18 @@ export const CartScreen = ({ navigation }: any) => {
                   deliverySlot === '2-3 PM' && styles.selectedSlotOption,
                   !isSlotAvailable('2-3 PM') && styles.disabledSlotOption
                 ]}
-                onPress={() => {
+                onPress={async () => {
+                  setLoading(true);
+                  const check = await checkStoresOpenForBatchSlot('2-3 PM');
+                  setLoading(false);
+                  if (!check.success) {
+                    showAlert({
+                      title: 'Store Closed at Pickup Time',
+                      message: `${check.closedStoreName} is closed during the batch delivery pickup time (${check.pickupWindowText}).`,
+                      type: 'warning'
+                    });
+                    return;
+                  }
                   setDeliverySlot('2-3 PM');
                   setSlotModalVisible(false);
                 }}
@@ -2328,7 +2433,18 @@ export const CartScreen = ({ navigation }: any) => {
                   deliverySlot === '8-9 PM' && styles.selectedSlotOption,
                   !isSlotAvailable('8-9 PM') && styles.disabledSlotOption
                 ]}
-                onPress={() => {
+                onPress={async () => {
+                  setLoading(true);
+                  const check = await checkStoresOpenForBatchSlot('8-9 PM');
+                  setLoading(false);
+                  if (!check.success) {
+                    showAlert({
+                      title: 'Store Closed at Pickup Time',
+                      message: `${check.closedStoreName} is closed during the batch delivery pickup time (${check.pickupWindowText}).`,
+                      type: 'warning'
+                    });
+                    return;
+                  }
                   setDeliverySlot('8-9 PM');
                   setSlotModalVisible(false);
                 }}

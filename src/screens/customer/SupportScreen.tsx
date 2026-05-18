@@ -141,7 +141,7 @@ export const SupportScreen = ({ navigation }: any) => {
             <Text style={[styles.tipTitle, { color: '#991B1B' }]}>Cancel Policy</Text>
           </View>
           <Text style={[styles.tipContent, { color: '#991B1B' }]}>
-            Order can only be cancelled before pickup by rider. Once the rider has picked up the order, cancellation is not possible.
+            Order can only be cancelled before a rider accepts the delivery. Once a rider has been assigned, cancellation is not possible.
           </Text>
         </View>
 

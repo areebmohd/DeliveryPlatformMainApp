@@ -166,17 +166,27 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
             // First check the latest status from server
             const { data: currentOrder } = await supabase
               .from('orders')
-              .select('status')
+              .select('status, rider_id')
               .eq('id', orderId)
               .single();
 
-            if (currentOrder && (currentOrder.status === 'picked_up' || currentOrder.status === 'delivered')) {
-              fetchOrders(); // Sync local state
-              return showAlert({
-                title: 'Cannot Cancel Order',
-                message: `This order has already been ${currentOrder.status === 'picked_up' ? 'picked up' : 'delivered'} and cannot be cancelled.`,
-                type: 'error'
-              });
+            if (currentOrder) {
+              if (currentOrder.rider_id) {
+                fetchOrders(); // Sync local state
+                return showAlert({
+                  title: 'Cannot Cancel Order',
+                  message: 'A rider has already accepted this delivery, so it can no longer be cancelled.',
+                  type: 'error'
+                });
+              }
+              if (currentOrder.status === 'picked_up' || currentOrder.status === 'delivered') {
+                fetchOrders(); // Sync local state
+                return showAlert({
+                  title: 'Cannot Cancel Order',
+                  message: `This order has already been ${currentOrder.status === 'picked_up' ? 'picked up' : 'delivered'} and cannot be cancelled.`,
+                  type: 'error'
+                });
+              }
             }
 
             const { error } = await supabase
@@ -233,8 +243,8 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
   const renderOrderItem = useCallback(({ item }: { item: any }) => {
     const statusInfo = getStatusInfo(item.status);
     const date = new Date(item.created_at);
-    // Can cancel if status is one of the "waiting" statuses
-    const canCancel = item.status === 'waiting_for_pickup';
+    // Can cancel if status is "waiting_for_pickup" and no rider has accepted the order
+    const canCancel = item.status === 'waiting_for_pickup' && !item.rider_id;
     const formattedTime = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     return (
