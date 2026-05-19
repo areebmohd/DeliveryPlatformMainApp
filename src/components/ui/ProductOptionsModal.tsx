@@ -13,7 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from './Button';
-import { calculateProductPrice, getPriceAdjustmentLabel } from '../../utils/priceUtils';
+import { calculateProductPrice, calculateProductWeight, getPriceAdjustmentLabel } from '../../utils/priceUtils';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -71,6 +71,7 @@ export const ProductOptionsModal = ({
   if (!product) return null;
 
   const currentPrice = calculateProductPrice(product, selectedOptions);
+  const currentWeight = calculateProductWeight(product, selectedOptions);
 
   const handleConfirm = () => {
     // Validate all options are selected
@@ -118,7 +119,9 @@ export const ProductOptionsModal = ({
               )}
               <View style={styles.titleInfo}>
                 <Text style={styles.productName}>{product.name}</Text>
-                <Text style={styles.productPrice}>₹{currentPrice}</Text>
+                <Text style={styles.productPrice}>
+                  ₹{currentPrice} {currentWeight > 0 ? `(${currentWeight < 1 ? `${currentWeight * 1000}gm` : `${currentWeight}kg`})` : ''}
+                </Text>
               </View>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>

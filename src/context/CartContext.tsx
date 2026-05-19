@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAlert } from './AlertContext';
 import { useAuth } from './AuthContext';
 import { parseWKT, getHaversineDistance } from '../utils/productUtils';
+import { calculateProductWeight } from '../utils/priceUtils';
 
 const STORAGE_KEYS = {
   CART_ITEMS: '@cart_items',
@@ -150,6 +151,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Vehicle Consistency Check
     const productNeedsLarge = !!product.needs_large_vehicle;
+    const selectedOptions = product.selectedOptions || {};
+    const adjustedWeight = calculateProductWeight(product, selectedOptions);
+
     if (items.length > 0) {
       const cartIsLarge = items[0].needs_large_vehicle;
       if (cartIsLarge !== productNeedsLarge) {
@@ -168,14 +172,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 quantity: 1,
                 store_id: store.id,
                 store_name: store.name,
-                weight_kg: product.weight_kg || 0,
+                weight_kg: adjustedWeight,
                 length_cm: product.length_cm || 0,
                 width_cm: product.width_cm || 0,
                 height_cm: product.height_cm || 0,
                 needs_large_vehicle: productNeedsLarge,
                 store_lat: storeLat,
                 store_lng: storeLng,
-                selected_options: product.selectedOptions || {},
+                selected_options: selectedOptions,
                 preparation_time: product.preparation_time || 0,
                 barcode: product.barcode,
                 product_type: product.product_type,
@@ -188,8 +192,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
     }
-
-    const selectedOptions = product.selectedOptions || {};
 
     setItems(prev => {
       // 3. Identification of "Equivalent" product
@@ -209,7 +211,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newItems = [...prev];
         newItems[existingIdx] = { 
           ...existing, 
-          quantity: existing.quantity + (quantity || 1) 
+          quantity: existing.quantity + 1
         };
         return newItems;
       }
@@ -221,7 +223,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         quantity: 1, 
         store_id: store.id,
         store_name: store.name,
-        weight_kg: product.weight_kg || 0,
+        weight_kg: adjustedWeight,
         length_cm: product.length_cm || 0,
         width_cm: product.width_cm || 0,
         height_cm: product.height_cm || 0,

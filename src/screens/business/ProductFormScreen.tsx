@@ -60,11 +60,13 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       ? product.options.map((opt: any) => ({ 
           ...opt, 
           values: opt.values?.length 
-            ? opt.values.map((v: any) => typeof v === 'string' ? { value: v, price_adjustment: 0 } : v) 
-            : [{ value: '', price_adjustment: 0 }], 
+            ? opt.values.map((v: any) => typeof v === 'string' 
+                ? { value: v, price_adjustment: 0, weight_adjustment: 0 } 
+                : { ...v, price_adjustment: parseFloat(v.price_adjustment) || 0, weight_adjustment: parseFloat(v.weight_adjustment) || 0 }) 
+            : [{ value: '', price_adjustment: 0, weight_adjustment: 0 }], 
           currentInput: '' 
         }))
-      : [{ title: '', values: [{ value: '', price_adjustment: 0 }], currentInput: '' }]
+      : [{ title: '', values: [{ value: '', price_adjustment: 0, weight_adjustment: 0 }], currentInput: '' }]
   );
   const [tags, setTags] = useState<string[]>(product?.tags || []);
   const [tagInput, setTagInput] = useState('');
@@ -154,8 +156,10 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               setProductOptions(data.options.map((opt: any) => ({
                 ...opt,
                 values: opt.values?.length 
-                  ? opt.values.map((v: any) => typeof v === 'string' ? { value: v, price_adjustment: 0 } : v)
-                  : [{ value: '', price_adjustment: 0 }],
+                  ? opt.values.map((v: any) => typeof v === 'string' 
+                      ? { value: v, price_adjustment: 0, weight_adjustment: 0 } 
+                      : { ...v, price_adjustment: parseFloat(v.price_adjustment) || 0, weight_adjustment: parseFloat(v.weight_adjustment) || 0 })
+                  : [{ value: '', price_adjustment: 0, weight_adjustment: 0 }],
                 currentInput: ''
               })));
             }
@@ -516,7 +520,8 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             .filter((v: any) => v.value.trim() !== '')
             .map((v: any) => ({
               value: v.value.trim(),
-              price_adjustment: parseFloat(v.price_adjustment) || 0
+              price_adjustment: parseFloat(v.price_adjustment) || 0,
+              weight_adjustment: parseFloat(v.weight_adjustment) || 0
             }))
         }))
         .filter(o => o.title !== '' || o.values.length > 0);
@@ -974,50 +979,148 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                           <Text style={styles.tinyLabel}>Values</Text>
                           <View style={styles.valuesList}>
                             {opt.values.map((valObj: any, vIdx: number) => (
-                              <View key={vIdx} style={[styles.optionInputWithAction, { marginBottom: 12, alignItems: 'center' }]}>
-                                <View style={{ flex: 1, marginRight: 8 }}>
-                                  <TextInput
-                                    placeholder={vIdx === 0 ? "Base Option (e.g. S)" : "Value (e.g. M)"}
-                                    placeholderTextColor={Colors.textSecondary + '70'}
-                                    value={valObj.value}
-                                    onChangeText={(newVal) => {
-                                      setProductOptions(prev => {
-                                        const next = [...prev];
-                                        const updatedValues = [...next[oIdx].values];
-                                        updatedValues[vIdx] = { ...updatedValues[vIdx], value: newVal };
-                                        next[oIdx] = { ...next[oIdx], values: updatedValues };
-                                        return next;
-                                      });
-                                    }}
-                                    style={[styles.optionValueInput, { width: '100%' }]}
-                                    editable={canEditPriceWeight}
-                                  />
-                                </View>
-                                <View style={{ width: 85, marginRight: 4 }}>
-                                  {vIdx === 0 ? (
-                                    <View style={[styles.optionValueInput, { backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center', borderColor: Colors.border, borderStyle: 'dashed' }]}>
-                                      <Text style={{ fontSize: 10, color: Colors.textSecondary, fontWeight: '700', textTransform: 'uppercase' }}>Base Price</Text>
-                                    </View>
-                                  ) : (
+                              <View key={vIdx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                                {/* Option Value Box Card */}
+                                <View style={{
+                                  flex: 1,
+                                  backgroundColor: '#F8F9FA',
+                                  borderWidth: 1,
+                                  borderColor: '#E5E5EA',
+                                  borderRadius: 12,
+                                  padding: 12,
+                                }}>
+                                  {/* Value Input (Top) */}
+                                  <View style={{ marginBottom: 8 }}>
+                                    <Text style={{ fontSize: 10, color: '#8E8E93', fontWeight: '800', textTransform: 'uppercase', marginBottom: 4 }}>Value</Text>
                                     <TextInput
-                                      placeholder="+₹0"
+                                      placeholder={vIdx === 0 ? "Base Option (e.g. S)" : "Value (e.g. M)"}
                                       placeholderTextColor={Colors.textSecondary + '70'}
-                                      value={valObj.price_adjustment?.toString() === '0' ? '' : valObj.price_adjustment?.toString()}
-                                      onChangeText={(newPrice) => {
+                                      value={valObj.value}
+                                      onChangeText={(newVal) => {
                                         setProductOptions(prev => {
                                           const next = [...prev];
                                           const updatedValues = [...next[oIdx].values];
-                                          updatedValues[vIdx] = { ...updatedValues[vIdx], price_adjustment: newPrice.replace(/[^0-9]/g, '') };
+                                          updatedValues[vIdx] = { ...updatedValues[vIdx], value: newVal };
                                           next[oIdx] = { ...next[oIdx], values: updatedValues };
                                           return next;
                                         });
                                       }}
-                                      keyboardType="numeric"
-                                      style={[styles.optionValueInput, { textAlign: 'center' }]}
+                                      style={{
+                                        backgroundColor: Colors.white,
+                                        borderWidth: 1,
+                                        borderColor: Colors.border,
+                                        borderRadius: 8,
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 8,
+                                        fontSize: 14,
+                                        color: Colors.text,
+                                        height: 40,
+                                      }}
                                       editable={canEditPriceWeight}
                                     />
-                                  )}
+                                  </View>
+
+                                  {/* Adjustments row (Bottom) */}
+                                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                                    {/* Price Adjustment */}
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={{ fontSize: 10, color: '#8E8E93', fontWeight: '800', textTransform: 'uppercase', marginBottom: 4 }}>Extra Price</Text>
+                                      {vIdx === 0 ? (
+                                        <View style={{
+                                          backgroundColor: Colors.surface,
+                                          borderWidth: 1,
+                                          borderColor: Colors.border,
+                                          borderStyle: 'dashed',
+                                          borderRadius: 8,
+                                          height: 40,
+                                          justifyContent: 'center',
+                                          alignItems: 'center',
+                                        }}>
+                                          <Text style={{ fontSize: 10, color: Colors.textSecondary, fontWeight: '700', textTransform: 'uppercase' }}>Base Price</Text>
+                                        </View>
+                                      ) : (
+                                        <TextInput
+                                          placeholder="+₹0"
+                                          placeholderTextColor={Colors.textSecondary + '70'}
+                                          value={valObj.price_adjustment?.toString() === '0' ? '' : valObj.price_adjustment?.toString()}
+                                          onChangeText={(newPrice) => {
+                                            setProductOptions(prev => {
+                                              const next = [...prev];
+                                              const updatedValues = [...next[oIdx].values];
+                                              updatedValues[vIdx] = { ...updatedValues[vIdx], price_adjustment: newPrice.replace(/[^0-9]/g, '') };
+                                              next[oIdx] = { ...next[oIdx], values: updatedValues };
+                                              return next;
+                                            });
+                                          }}
+                                          keyboardType="numeric"
+                                          style={{
+                                            backgroundColor: Colors.white,
+                                            borderWidth: 1,
+                                            borderColor: Colors.border,
+                                            borderRadius: 8,
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 8,
+                                            fontSize: 14,
+                                            color: Colors.text,
+                                            textAlign: 'center',
+                                            height: 40,
+                                          }}
+                                          editable={canEditPriceWeight}
+                                        />
+                                      )}
+                                    </View>
+
+                                    {/* Weight Adjustment */}
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={{ fontSize: 10, color: '#8E8E93', fontWeight: '800', textTransform: 'uppercase', marginBottom: 4 }}>Extra Weight</Text>
+                                      {vIdx === 0 ? (
+                                        <View style={{
+                                          backgroundColor: Colors.surface,
+                                          borderWidth: 1,
+                                          borderColor: Colors.border,
+                                          borderStyle: 'dashed',
+                                          borderRadius: 8,
+                                          height: 40,
+                                          justifyContent: 'center',
+                                          alignItems: 'center',
+                                        }}>
+                                          <Text style={{ fontSize: 10, color: Colors.textSecondary, fontWeight: '700', textTransform: 'uppercase' }}>Base Weight</Text>
+                                        </View>
+                                      ) : (
+                                        <TextInput
+                                          placeholder="+0kg"
+                                          placeholderTextColor={Colors.textSecondary + '70'}
+                                          value={valObj.weight_adjustment?.toString() === '0' ? '' : valObj.weight_adjustment?.toString()}
+                                          onChangeText={(newWeight) => {
+                                            setProductOptions(prev => {
+                                              const next = [...prev];
+                                              const updatedValues = [...next[oIdx].values];
+                                              updatedValues[vIdx] = { ...updatedValues[vIdx], weight_adjustment: newWeight.replace(/[^0-9.]/g, '') };
+                                              next[oIdx] = { ...next[oIdx], values: updatedValues };
+                                              return next;
+                                            });
+                                          }}
+                                          keyboardType="numeric"
+                                          style={{
+                                            backgroundColor: Colors.white,
+                                            borderWidth: 1,
+                                            borderColor: Colors.border,
+                                            borderRadius: 8,
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 8,
+                                            fontSize: 14,
+                                            color: Colors.text,
+                                            textAlign: 'center',
+                                            height: 40,
+                                          }}
+                                          editable={canEditPriceWeight}
+                                        />
+                                      )}
+                                    </View>
+                                  </View>
                                 </View>
+
+                                {/* Delete Button on the Right */}
                                 {canEditPriceWeight && opt.values.length > 1 && (
                                   <TouchableOpacity 
                                     onPress={() => {
@@ -1027,7 +1130,17 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                                         return next;
                                       });
                                     }}
-                                    style={styles.deleteValueBtn}
+                                    style={{
+                                      marginLeft: 12,
+                                      width: 40,
+                                      height: 40,
+                                      backgroundColor: '#FFF5F5',
+                                      borderWidth: 1,
+                                      borderColor: '#FFCCD5',
+                                      borderRadius: 10,
+                                      justifyContent: 'center',
+                                      alignItems: 'center',
+                                    }}
                                   >
                                     <Icon name="trash-can-outline" size={20} color={Colors.error} />
                                   </TouchableOpacity>
@@ -1041,7 +1154,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                                 onPress={() => {
                                   setProductOptions(prev => {
                                     const next = [...prev];
-                                    next[oIdx].values = [...next[oIdx].values, { value: '', price_adjustment: 0 }];
+                                    next[oIdx].values = [...next[oIdx].values, { value: '', price_adjustment: 0, weight_adjustment: 0 }];
                                     return next;
                                   });
                                 }}
@@ -1060,7 +1173,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                   {canEditPriceWeight && (
                     <TouchableOpacity 
                       style={styles.addPairBtn}
-                      onPress={() => setProductOptions(prev => [...prev, { title: '', values: [{ value: '', price_adjustment: 0 }], currentInput: '' }])}
+                      onPress={() => setProductOptions(prev => [...prev, { title: '', values: [{ value: '', price_adjustment: 0, weight_adjustment: 0 }], currentInput: '' }])}
                     >
                       <Icon name="plus-circle-outline" size={20} color={Colors.primary} />
                       <Text style={styles.addPairText}>Add More Options</Text>
