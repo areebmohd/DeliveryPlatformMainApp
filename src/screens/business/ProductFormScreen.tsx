@@ -539,6 +539,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         stock_quantity: parseInt(stockQuantity),
         in_stock: inStock,
         needs_large_vehicle: needsLarge,
+        delivery_vehicle: needsLarge ? 'truck' : 'bike',
         is_info_complete: isComplete, // Mark as complete once saved with details
         raw_image_url: rawImageUrl,
         preparation_time: parseInt(preparationTime) || 0,

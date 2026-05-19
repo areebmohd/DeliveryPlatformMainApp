@@ -281,7 +281,7 @@ const BillingSection = React.memo(({
               title: 'Delivery Fee',
               content: isLargeVehicle 
                 ? `₹300 (fixed for 1st km) + ₹30 per extra km\n(Large Vehicle)\n\nDistance: ${distance.toFixed(2)} km`
-                : `₹30 (fixed for 1st km) + ₹10 per extra km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
+                : `₹20 (fixed for 1st km) + ₹10 per extra km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
             })}>
               <Icon name="information-outline" size={16} color={Colors.primary} />
             </TouchableOpacity>
@@ -366,8 +366,13 @@ const CartStoreSection = React.memo(({
   getOfferDescription,
   manuallyRemovedStores,
   setManuallyRemovedStores,
-  setAppliedOffers
+  setAppliedOffers,
+  storeDistances,
+  isLargeVehicle,
+  deliveryType
 }: any) => {
+  const distance = storeDistances?.[storeId];
+
   return (
     <View key={storeId} style={styles.storeSection}>
       <View style={styles.storeHeader}>
@@ -375,8 +380,24 @@ const CartStoreSection = React.memo(({
           style={styles.storeHeaderLeft}
           onPress={() => navigateToStore(storeId)}
         >
-          <Icon name="storefront-outline" size={20} color={Colors.primary} />
-          <Text style={styles.storeName} numberOfLines={1} ellipsizeMode="tail">{storeData.name}</Text>
+          <Icon name="storefront-outline" size={20} color={Colors.primary} style={{ marginTop: 2 }} />
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={[styles.storeName, { marginLeft: 0 }]} numberOfLines={1} ellipsizeMode="tail">{storeData.name}</Text>
+            {distance !== undefined && distance !== null && (
+              <View style={styles.distanceBadgeContainer}>
+                {!isLargeVehicle && distance >= 2 && (
+                  <View style={styles.warningPill}>
+                    <Text style={styles.warningPillText}>Out of Bike Range (Max 2km)</Text>
+                  </View>
+                )}
+                {!isLargeVehicle && deliveryType === 'batch' && distance >= 1 && distance < 2 && (
+                  <View style={styles.warningPill}>
+                    <Text style={styles.warningPillText}>Out of Batch Range (Max 1km)</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.viewOffersBtn}
@@ -1381,6 +1402,13 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
+  const handleCloseSlotModal = () => {
+    setSlotModalVisible(false);
+    if (!deliverySlot) {
+      setDeliveryType('fast');
+    }
+  };
+
   const groupedItems = React.useMemo(() => {
     return items.reduce((groups: Record<string, any>, item: any) => {
       const storeId = item.store_id;
@@ -1404,6 +1432,20 @@ export const CartScreen = ({ navigation }: any) => {
            Object.values(storeDistances).every(d => d < 1);
   }, [isLargeVehicle, storeDistances]);
 
+  const tooFarBikeStores = React.useMemo(() => {
+    if (isLargeVehicle) return [];
+    return Object.entries(storeDistances)
+      .filter(([_, dist]) => dist >= 2)
+      .map(([id]) => id);
+  }, [isLargeVehicle, storeDistances]);
+
+  const tooFarBatchStores = React.useMemo(() => {
+    if (isLargeVehicle || deliveryType !== 'batch') return [];
+    return Object.entries(storeDistances)
+      .filter(([_, dist]) => dist >= 1)
+      .map(([id]) => id);
+  }, [isLargeVehicle, deliveryType, storeDistances]);
+
   const isAppOfferActive = React.useMemo(() => {
     const isBatchActive = !!appliedOffers['app_batch_offer'] && 
                          deliveryType === 'batch' &&
@@ -1424,7 +1466,7 @@ export const CartScreen = ({ navigation }: any) => {
     const actualTravelFee = items.length === 0 ? 0 : (
       isLargeVehicle 
         ? 300 + Math.ceil(Math.max(0, distance - 1)) * 30
-        : 30 + Math.ceil(Math.max(0, distance - 1)) * 10
+        : 20 + Math.ceil(Math.max(0, distance - 1)) * 10
     );
     const hFee = hasHelper ? 300 : 0;
     
@@ -1448,7 +1490,7 @@ export const CartScreen = ({ navigation }: any) => {
         const dist = storeDistances[offer.store_id] || 0;
         const storeFee = isLargeVehicle 
           ? 300 + Math.ceil(Math.max(0, dist - 1)) * 30
-          : 30 + Math.ceil(Math.max(0, dist - 1)) * 10;
+          : 20 + Math.ceil(Math.max(0, dist - 1)) * 10;
         
         storeContribs[offer.store_id] = storeFee;
         totalStoreSponsorship += storeFee;
@@ -1668,6 +1710,43 @@ export const CartScreen = ({ navigation }: any) => {
         return;
       }
 
+      // Check distance rules for bike deliveries
+      if (!isLargeVehicle) {
+        // 1. Batch Delivery under 1km rule
+        if (deliveryType === 'batch') {
+          const tooFarBatch = Object.entries(storeDistances).filter(([_, dist]) => dist >= 1);
+          if (tooFarBatch.length > 0) {
+            const farStoreNames = items
+              .filter(item => tooFarBatch.some(([id]) => id === item.store_id))
+              .map(item => item.store_name);
+            const uniqueFarStoreNames = [...new Set(farStoreNames)].join(', ');
+
+            showAlert({
+              title: 'Out of Batch Range',
+              message: `Batch delivery is only available for stores within 1km of your location.\n\nThe following store(s) are too far:\n• ${uniqueFarStoreNames}\n\nPlease switch to Fast Delivery or remove these items.`,
+              type: 'warning'
+            });
+            return;
+          }
+        }
+
+        // 2. Bike Delivery under 2km rule
+        const tooFarBike = Object.entries(storeDistances).filter(([_, dist]) => dist >= 2);
+        if (tooFarBike.length > 0) {
+          const farStoreNames = items
+            .filter(item => tooFarBike.some(([id]) => id === item.store_id))
+            .map(item => item.store_name);
+          const uniqueFarStoreNames = [...new Set(farStoreNames)].join(', ');
+
+          showAlert({
+            title: 'Out of Delivery Range',
+            message: `Standard bike delivery is only available for stores within 2km of your location.\n\nThe following store(s) are too far:\n• ${uniqueFarStoreNames}\n\nPlease remove these items or switch to a Large Vehicle.`,
+            type: 'warning'
+          });
+          return;
+        }
+      }
+
       const maxPrepTime = Math.max(0, ...items.map(i => i.preparation_time || 0));
       const readyTimeText = maxPrepTime > 0 
         ? new Date(Date.now() + maxPrepTime * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1881,10 +1960,12 @@ export const CartScreen = ({ navigation }: any) => {
             offerProductDetails={offerProductDetails}
             updateQuantity={updateQuantity}
             checkOfferConditions={checkOfferConditions}
-            getOfferDescription={getOfferDescription}
             manuallyRemovedStores={manuallyRemovedStores}
             setManuallyRemovedStores={setManuallyRemovedStores}
             setAppliedOffers={setAppliedOffers}
+            storeDistances={storeDistances}
+            isLargeVehicle={isLargeVehicle}
+            deliveryType={deliveryType}
           />
         ))}
 
@@ -2141,6 +2222,30 @@ export const CartScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
 
+        {tooFarBikeStores.length > 0 && (
+          <View style={styles.outOfRangeBanner}>
+            <Icon name="alert-circle" size={22} color="#EF4444" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.outOfRangeTitle}>Bike Delivery Unavailable</Text>
+              <Text style={styles.outOfRangeDesc}>
+                Some stores in your cart are further than 2km. Bike delivery is only supported under 2km. Please remove these items or switch to a Large Vehicle.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {tooFarBikeStores.length === 0 && tooFarBatchStores.length > 0 && (
+          <View style={styles.outOfRangeBanner}>
+            <Icon name="alert-circle" size={22} color="#F59E0B" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={[styles.outOfRangeTitle, { color: '#D97706' }]}>Batch Delivery Unavailable</Text>
+              <Text style={[styles.outOfRangeDesc, { color: '#B45309' }]}>
+                Batch delivery is only supported for stores within 1km. Please select Fast Delivery or remove these items.
+              </Text>
+            </View>
+          </View>
+        )}
+
         <DeliveryTypeSection
           deliveryType={deliveryType}
           onSelectDeliveryType={handleSelectDeliveryType}
@@ -2382,17 +2487,17 @@ export const CartScreen = ({ navigation }: any) => {
         visible={slotModalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setSlotModalVisible(false)}
+        onRequestClose={handleCloseSlotModal}
       >
         <TouchableOpacity 
           style={styles.modalOverlay} 
           activeOpacity={1} 
-          onPress={() => setSlotModalVisible(false)}
+          onPress={handleCloseSlotModal}
         >
           <View style={styles.slotModalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Delivery Slot</Text>
-              <TouchableOpacity onPress={() => setSlotModalVisible(false)}>
+              <TouchableOpacity onPress={handleCloseSlotModal}>
                 <Icon name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
@@ -3559,5 +3664,51 @@ const styles = StyleSheet.create({
     color: Colors.error,
     marginTop: 2,
     fontWeight: '600',
+  },
+  distanceBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  distanceText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  warningPill: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  warningPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  outOfRangeBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FEE2E2',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  outOfRangeTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#EF4444',
+    marginBottom: 2,
+  },
+  outOfRangeDesc: {
+    fontSize: 13,
+    color: '#991B1B',
+    lineHeight: 18,
   },
 });

@@ -489,6 +489,22 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
     return item ? item.quantity : 0;
   };
 
+  const formatWhatsAppNumber = (num: string) => {
+    if (!num) return '';
+    const trimmed = num.trim();
+    if (trimmed.startsWith('+')) {
+      return trimmed.replace(/\D/g, '');
+    }
+    let cleaned = trimmed.replace(/\D/g, '');
+    if (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+    if (cleaned.length === 10) {
+      return `91${cleaned}`;
+    }
+    return cleaned;
+  };
+
   const handleContact = async (type: string, value: string) => {
     let url = '';
     switch (type) {
@@ -499,8 +515,8 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         url = `mailto:${value}`;
         break;
       case 'whatsapp':
-        // Remove non-numeric characters for WhatsApp
-        const cleanedNumber = value.replace(/\D/g, '');
+        // Remove non-numeric characters and format for WhatsApp
+        const cleanedNumber = formatWhatsAppNumber(value);
         url = `whatsapp://send?phone=${cleanedNumber}`;
         break;
       case 'browser':
@@ -516,7 +532,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
           if (canOpen) {
             await Linking.openURL(url);
           } else {
-            await Linking.openURL(`https://wa.me/${value.replace(/\D/g, '')}`);
+            await Linking.openURL(`https://wa.me/${formatWhatsAppNumber(value)}`);
           }
         } else {
           // For other links, just try to open them directly
