@@ -12,11 +12,10 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Pressable,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
 import { supabase } from '../../api/supabase';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,8 +27,6 @@ type UserRole = 'customer' | 'store';
 export const AuthScreen = ({ navigation, route }: any) => {
   const insets = useSafeAreaInsets();
   const [role, setRole] = useState<UserRole>('customer');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,102 +35,6 @@ export const AuthScreen = ({ navigation, route }: any) => {
       Alert.alert('Success', route.params.message || 'Email verified successfully!');
     }
   }, [route.params]);
-
-  const handleAuthSubmit = async () => {
-    if (!email || !password) {
-      setError('Please fill in all fields');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const { data: existingRole, error: checkError } = await supabase.rpc('check_email_exists', {
-        email_to_check: email.toLowerCase().trim(),
-      });
-
-      if (checkError) throw checkError;
-
-      if (existingRole) {
-        let rawRole = existingRole;
-        if (Array.isArray(existingRole) && existingRole.length > 0) {
-          rawRole = existingRole[0].check_email_exists || existingRole[0];
-        } else if (typeof existingRole === 'object' && existingRole !== null) {
-          rawRole = (existingRole as any).check_email_exists || existingRole;
-        }
-        
-        const cleanedExistingRole = String(rawRole).trim().toLowerCase();
-        
-        if (cleanedExistingRole !== 'null' && cleanedExistingRole !== 'undefined' && cleanedExistingRole !== '' && cleanedExistingRole !== 'exists_no_profile') {
-          if (cleanedExistingRole !== role.toLowerCase()) {
-            const roleDisplay = cleanedExistingRole === 'store' ? 'Business' : 'Customer';
-            setError(`This email is registered as a ${roleDisplay}. Please select the correct role above.`);
-            setLoading(false);
-            return;
-          }
-        }
-
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email: email.toLowerCase().trim(),
-          password,
-        });
-
-        if (loginError) {
-          if (loginError.message.toLowerCase().includes('email not confirmed')) {
-             await supabase.auth.resend({
-               type: 'signup',
-               email: email.toLowerCase().trim(),
-             });
-             navigation.navigate('VerifyEmailOTP', { email: email.toLowerCase().trim() });
-          } else {
-            throw loginError;
-          }
-        }
-      } else {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: email.toLowerCase().trim(),
-          password,
-          options: {
-            data: {
-              role: role,
-              full_name: email.split('@')[0],
-            },
-          },
-        });
-
-        if (signUpError) {
-          if (signUpError.message.toLowerCase().includes('already registered')) {
-            // Fallback: If signup says they exist, try logging them in
-            const { error: retryLoginError } = await supabase.auth.signInWithPassword({
-              email: email.toLowerCase().trim(),
-              password,
-            });
-            if (retryLoginError) throw retryLoginError;
-          } else {
-            throw signUpError;
-          }
-        }
-
-        if (signUpData.user) {
-          Alert.alert(
-            'Verification Required',
-            'A verification code has been sent to your email.',
-            [{ text: 'OK', onPress: () => navigation.navigate('VerifyEmailOTP', { email: email.toLowerCase().trim() }) }]
-          );
-        }
-      }
-    } catch (e: any) {
-      setError(e.message || 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoogleLogin = async () => {
     try {
@@ -155,8 +56,7 @@ export const AuthScreen = ({ navigation, route }: any) => {
 
       if (checkError) throw checkError;
 
-      // Debug alert for Google flow
-      // Alert.alert('DEBUG Google', `Role for ${userEmail}: ${JSON.stringify(existingRole)}`);
+      let isNewUser = true;
 
       if (existingRole) {
         let rawRole = existingRole;
@@ -169,6 +69,7 @@ export const AuthScreen = ({ navigation, route }: any) => {
         const cleanedExistingRole = String(rawRole).trim().toLowerCase();
         
         if (cleanedExistingRole !== 'null' && cleanedExistingRole !== 'undefined' && cleanedExistingRole !== '' && cleanedExistingRole !== 'exists_no_profile') {
+          isNewUser = false;
           if (cleanedExistingRole !== role.toLowerCase()) {
             const roleDisplay = cleanedExistingRole === 'store' ? 'Business' : 'Customer';
             setError(`This email is registered as a ${roleDisplay}. Please switch your selection to ${roleDisplay}.`);
@@ -186,21 +87,33 @@ export const AuthScreen = ({ navigation, route }: any) => {
 
       if (authError) throw authError;
 
-      // ONLY update the role if the user doesn't have one or is new
+      // Ensure profile contains correct role on signup
       if (data.user) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
-        
-        if (!profile?.role) {
-          await supabase.auth.updateUser({
-            data: { role, full_name: userInfo.data?.user?.name || 'New User' }
-          });
-          
+        if (isNewUser) {
+          // 1. Explicitly force-upsert the public profile to set the selected 'store' role first
           await supabase.from('profiles').upsert({ 
             id: data.user.id,
             email: userEmail.toLowerCase().trim(),
             role, 
-            full_name: userInfo.data?.user?.name || 'New User' 
+            full_name: userInfo.data?.user?.name || 'New User',
+            updated_at: new Date().toISOString()
           });
+
+          // 2. Force update the selected role in user metadata (this triggers onAuthStateChange to refresh AuthContext)
+          await supabase.auth.updateUser({
+            data: { role, full_name: userInfo.data?.user?.name || 'New User' }
+          });
+        } else {
+          // Double check if profile exists (e.g. pre-registered user)
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
+          if (!profile?.role) {
+            await supabase.from('profiles').upsert({ 
+              id: data.user.id,
+              email: userEmail.toLowerCase().trim(),
+              role, 
+              full_name: userInfo.data?.user?.name || 'New User' 
+            });
+          }
         }
       }
       
@@ -224,98 +137,106 @@ export const AuthScreen = ({ navigation, route }: any) => {
         style={{ flex: 1 }}
       >
         <ScrollView 
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + Spacing.xl }]}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + Spacing.xxl + 24 }]}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Left-Aligned Heading */}
           <View style={styles.headerContainer}>
-            <Text style={styles.welcomeText}>Welcome</Text>
-            <Text style={styles.subHeaderText}>Join the revolution</Text>
+            <Text style={styles.welcomeText}>Get Started,</Text>
+            <Text style={styles.subHeaderText}>Choose your account type</Text>
           </View>
 
+          {/* Vertical Role Cards */}
           <View style={styles.roleContainer}>
-            <TouchableOpacity 
-              style={[styles.roleButton, role === 'customer' && styles.roleButtonActive]}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.roleCard, 
+                role === 'customer' && styles.roleCardActive,
+                pressed && role !== 'customer' && styles.roleCardPressed
+              ]}
               onPress={() => setRole('customer')}
             >
-              <Icon 
-                name="account" 
-                size={20} 
-                color={role === 'customer' ? Colors.primary : Colors.textSecondary} 
-                style={styles.roleIcon}
-              />
-              <Text style={[styles.roleText, role === 'customer' && styles.roleTextActive]}>Customer</Text>
-            </TouchableOpacity>
+              <View style={[styles.roleIconContainer, role === 'customer' && styles.roleIconContainerActive]}>
+                <Icon 
+                  name="account" 
+                  size={26} 
+                  color={role === 'customer' ? Colors.white : Colors.textSecondary} 
+                />
+              </View>
+              <View style={styles.roleTextContainer}>
+                <Text style={[styles.roleCardTitle, role === 'customer' && styles.roleCardTitleActive]}>Customer</Text>
+                <Text style={[styles.roleCardSubtitle, role === 'customer' && styles.roleCardSubtitleActive]}>Order food and goods locally</Text>
+              </View>
+              <View style={[styles.radioButton, role === 'customer' && styles.radioButtonActive]}>
+                <View style={[styles.radioButtonInner, role === 'customer' && styles.radioButtonInnerActive]} />
+              </View>
+            </Pressable>
             
-            <TouchableOpacity 
-              style={[styles.roleButton, role === 'store' && styles.roleButtonActive]}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.roleCard, 
+                role === 'store' && styles.roleCardActive,
+                pressed && role !== 'store' && styles.roleCardPressed
+              ]}
               onPress={() => setRole('store')}
             >
-              <Icon 
-                name="store" 
-                size={20} 
-                color={role === 'store' ? Colors.primary : Colors.textSecondary} 
-                style={styles.roleIcon}
-              />
-              <Text style={[styles.roleText, role === 'store' && styles.roleTextActive]}>Business</Text>
-            </TouchableOpacity>
+              <View style={[styles.roleIconContainer, role === 'store' && styles.roleIconContainerActive]}>
+                <Icon 
+                  name="store" 
+                  size={26} 
+                  color={role === 'store' ? Colors.white : Colors.textSecondary} 
+                />
+              </View>
+              <View style={styles.roleTextContainer}>
+                <Text style={[styles.roleCardTitle, role === 'store' && styles.roleCardTitleActive]}>Business</Text>
+                <Text style={[styles.roleCardSubtitle, role === 'store' && styles.roleCardSubtitleActive]}>Manage your store and deliveries</Text>
+              </View>
+              <View style={[styles.radioButton, role === 'store' && styles.radioButtonActive]}>
+                <View style={[styles.radioButtonInner, role === 'store' && styles.radioButtonInnerActive]} />
+              </View>
+            </Pressable>
           </View>
 
-          <View style={styles.formContainer}>
-            <Input
-              placeholder="Email Address"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              containerStyle={styles.inputStyle}
-            />
-            <Input
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              containerStyle={styles.inputStyle}
-            />
+          {/* AND Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>AND</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
+          {/* Main Action Area */}
+          <View style={styles.actionContainer}>
             <TouchableOpacity 
-              onPress={() => navigation.navigate('ForgotPassword')}
-              style={styles.forgotButton}
-            >
-              <Text style={styles.forgotText}>Forgot password?</Text>
-            </TouchableOpacity>
-
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            <Button
-              title={loading ? "" : "Continue"}
-              onPress={handleAuthSubmit}
-              loading={loading}
-              style={styles.submitButton}
-            />
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity 
-              style={styles.googleButton} 
+              style={[styles.googleButton, loading && styles.googleButtonDisabled]} 
               onPress={handleGoogleLogin}
               disabled={loading}
+              activeOpacity={0.85}
             >
-              <Icon name="google" size={24} color="#EA4335" />
-              <Text style={styles.googleButtonText}>Continue with Google</Text>
+              {loading ? (
+                <ActivityIndicator color={Colors.primary} size="small" />
+              ) : (
+                <>
+                  <Icon name="google" size={24} color="#EA4335" />
+                  <Text style={styles.googleButtonText}>Continue with Google</Text>
+                </>
+              )}
             </TouchableOpacity>
+
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Icon name="alert-circle" size={20} color={Colors.error} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
           </View>
         </ScrollView>
         
-        <View style={styles.footerContainer}>
-          <Text style={styles.footerText}>
+        {/* Modern Minimal Footer */}
+        <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, Spacing.xl)}]}>
+          <Text style={styles.footerText} numberOfLines={1} adjustsFontSizeToFit>
             By continuing, you agree to our{' '}
             <Text style={styles.footerLink} onPress={() => handleOpenLink('https://zorodeliveryapp.vercel.app/terms.html')}>
-              Terms & Conditions
+              Terms of Service
             </Text>
             {' '}and{' '}
             <Text style={styles.footerLink} onPress={() => handleOpenLink('https://zorodeliveryapp.vercel.app/privacy.html')}>
@@ -339,73 +260,121 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xxl,
   },
   headerContainer: {
-    marginBottom: Spacing.xxl,
-    marginTop: Spacing.md,
+    marginBottom: Spacing.xl,
+    alignItems: 'flex-start',
+    marginTop: Spacing.xxl,
   },
   welcomeText: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: Colors.black,
-    letterSpacing: -1,
+    fontSize: 40,
+    fontWeight: '900',
+    color: Colors.text,
+    letterSpacing: -1.5,
+    textAlign: 'left',
   },
   subHeaderText: {
-    fontSize: 18,
+    fontSize: 16,
     color: Colors.textSecondary,
     fontWeight: '400',
-    marginTop: -2,
+    marginTop: 6,
+    textAlign: 'left',
   },
   roleContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: Spacing.lg,
-    overflow: 'visible', // Ensure shadows aren't clipped
+    gap: Spacing.md,
+    marginBottom: Spacing.sm,
   },
-  roleButton: {
-    flex: 1,
+  roleCard: {
     flexDirection: 'row',
-    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: 'transparent',
-  },
-  roleIcon: {
-    marginRight: 8,
-  },
-  roleButtonActive: {
     backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2, // Increased for visibility
-    shadowRadius: 8, // Increased for visibility
-    elevation: 5, // Increased for Android
-    zIndex: 10, // Ensure shadow isn't covered
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 1,
   },
-  roleText: {
-    fontSize: 14,
-    fontWeight: '600',
+  roleCardActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  roleCardPressed: {
+    backgroundColor: Colors.border,
+  },
+  roleIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  roleIconContainerActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  roleTextContainer: {
+    flex: 1,
+  },
+  roleCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  roleCardTitleActive: {
+    color: Colors.white,
+  },
+  roleCardSubtitle: {
+    fontSize: 13,
     color: Colors.textSecondary,
+    marginTop: 2,
+    fontWeight: '400',
   },
-  roleTextActive: {
-    color: Colors.primary,
+  roleCardSubtitleActive: {
+    color: 'rgba(255, 255, 255, 0.8)',
   },
-  formContainer: {
-    gap: Spacing.md,
+  radioButton: {
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
-  inputStyle: {
-    marginBottom: 0,
+  radioButtonActive: {
+    borderColor: Colors.white,
   },
-  submitButton: {
-    height: 60,
-    borderRadius: borderRadius.md,
-    marginTop: Spacing.sm,
+  radioButtonInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+  },
+  radioButtonInnerActive: {
+    backgroundColor: Colors.white,
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: Spacing.md,
+    marginVertical: Spacing.xl,
   },
   dividerLine: {
     flex: 1,
@@ -415,8 +384,12 @@ const styles = StyleSheet.create({
   dividerText: {
     marginHorizontal: Spacing.md,
     color: Colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 1.5,
+  },
+  actionContainer: {
+    gap: Spacing.md,
   },
   googleButton: {
     flexDirection: 'row',
@@ -428,33 +401,46 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     backgroundColor: Colors.white,
     gap: 12,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  googleButtonDisabled: {
+    opacity: 0.7,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
   googleButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: Colors.text,
   },
-  forgotButton: {
+  errorContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.sm,
-  },
-  forgotText: {
-    color: Colors.primary,
-    fontWeight: '600',
-    fontSize: 14,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: Spacing.xs,
   },
   errorText: {
     color: Colors.error,
     fontSize: 14,
-    textAlign: 'center',
+    fontWeight: '500',
+    flex: 1,
   },
   footerContainer: {
-    padding: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 18,
@@ -464,3 +450,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
