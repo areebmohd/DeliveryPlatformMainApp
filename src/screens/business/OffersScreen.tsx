@@ -77,11 +77,16 @@ export const OffersScreen = ({ navigation }: any) => {
   const [endTimeActive, setEndTimeActive] = useState(false);
   const [activePicker, setActivePicker] = useState<'start' | 'end' | null>(null);
 
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [selectedRewardProducts, setSelectedRewardProducts] = useState<string[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
+  const [selectedRewardProducts, setSelectedRewardProducts] = useState<any[]>([]);
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
   const [productModalMode, setProductModalMode] = useState<'condition' | 'reward'>('condition');
   const [showProductModal, setShowProductModal] = useState(false);
+
+  // Option picker state
+  const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
+  const [tempSelectedOptions, setTempSelectedOptions] = useState<Record<string, string>>({});
+  const [tempQuantity, setTempQuantity] = useState<number>(1);
   const [formLoading, setFormLoading] = useState(false);
   const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
   const [conditionModal, setConditionModal] = useState<{ visible: boolean; offer: Offer | null }>({
@@ -126,7 +131,7 @@ export const OffersScreen = ({ navigation }: any) => {
 
         const { data: productsData, error: productsError } = await supabase
           .from('products')
-          .select('id, name, price')
+          .select('id, name, price, options')
           .eq('store_id', storeData.id)
           .eq('is_deleted', false)
           .order('name');
@@ -176,8 +181,22 @@ export const OffersScreen = ({ navigation }: any) => {
       setEndTimeActive(false);
     }
 
-    setSelectedProducts(offer.conditions.product_ids || []);
-    setSelectedRewardProducts(offer.reward_data?.product_ids || []);
+    const mapLegacy = (ids: any[]) => {
+      return (ids || []).map(pid => {
+        if (typeof pid !== 'string') return pid;
+        const product = storeProducts.find(p => String(p.id) === String(pid));
+        return {
+          id: pid,
+          name: product?.name || 'Product',
+          price: product?.price || 0,
+          quantity: 1,
+          selected_options: {},
+          options: product?.options || []
+        };
+      });
+    };
+    setSelectedProducts(mapLegacy(offer.conditions.product_ids || []));
+    setSelectedRewardProducts(mapLegacy(offer.reward_data?.product_ids || []));
     setSelectedType(offer.type);
     setShowFormModal(true);
   };
@@ -259,9 +278,11 @@ export const OffersScreen = ({ navigation }: any) => {
         reward_data: (selectedType === 'free_product' || selectedType === 'cheap_product' || selectedType === 'combo' || selectedType === 'fixed_price') ? { 
           product_ids: selectedRewardProducts,
           product_name: selectedRewardProducts.length === 1 
-            ? (storeProducts.find(p => String(p.id) === String(selectedRewardProducts[0]))?.name || 'Item')
+            ? (selectedRewardProducts[0]?.name || 'Item')
             : (selectedRewardProducts.length > 1 ? `${selectedRewardProducts.length} Items` : 'Items'),
-          product_price: storeProducts.find(p => String(p.id) === String(selectedRewardProducts[0]))?.price || 0
+          product_price: selectedRewardProducts.length === 1 
+            ? (selectedRewardProducts[0]?.price || 0)
+            : 0
         } : {},
         status: editingOffer ? editingOffer.status : 'active'
       };
@@ -741,55 +762,267 @@ export const OffersScreen = ({ navigation }: any) => {
             </ScrollView>
 
             {/* Product Selection Modal - Nested for Android Reliability */}
-            <Modal visible={showProductModal} transparent animationType="slide">
+            <Modal 
+              visible={showProductModal} 
+              transparent 
+              animationType="slide"
+              onRequestClose={() => setShowProductModal(false)}
+            >
               <View style={styles.modalOverlay}>
-                <View style={styles.productModalContent}>
+                <View style={[styles.productModalContent, { height: height * 0.85 }]}>
                   <View style={[styles.modalHeader, { marginBottom: 8 }]}>
                     <View style={{ flex: 1, marginRight: 12 }}>
                       <Text style={styles.modalTitle}>
                         {productModalMode === 'reward' ? 'Select Free Products' : 'Select Target Products'}
                       </Text>
+                      <Text style={styles.modalSubtitle}>
+                        {productModalMode === 'reward' ? selectedRewardProducts.length : selectedProducts.length} items configured
+                      </Text>
                     </View>
-                    <TouchableOpacity onPress={() => setShowProductModal(false)}>
+                    <TouchableOpacity onPress={() => {
+                      setExpandedProductId(null);
+                      setShowProductModal(false);
+                    }}>
                       <Icon name="close" size={24} color={Colors.text} />
                     </TouchableOpacity>
                   </View>
 
-                  <Text style={[styles.modalSubtitle, { marginBottom: 20 }]}>
-                    {productModalMode === 'reward' ? selectedRewardProducts.length : selectedProducts.length} selected
-                  </Text>
-
                   <ScrollView showsVerticalScrollIndicator={false} style={styles.productList}>
+                    {/* SECTION 1: SELECTED ITEMS */}
+                    <Text style={[styles.sectionTitle, { fontSize: 15, marginTop: 12, marginBottom: 8 }]}>Selected Items</Text>
+                    <View style={styles.selectedSectionCard}>
+                      {(() => {
+                        const currentList = productModalMode === 'reward' ? selectedRewardProducts : selectedProducts;
+                        const setList = productModalMode === 'reward' ? setSelectedRewardProducts : setSelectedProducts;
+
+                        if (currentList.length === 0) {
+                          return (
+                            <Text style={styles.noSelectedText}>No products selected. Tap products below to add.</Text>
+                          );
+                        }
+
+                        return currentList.map((item, index) => {
+                          const optsStr = item.selected_options && Object.keys(item.selected_options).length > 0
+                            ? Object.entries(item.selected_options).map(([k, v]) => `${k}: ${v}`).join(', ')
+                            : '';
+
+                          return (
+                            <View key={`${item.id}_${index}`} style={styles.selectedItemRow}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.selectedItemName}>{item.name}</Text>
+                                {optsStr ? <Text style={styles.selectedItemOptions}>{optsStr}</Text> : null}
+                              </View>
+                              
+                              <View style={styles.qtyContainer}>
+                                <TouchableOpacity 
+                                  style={styles.qtyBtn} 
+                                  onPress={() => {
+                                    if (item.quantity > 1) {
+                                      const newList = [...currentList];
+                                      newList[index] = { ...item, quantity: item.quantity - 1 };
+                                      setList(newList);
+                                    } else {
+                                      // Remove item
+                                      setList(currentList.filter((_, idx) => idx !== index));
+                                    }
+                                  }}
+                                >
+                                  <Icon name={item.quantity > 1 ? "minus" : "trash-can-outline"} size={16} color={Colors.textSecondary} />
+                                </TouchableOpacity>
+                                <Text style={styles.qtyText}>{item.quantity}</Text>
+                                <TouchableOpacity 
+                                  style={styles.qtyBtn} 
+                                  onPress={() => {
+                                    const newList = [...currentList];
+                                    newList[index] = { ...item, quantity: item.quantity + 1 };
+                                    setList(newList);
+                                  }}
+                                >
+                                  <Icon name="plus" size={16} color={Colors.textSecondary} />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          );
+                        });
+                      })()}
+                    </View>
+
+                    {/* SECTION 2: ALL PRODUCTS */}
+                    <Text style={[styles.sectionTitle, { fontSize: 15, marginTop: 24, marginBottom: 8 }]}>All Products</Text>
+                    
                     {storeProducts.length > 0 ? (
                       storeProducts.map((product) => {
-                        const isSelected = productModalMode === 'reward' 
-                          ? selectedRewardProducts.includes(String(product.id))
-                          : selectedProducts.includes(String(product.id));
+                        const hasOptions = product.options && Array.isArray(product.options) && product.options.length > 0;
+                        const isExpanded = expandedProductId === String(product.id);
+                        
+                        const currentList = productModalMode === 'reward' ? selectedRewardProducts : selectedProducts;
+                        const setList = productModalMode === 'reward' ? setSelectedRewardProducts : setSelectedProducts;
+
+                        // Check if this product (any variant) is selected
+                        const countSelected = currentList.filter(item => item.id === String(product.id)).reduce((acc, curr) => acc + curr.quantity, 0);
 
                         return (
-                          <TouchableOpacity 
-                            key={product.id} 
-                            style={styles.productItem}
-                            onPress={() => {
-                              const pId = String(product.id);
-                              if (productModalMode === 'reward') {
-                                if (isSelected) setSelectedRewardProducts(selectedRewardProducts.filter(id => id !== pId));
-                                else setSelectedRewardProducts([...selectedRewardProducts, pId]);
-                              } else {
-                                if (isSelected) setSelectedProducts(selectedProducts.filter(id => id !== pId));
-                                else setSelectedProducts([...selectedProducts, pId]);
-                              }
-                            }}
-                          >
-                            <Text style={[styles.productName, isSelected && styles.productNameActive]}>
-                              {product.name}
-                            </Text>
-                            <Icon 
-                              name={isSelected ? "checkbox-marked" : "checkbox-blank-outline"} 
-                              size={24} 
-                              color={isSelected ? Colors.primary : Colors.border} 
-                            />
-                          </TouchableOpacity>
+                          <View key={product.id} style={styles.allProductItemCard}>
+                            <TouchableOpacity 
+                              style={styles.allProductHeaderRow}
+                              activeOpacity={0.7}
+                              onPress={() => {
+                                const pId = String(product.id);
+                                if (hasOptions) {
+                                  if (isExpanded) {
+                                    setExpandedProductId(null);
+                                  } else {
+                                    setExpandedProductId(pId);
+                                    setTempSelectedOptions({});
+                                    setTempQuantity(1);
+                                  }
+                                } else {
+                                  // Simple product - add to Selected Items
+                                  // If already exists, increment quantity
+                                  const existingIdx = currentList.findIndex(item => item.id === pId);
+                                  if (existingIdx !== -1) {
+                                    const newList = [...currentList];
+                                    newList[existingIdx] = { ...newList[existingIdx], quantity: newList[existingIdx].quantity + 1 };
+                                    setList(newList);
+                                    showToast(`${product.name} quantity increased`, 'success');
+                                  } else {
+                                    setList([...currentList, {
+                                      id: pId,
+                                      name: product.name,
+                                      price: product.price || 0,
+                                      quantity: 1,
+                                      selected_options: {},
+                                      options: product.options || []
+                                    }]);
+                                    showToast(`${product.name} added to selected`, 'success');
+                                  }
+                                }
+                              }}
+                            >
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.allProductName}>{product.name}</Text>
+                                <Text style={styles.allProductPrice}>₹{product.price}</Text>
+                              </View>
+                              
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                {countSelected > 0 && (
+                                  <View style={styles.selectedCountBadge}>
+                                    <Text style={styles.selectedCountBadgeText}>{countSelected} selected</Text>
+                                  </View>
+                                )}
+                                {hasOptions ? (
+                                  <Icon 
+                                    name={isExpanded ? "chevron-up" : "chevron-down"} 
+                                    size={20} 
+                                    color={Colors.textSecondary} 
+                                  />
+                                ) : (
+                                  <Icon 
+                                    name="plus-circle-outline" 
+                                    size={24} 
+                                    color={Colors.primary} 
+                                  />
+                                )}
+                              </View>
+                            </TouchableOpacity>
+
+                            {/* Option & Quantity Selector (Expanded) */}
+                            {hasOptions && isExpanded && (
+                              <View style={styles.optionSelectorContainer}>
+                                <View style={styles.optionDivider} />
+                                {product.options.map((opt: any, idx: number) => (
+                                  <View key={idx} style={{ marginBottom: 12 }}>
+                                    <Text style={styles.miniOptionTitle}>{opt.title}</Text>
+                                    <View style={styles.miniChipsRow}>
+                                      {opt.values.map((val: any, vIdx: number) => {
+                                        const valText = typeof val === 'string' ? val : val.value;
+                                        const isSel = tempSelectedOptions[opt.title] === valText;
+                                        return (
+                                          <TouchableOpacity
+                                            key={vIdx}
+                                            style={[styles.miniChip, isSel && styles.miniChipSelected]}
+                                            onPress={() => setTempSelectedOptions({ ...tempSelectedOptions, [opt.title]: valText })}
+                                          >
+                                            <Text style={[styles.miniChipText, isSel && styles.miniChipTextSelected]}>
+                                              {valText}
+                                            </Text>
+                                          </TouchableOpacity>
+                                        );
+                                      })}
+                                    </View>
+                                  </View>
+                                ))}
+
+                                {/* Quantity Adjuster inside expanded section */}
+                                <View style={styles.inlineQtyRow}>
+                                  <Text style={styles.miniOptionTitle}>Quantity</Text>
+                                  <View style={styles.qtyContainer}>
+                                    <TouchableOpacity 
+                                      style={styles.qtyBtn} 
+                                      onPress={() => { if (tempQuantity > 1) setTempQuantity(tempQuantity - 1); }}
+                                    >
+                                      <Icon name="minus" size={16} color={Colors.textSecondary} />
+                                    </TouchableOpacity>
+                                    <Text style={styles.qtyText}>{tempQuantity}</Text>
+                                    <TouchableOpacity 
+                                      style={styles.qtyBtn} 
+                                      onPress={() => setTempQuantity(tempQuantity + 1)}
+                                    >
+                                      <Icon name="plus" size={16} color={Colors.textSecondary} />
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+
+                                {/* Action Buttons */}
+                                <View style={styles.optionActionsRow}>
+                                  <TouchableOpacity 
+                                    style={styles.miniAddBtn}
+                                    onPress={() => {
+                                      // Validate all options are selected
+                                      const missing = product.options.find((opt: any) => !tempSelectedOptions[opt.title]);
+                                      if (missing) {
+                                        showToast(`Please select ${missing.title}`, 'error');
+                                        return;
+                                      }
+
+                                      const pId = String(product.id);
+                                      // Check if this product variant is already selected
+                                      const existingIdx = currentList.findIndex(item => 
+                                        item.id === pId && 
+                                        JSON.stringify(item.selected_options || {}) === JSON.stringify(tempSelectedOptions)
+                                      );
+
+                                      if (existingIdx !== -1) {
+                                        // Increment quantity
+                                        const newList = [...currentList];
+                                        newList[existingIdx] = { 
+                                          ...newList[existingIdx], 
+                                          quantity: newList[existingIdx].quantity + tempQuantity 
+                                        };
+                                        setList(newList);
+                                        showToast(`${product.name} variant quantity increased`, 'success');
+                                      } else {
+                                        // Add new item
+                                        setList([...currentList, {
+                                          id: pId,
+                                          name: product.name,
+                                          price: product.price || 0,
+                                          quantity: tempQuantity,
+                                          selected_options: { ...tempSelectedOptions },
+                                          options: product.options || []
+                                        }]);
+                                        showToast(`${product.name} variant added`, 'success');
+                                      }
+
+                                      setExpandedProductId(null);
+                                    }}
+                                  >
+                                    <Text style={styles.miniAddBtnText}>Add to Offer</Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            )}
+                          </View>
                         );
                       })
                     ) : (
@@ -806,13 +1039,17 @@ export const OffersScreen = ({ navigation }: any) => {
                       onPress={() => {
                         if (productModalMode === 'reward') setSelectedRewardProducts([]);
                         else setSelectedProducts([]);
+                        showToast('Selection cleared', 'info');
                       }}
                     >
                       <Text style={styles.clearBtnText}>Clear All</Text>
                     </TouchableOpacity>
                     <Button 
                       title="Done" 
-                      onPress={() => setShowProductModal(false)} 
+                      onPress={() => {
+                        setExpandedProductId(null);
+                        setShowProductModal(false);
+                      }} 
                       style={styles.doneBtn}
                     />
                   </View>
@@ -1418,27 +1655,166 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: Spacing.xl,
-    height: height * 0.8,
   },
   productList: {
     flex: 1,
   },
-  productItem: {
+  selectedSectionCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: 8,
+  },
+  noSelectedText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: 12,
+    fontStyle: 'italic',
+  },
+  selectedItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  productName: {
-    fontSize: 15,
-    color: Colors.text,
-    fontWeight: '500',
-  },
-  productNameActive: {
-    color: Colors.primary,
+  selectedItemName: {
+    fontSize: 14,
     fontWeight: '700',
+    color: Colors.text,
+  },
+  selectedItemOptions: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  qtyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E5E7EB',
+    borderRadius: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    gap: 10,
+  },
+  qtyBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.text,
+    minWidth: 16,
+    textAlign: 'center',
+  },
+  allProductItemCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  allProductHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+  },
+  allProductName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  allProductPrice: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  selectedCountBadge: {
+    backgroundColor: Colors.primary + '15',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  selectedCountBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  optionSelectorContainer: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
+  optionDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginBottom: 12,
+  },
+  miniOptionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  miniChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  miniChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  miniChipSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  miniChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  miniChipTextSelected: {
+    color: Colors.white,
+  },
+  inlineQtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  optionActionsRow: {
+    alignItems: 'flex-end',
+  },
+  miniAddBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  miniAddBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.white,
   },
   productModalActions: {
     flexDirection: 'row',

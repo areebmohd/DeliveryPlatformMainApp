@@ -80,7 +80,20 @@ export const getOfferConditionList = (offer: any) => {
   }
 
   if (conditions.product_ids && conditions.product_ids.length > 0) {
-    list.push(`${conditions.product_ids.length} products`);
+    if (conditions.product_ids.length === 1) {
+      const p = conditions.product_ids[0];
+      if (typeof p === 'string') {
+        list.push(`1 product`);
+      } else {
+        const qty = p.quantity || 1;
+        const optsStr = p.selected_options && Object.keys(p.selected_options).length > 0 
+          ? ` (${Object.values(p.selected_options).join(', ')})` 
+          : '';
+        list.push(`${qty > 1 ? `${qty}x ` : ''}${p.name || 'product'}${optsStr}`);
+      }
+    } else {
+      list.push(`${conditions.product_ids.length} products`);
+    }
   }
 
   if (list.length === 0) {
@@ -134,9 +147,29 @@ export const validateOffer = (offer: any, subtotal: number, distance: number = 0
 
   // ALL products check
   if (conditions.product_ids && conditions.product_ids.length > 0) {
-    const allPresent = conditions.product_ids.every((pid: string) => 
-      cartItems.some(item => item.id === pid)
-    );
+    const allPresent = conditions.product_ids.every((pid: any) => {
+      const id = typeof pid === 'string' ? pid : pid.id;
+      const requiredQty = typeof pid === 'string' ? 1 : (pid.quantity || 1);
+      const requiredOptions = typeof pid === 'string' ? null : pid.selected_options;
+
+      return cartItems.some(item => {
+        const itemId = item.product_id || item.products?.id || item.id;
+        if (itemId !== id) return false;
+
+        // Check quantity
+        if (item.quantity < requiredQty) return false;
+
+        // Check options
+        if (requiredOptions && Object.keys(requiredOptions).length > 0) {
+          const itemOpts = item.selected_options || {};
+          return Object.entries(requiredOptions).every(([optTitle, optVal]) => 
+            itemOpts[optTitle] === optVal
+          );
+        }
+
+        return true;
+      });
+    });
     if (!allPresent) {
       errors.push(`All ${conditions.product_ids.length} required products must be in your cart`);
     }
@@ -154,10 +187,11 @@ export const getItemTotals = (product: any, allStoreItems: any[], storeOffer: an
 
   // Helper to check if a product (item) matches a target ID from an offer
   // Handling barcode/name/weight fallback for common products
-  const matchesOfferId = (item: any, targetId: string) => {
+  const matchesOfferId = (item: any, targetId: any) => {
+    const id = typeof targetId === 'string' ? targetId : targetId.id;
     // 1. Direct ID match (most common)
     const itemId = item.product_id || item.products?.id || item.id;
-    if (itemId === targetId) return true;
+    if (itemId === id) return true;
 
     // 2. Identity match for common/barcode products
     // We need the product details (either from join or direct)
@@ -168,7 +202,7 @@ export const getItemTotals = (product: any, allStoreItems: any[], storeOffer: an
     // We also need the details of the targetId.
     // In many cases, the offer's reward_data or conditions might NOT contain full details,
     // but the 'allStoreItems' might contain an item that DOES match the targetId.
-    const targetProduct = allStoreItems.find(i => (i.product_id || i.products?.id || i.id) === targetId);
+    const targetProduct = allStoreItems.find(i => (i.product_id || i.products?.id || i.id) === id);
     const tpDetails = targetProduct?.products || targetProduct;
 
     if (tpDetails) {
@@ -192,31 +226,64 @@ export const getItemTotals = (product: any, allStoreItems: any[], storeOffer: an
       break;
     case 'cheap_product': {
       const productIds = [...(storeOffer.conditions?.product_ids || []), ...(storeOffer.reward_data?.product_ids || [])];
-      if (productIds.some(pid => matchesOfferId(product, pid))) {
-        discountedTotal = originalTotal * (1 - storeOffer.amount / 100);
+      const match = productIds.find(pid => matchesOfferId(product, pid));
+      if (match) {
+        const requiredOptions = typeof match === 'string' ? null : match.selected_options;
+        let optionMatches = true;
+        if (requiredOptions && Object.keys(requiredOptions).length > 0) {
+          const itemOpts = product.selected_options || {};
+          optionMatches = Object.entries(requiredOptions).every(([optTitle, optVal]) => 
+            itemOpts[optTitle] === optVal
+          );
+        }
+        if (optionMatches) {
+          discountedTotal = originalTotal * (1 - storeOffer.amount / 100);
+        }
       }
       break;
     }
     case 'fixed_price': {
       const productIds = storeOffer.reward_data?.product_ids || [];
-      if (productIds.some(pid => matchesOfferId(product, pid))) {
-        discountedTotal = storeOffer.amount * product.quantity;
+      const match = productIds.find((pid: any) => matchesOfferId(product, pid));
+      if (match) {
+        const requiredOptions = typeof match === 'string' ? null : match.selected_options;
+        let optionMatches = true;
+        if (requiredOptions && Object.keys(requiredOptions).length > 0) {
+          const itemOpts = product.selected_options || {};
+          optionMatches = Object.entries(requiredOptions).every(([optTitle, optVal]) => 
+            itemOpts[optTitle] === optVal
+          );
+        }
+        if (optionMatches) {
+          discountedTotal = storeOffer.amount * product.quantity;
+        }
       }
       break;
     }
     case 'combo': {
       const productIds = storeOffer.reward_data?.product_ids || [];
-      if (productIds.some(pid => matchesOfferId(product, pid))) {
-        // Only 1 unit of each product participates in the bundle; extra units are full price
-        const comboItems = allStoreItems.filter((i: any) => {
-            return productIds.some(pid => matchesOfferId(i, pid));
-        });
-        const comboBundleOriginal = comboItems.reduce((acc: any, curr: any) => acc + curr.product_price, 0); // 1 of each unit
-        const totalBundleDiscount = Math.max(0, comboBundleOriginal - storeOffer.amount);
-        const myProportion = product.product_price / (comboBundleOriginal || 1);
-        const myBundleDiscount = totalBundleDiscount * myProportion; // discount on exactly 1 unit
-        // 1 discounted unit + (quantity - 1) full price units
-        discountedTotal = (product.product_price - myBundleDiscount) + (product.product_price * (product.quantity - 1));
+      const match = productIds.find((pid: any) => matchesOfferId(product, pid));
+      if (match) {
+        const requiredOptions = typeof match === 'string' ? null : match.selected_options;
+        let optionMatches = true;
+        if (requiredOptions && Object.keys(requiredOptions).length > 0) {
+          const itemOpts = product.selected_options || {};
+          optionMatches = Object.entries(requiredOptions).every(([optTitle, optVal]) => 
+            itemOpts[optTitle] === optVal
+          );
+        }
+        if (optionMatches) {
+          // Only 1 unit of each product participates in the bundle; extra units are full price
+          const comboItems = allStoreItems.filter((i: any) => {
+              return productIds.some((pid: any) => matchesOfferId(i, pid));
+          });
+          const comboBundleOriginal = comboItems.reduce((acc: any, curr: any) => acc + curr.product_price, 0); // 1 of each unit
+          const totalBundleDiscount = Math.max(0, comboBundleOriginal - storeOffer.amount);
+          const myProportion = product.product_price / (comboBundleOriginal || 1);
+          const myBundleDiscount = totalBundleDiscount * myProportion; // discount on exactly 1 unit
+          // 1 discounted unit + (quantity - 1) full price units
+          discountedTotal = (product.product_price - myBundleDiscount) + (product.product_price * (product.quantity - 1));
+        }
       }
       break;
     }

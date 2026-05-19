@@ -834,29 +834,66 @@ export const CartScreen = ({ navigation }: any) => {
     }
 
     if (conditions.product_ids && conditions.product_ids.length > 0) {
-      const missingIds = conditions.product_ids.filter((pid: string) => {
-        const requiredProduct = offerProductDetails[pid];
-        if (!requiredProduct) return !items.some(item => item.id === pid); // Fallback to exact ID
+      const missingIds = conditions.product_ids.filter((pid: any) => {
+        const id = typeof pid === 'string' ? pid : pid.id;
+        const requiredQty = typeof pid === 'string' ? 1 : (pid.quantity || 1);
+        const requiredOptions = typeof pid === 'string' ? null : pid.selected_options;
+
+        const requiredProduct = offerProductDetails[id];
+        if (!requiredProduct) {
+          // Fallback to exact ID & check quantity + options
+          return !items.some(item => {
+            if (item.id !== id) return false;
+            if (item.quantity < requiredQty) return false;
+            if (requiredOptions && Object.keys(requiredOptions).length > 0) {
+              const itemOpts = item.selected_options || {};
+              return Object.entries(requiredOptions).every(([k, v]) => itemOpts[k] === v);
+            }
+            return true;
+          });
+        }
 
         // Identity check against cart items
         return !items.some(item => {
-          // Exact ID
-          if (item.id === pid) return true;
-          
-          // Fluid identity match
-          if (item.is_store_specific || item.product_type === 'personal') return false;
-          
-          if (requiredProduct.product_type === 'barcode' && requiredProduct.barcode && item.barcode === requiredProduct.barcode) {
-            return true;
+          // Exact ID or Fluid identity match
+          const isIdMatch = item.id === id;
+          const isIdentityMatch = isIdMatch || (() => {
+            if (item.is_store_specific || item.product_type === 'personal') return false;
+            
+            if (requiredProduct.product_type === 'barcode' && requiredProduct.barcode && item.barcode === requiredProduct.barcode) {
+              return true;
+            }
+
+            return item.name === requiredProduct.name && 
+                   item.weight_kg === requiredProduct.weight_kg;
+          })();
+
+          if (!isIdentityMatch) return false;
+
+          // Quantity check
+          if (item.quantity < requiredQty) return false;
+
+          // Options check
+          if (requiredOptions && Object.keys(requiredOptions).length > 0) {
+            const itemOpts = item.selected_options || {};
+            return Object.entries(requiredOptions).every(([k, v]) => itemOpts[k] === v);
           }
 
-          return item.name === requiredProduct.name && 
-                 item.weight_kg === requiredProduct.weight_kg;
+          return true;
         });
       });
 
       if (missingIds.length > 0) {
-        const missingNames = missingIds.map((id: string) => offerProductDetails[id]?.name || 'Unknown Product').join(', ');
+        const missingNames = missingIds.map((pid: any) => {
+          const id = typeof pid === 'string' ? pid : pid.id;
+          const requiredQty = typeof pid === 'string' ? 1 : (pid.quantity || 1);
+          const requiredOptions = typeof pid === 'string' ? null : pid.selected_options;
+          const name = typeof pid === 'string' ? (offerProductDetails[id]?.name || 'Unknown Product') : pid.name;
+          const optsStr = requiredOptions && Object.keys(requiredOptions).length > 0 
+            ? ` (${Object.values(requiredOptions).join(', ')})` 
+            : '';
+          return `${requiredQty > 1 ? `${requiredQty}x ` : ''}${name}${optsStr}`;
+        }).join(', ');
         errors.push(`Required products missing from cart: ${missingNames}`);
       }
     }
@@ -1514,45 +1551,81 @@ export const CartScreen = ({ navigation }: any) => {
         } else if (offer.type === 'cheap_product') {
           const eligibleItems = items.filter(item => {
             const productIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
-            if (productIds.includes(item.id)) return true;
-            const hasEquivalent = productIds.some((pid: string) => {
-              const rp = offerProductDetails[pid];
-              if (!rp) return false;
-              if (item.is_store_specific || item.product_type === 'personal') return false;
-              if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-              return item.name === rp.name && item.weight_kg === rp.weight_kg;
+            return productIds.some((pid: any) => {
+              const id = typeof pid === 'string' ? pid : pid.id;
+              const opts = typeof pid === 'string' ? null : pid.selected_options;
+              
+              const isIdMatch = item.id === id;
+              const hasEquivalent = isIdMatch || (() => {
+                const rp = offerProductDetails[id];
+                if (!rp) return false;
+                if (item.is_store_specific || item.product_type === 'personal') return false;
+                if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+                return item.name === rp.name && item.weight_kg === rp.weight_kg;
+              })();
+
+              if (!hasEquivalent) return false;
+
+              if (opts && Object.keys(opts).length > 0) {
+                const itemOpts = item.selected_options || {};
+                return Object.entries(opts).every(([k, v]) => itemOpts[k] === v);
+              }
+              return true;
             });
-            return hasEquivalent;
           });
           const eligibleSubtotal = eligibleItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
           offerDiscount = (eligibleSubtotal * offer.amount) / 100;
         } else if (offer.type === 'combo') {
           const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
           const comboItems = items.filter(item => {
-            if (rewardIds.includes(item.id)) return true;
-            const hasEquivalent = rewardIds.some((pid: string) => {
-              const rp = offerProductDetails[pid];
-              if (!rp) return false;
-              if (item.is_store_specific || item.product_type === 'personal') return false;
-              if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-              return item.name === rp.name && item.weight_kg === rp.weight_kg;
+            return rewardIds.some((pid: any) => {
+              const id = typeof pid === 'string' ? pid : pid.id;
+              const opts = typeof pid === 'string' ? null : pid.selected_options;
+              
+              const isIdMatch = item.id === id;
+              const hasEquivalent = isIdMatch || (() => {
+                const rp = offerProductDetails[id];
+                if (!rp) return false;
+                if (item.is_store_specific || item.product_type === 'personal') return false;
+                if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+                return item.name === rp.name && item.weight_kg === rp.weight_kg;
+              })();
+
+              if (!hasEquivalent) return false;
+
+              if (opts && Object.keys(opts).length > 0) {
+                const itemOpts = item.selected_options || {};
+                return Object.entries(opts).every(([k, v]) => itemOpts[k] === v);
+              }
+              return true;
             });
-            return hasEquivalent;
           });
           const comboSubtotal = comboItems.reduce((sum, i) => sum + i.price, 0);
           offerDiscount = Math.max(0, comboSubtotal - offer.amount);
         } else if (offer.type === 'fixed_price') {
           const rewardIds = [...(offer.conditions?.product_ids || []), ...(offer.reward_data?.product_ids || [])];
           const eligibleItems = items.filter(item => {
-            if (rewardIds.includes(item.id)) return true;
-            const hasEquivalent = rewardIds.some((pid: string) => {
-              const rp = offerProductDetails[pid];
-              if (!rp) return false;
-              if (item.is_store_specific || item.product_type === 'personal') return false;
-              if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
-              return item.name === rp.name && item.weight_kg === rp.weight_kg;
+            return rewardIds.some((pid: any) => {
+              const id = typeof pid === 'string' ? pid : pid.id;
+              const opts = typeof pid === 'string' ? null : pid.selected_options;
+              
+              const isIdMatch = item.id === id;
+              const hasEquivalent = isIdMatch || (() => {
+                const rp = offerProductDetails[id];
+                if (!rp) return false;
+                if (item.is_store_specific || item.product_type === 'personal') return false;
+                if (rp.product_type === 'barcode' && rp.barcode && item.barcode === rp.barcode) return true;
+                return item.name === rp.name && item.weight_kg === rp.weight_kg;
+              })();
+
+              if (!hasEquivalent) return false;
+
+              if (opts && Object.keys(opts).length > 0) {
+                const itemOpts = item.selected_options || {};
+                return Object.entries(opts).every(([k, v]) => itemOpts[k] === v);
+              }
+              return true;
             });
-            return hasEquivalent;
           });
           offerDiscount = eligibleItems.reduce((sum, item) => {
             const diff = item.price - offer.amount;
@@ -1860,13 +1933,21 @@ export const CartScreen = ({ navigation }: any) => {
 
       Object.entries(appliedOffers).forEach(([_, offer]: [string, any]) => {
         if (offer.type === 'free_product' && checkOfferConditions(offer).length === 0) {
+          const rewardProd = offer.reward_data?.product_ids?.[0];
+          const id = typeof rewardProd === 'string' ? rewardProd : (rewardProd?.id || 'GIFT');
+          const name = typeof rewardProd === 'string'
+            ? offer.reward_data?.product_name || 'Gift Item'
+            : rewardProd?.name || offer.reward_data?.product_name || 'Gift Item';
+          const qty = typeof rewardProd === 'string' ? 1 : (rewardProd?.quantity || 1);
+          const opts = typeof rewardProd === 'string' ? {} : (rewardProd?.selected_options || {});
+
           orderItems.push({
             order_id: order.id,
-            product_id: offer.reward_data?.product_ids?.[0] || 'GIFT',
-            product_name: offer.reward_data?.product_name || 'Gift Item',
+            product_id: id,
+            product_name: name,
             product_price: 0,
-            quantity: 1,
-            selected_options: { gift: 'true' }
+            quantity: qty,
+            selected_options: { gift: 'true', ...opts }
           });
         }
       });
