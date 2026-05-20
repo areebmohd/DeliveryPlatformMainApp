@@ -5,8 +5,6 @@ import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '../screens/auth/ResetPasswordScreen';
 import { VerifyResetOTPScreen } from '../screens/auth/VerifyResetOTPScreen';
 
-import { VerifyEmailOTPScreen } from '../screens/auth/VerifyEmailOTPScreen';
-
 const Stack = createNativeStackNavigator();
 
 export const AuthNavigator = () => {
@@ -17,10 +15,9 @@ export const AuthNavigator = () => {
         animation: 'slide_from_right',
       }}
     >
-      <Stack.Screen name="Login" component={AuthScreen} />
+      <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="VerifyResetOTP" component={VerifyResetOTPScreen} />
-      <Stack.Screen name="VerifyEmailOTP" component={VerifyEmailOTPScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
     </Stack.Navigator>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import {
   View,
   TextInput,
@@ -19,7 +19,7 @@ interface InputProps extends TextInputProps {
   rightIcon?: React.ReactNode;
 }
 
-export const Input = ({
+export const Input = forwardRef<TextInput, InputProps>(({
   label,
   error,
   containerStyle,
@@ -28,7 +28,7 @@ export const Input = ({
   leftIcon,
   rightIcon,
   ...props
-}: InputProps) => {
+}, ref) => {
   const [isFocused, setIsFocused] = React.useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
 
@@ -68,6 +68,7 @@ export const Input = ({
             </View>
           )}
           <TextInput
+            ref={ref}
             style={styles.input}
             placeholderTextColor={Colors.textSecondary}
             onFocus={handleFocus}
@@ -97,7 +98,7 @@ export const Input = ({
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -70,7 +70,7 @@ function AppContent() {
           prefixes: ['com.zorodelivery.app://'],
           config: {
             screens: {
-              Login: 'login',
+              Auth: 'auth',
               ResetPassword: 'reset-password',
             },
           },

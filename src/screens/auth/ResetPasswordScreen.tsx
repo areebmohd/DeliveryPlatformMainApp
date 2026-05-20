@@ -130,7 +130,7 @@ export const ResetPasswordScreen = ({ navigation }: any) => {
           text: 'Go to Sign In',
           onPress: () => {
             setIsResettingPassword(false);
-            navigation.replace('Login');
+            navigation.replace('Auth');
           }
         }}
       />
