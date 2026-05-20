@@ -127,11 +127,8 @@ export const ResetPasswordScreen = ({ navigation }: any) => {
         onClose={() => setAlertVisible(false)}
         showCancel={false}
         primaryAction={{
-          text: 'Go to Sign In',
-          onPress: () => {
-            setIsResettingPassword(false);
-            navigation.replace('Auth');
-          }
+          text: 'Continue',
+          onPress: () => setIsResettingPassword(false),
         }}
       />
     </SafeAreaView>
