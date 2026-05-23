@@ -4,41 +4,45 @@ import * as djwt from "https://deno.land/x/djwt@v2.8/mod.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+// Support Dual Firebase Projects
 const FIREBASE_SERVICE_ACCOUNT_ENV = Deno.env.get('FIREBASE_SERVICE_ACCOUNT');
+const FIREBASE_SERVICE_ACCOUNT_CUSTOMER_ENV = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_CUSTOMER');
+const FIREBASE_SERVICE_ACCOUNT_LEGACY_ENV = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_LEGACY');
 
-if (!FIREBASE_SERVICE_ACCOUNT_ENV) {
-  console.error("Missing FIREBASE_SERVICE_ACCOUNT environment variable");
-}
-
-const FIREBASE_SERVICE_ACCOUNT = FIREBASE_SERVICE_ACCOUNT_ENV ? JSON.parse(FIREBASE_SERVICE_ACCOUNT_ENV) : null;
+const globalAccount = FIREBASE_SERVICE_ACCOUNT_ENV ? JSON.parse(FIREBASE_SERVICE_ACCOUNT_ENV) : null;
+const customerAccount = FIREBASE_SERVICE_ACCOUNT_CUSTOMER_ENV ? JSON.parse(FIREBASE_SERVICE_ACCOUNT_CUSTOMER_ENV) : null;
+const legacyAccount = FIREBASE_SERVICE_ACCOUNT_LEGACY_ENV ? JSON.parse(FIREBASE_SERVICE_ACCOUNT_LEGACY_ENV) : null;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Cache the access token to avoid redundant OAuth calls
-let cachedToken: { token: string, expires: number } | null = null;
+// Cache access tokens for both projects to avoid redundant OAuth calls
+let cachedCustomerToken: { token: string, expires: number } | null = null;
+let cachedLegacyToken: { token: string, expires: number } | null = null;
 
-async function getAccessToken(): Promise<string> {
+async function getAccessToken(account: any, isLegacy: boolean): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
+    const cache = isLegacy ? cachedLegacyToken : cachedCustomerToken;
     
-    if (cachedToken && cachedToken.expires > now + 60) {
-        return cachedToken.token;
+    if (cache && cache.expires > now + 60) {
+        return cache.token;
     }
 
-    if (!FIREBASE_SERVICE_ACCOUNT) {
-        throw new Error("Cannot generate access token: FIREBASE_SERVICE_ACCOUNT missing");
+    if (!account) {
+        throw new Error("Cannot generate access token: Service account credentials missing");
     }
 
     try {
         const pemHeader = "-----BEGIN PRIVATE KEY-----";
         const pemFooter = "-----END PRIVATE KEY-----";
-        const privateKey = FIREBASE_SERVICE_ACCOUNT.private_key;
+        const privateKey = account.private_key;
         
         const pemContents = privateKey
             .replace(pemHeader, "")
             .replace(pemFooter, "")
             .replace(/\s/g, "");
         
-        const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+        const binaryDer = Uint8Array.from(atob(pemContents), (c: string) => c.charCodeAt(0));
         
         const key = await crypto.subtle.importKey(
             "pkcs8",
@@ -49,7 +53,7 @@ async function getAccessToken(): Promise<string> {
         );
 
         const payload = {
-            iss: FIREBASE_SERVICE_ACCOUNT.client_email,
+            iss: account.client_email,
             scope: "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/firebase.messaging",
             aud: "https://oauth2.googleapis.com/token",
             exp: now + 3600,
@@ -73,10 +77,16 @@ async function getAccessToken(): Promise<string> {
             throw new Error(`Failed to get access token: ${JSON.stringify(data)}`);
         }
 
-        cachedToken = {
+        const freshToken = {
             token: data.access_token,
             expires: now + (data.expires_in || 3600)
         };
+
+        if (isLegacy) {
+            cachedLegacyToken = freshToken;
+        } else {
+            cachedCustomerToken = freshToken;
+        }
 
         return data.access_token;
     } catch (e) {
@@ -105,6 +115,24 @@ Deno.serve(async (req: Request) => {
         return new Response(JSON.stringify({ success: false, message: "Broadcast blocked" }), { status: 200 });
     }
 
+    // Determine if we need to route via the Legacy project (Riders & Admins)
+    const isLegacy = target_group === 'rider' || target_group === 'admin';
+    
+    // Choose correct service account credentials
+    let activeAccount = isLegacy ? legacyAccount : customerAccount;
+    
+    // Backward-compatible fallback to default FIREBASE_SERVICE_ACCOUNT if specific ones are not configured
+    if (!activeAccount) {
+        activeAccount = globalAccount;
+        console.log(`[send-push] Using default FIREBASE_SERVICE_ACCOUNT fallback for target_group: ${target_group}`);
+    } else {
+        console.log(`[send-push] Using dedicated ${isLegacy ? 'Legacy' : 'Customer'} service account key for target_group: ${target_group}`);
+    }
+
+    if (!activeAccount) {
+        throw new Error(`No service account configuration found for target_group: ${target_group}`);
+    }
+
     // 1. Fetch tokens
     let tokenQuery = supabase.from('fcm_tokens').select('token');
     if (user_id) {
@@ -127,10 +155,10 @@ Deno.serve(async (req: Request) => {
     console.log(`[send-push] Found ${tokens.length} tokens. Authenticating with Google...`);
 
     // 2. Auth with Google
-    const accessToken = await getAccessToken();
+    const accessToken = await getAccessToken(activeAccount, isLegacy);
 
     // 3. Dispatch notifications
-    const results = await Promise.allSettled(tokens.map(async ({ token }) => {
+    const results = await Promise.allSettled(tokens.map(async ({ token }: { token: string }) => {
         const fcmPayload = {
             message: {
                 token: token,
@@ -159,7 +187,7 @@ Deno.serve(async (req: Request) => {
             }
         };
 
-        const res = await fetch(`https://fcm.googleapis.com/v1/projects/${FIREBASE_SERVICE_ACCOUNT.project_id}/messages:send`, {
+        const res = await fetch(`https://fcm.googleapis.com/v1/projects/${activeAccount.project_id}/messages:send`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${accessToken}`,
@@ -177,8 +205,8 @@ Deno.serve(async (req: Request) => {
         return res.json();
     }));
 
-    const successCount = results.filter(r => r.status === 'fulfilled').length;
-    const failures = results.filter(r => r.status === 'rejected');
+    const successCount = results.filter((r: any) => r.status === 'fulfilled').length;
+    const failures = results.filter((r: any) => r.status === 'rejected');
     
     console.log(`[send-push] Dispatched. Success: ${successCount}, Failures: ${failures.length}`);
 
