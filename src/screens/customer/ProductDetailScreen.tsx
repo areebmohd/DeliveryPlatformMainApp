@@ -17,7 +17,7 @@ import { useCart } from '../../context/CartContext';
 import { useAlert } from '../../context/AlertContext';
 import { supabase } from '../../api/supabase';
 
-import { calculateProductPrice, getPriceAdjustmentLabel } from '../../utils/priceUtils';
+import { calculateProductPrice, calculateProductWeight, getPriceAdjustmentLabel } from '../../utils/priceUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -37,6 +37,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   const { showAlert } = useAlert();
 
   const currentPrice = calculateProductPrice(product, selectedOptions);
+  const currentWeight = calculateProductWeight(product, selectedOptions);
 
   React.useEffect(() => {
     checkFavourite();
@@ -195,9 +196,9 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           
           <View style={styles.priceContainer}>
             <Text style={styles.price}>₹{formatPriceFull(currentPrice)}</Text>
-            {product.weight_kg ? (
+            {currentWeight ? (
               <Text style={styles.weight}>
-                ({product.weight_kg < 1 ? `${product.weight_kg * 1000}gm` : `${product.weight_kg}kg`})
+                ({currentWeight < 1 ? `${currentWeight * 1000}gm` : `${currentWeight}kg`})
               </Text>
             ) : null}
           </View>

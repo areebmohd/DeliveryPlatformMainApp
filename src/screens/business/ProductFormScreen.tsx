@@ -479,6 +479,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           .select('id')
           .eq('store_id', storeId)
           .eq('name', name.trim())
+          .eq('is_deleted', false)
           .maybeSingle();
         
         if (duplicateProduct) {

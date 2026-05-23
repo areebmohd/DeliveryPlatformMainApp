@@ -64,7 +64,7 @@ export const Button = ({
       {loading ? (
         <ActivityIndicator color={Colors.primary} />
       ) : (
-        <View style={styles.contentContainer}>
+        <View style={styles.contentContainer} pointerEvents="none">
           {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
           <Text style={[styles.textBase, getTextStyle(), textStyle]}>{title}</Text>
           {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
@@ -117,6 +117,8 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   contentContainer: {
+    width: '100%',
+    height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
