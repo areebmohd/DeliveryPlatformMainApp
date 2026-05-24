@@ -113,7 +113,7 @@ function AppContent() {
       <NavigationContainer
         ref={navigationRef}
         linking={{
-          prefixes: ['com.zorodelivery.app://', 'https://zorodelivery.com', 'https://www.zorodelivery.com'],
+          prefixes: ['com.zorodelivery.app://', 'https://zorodelivery.vercel.app', 'https://www.zorodelivery.vercel.app'],
           config: {
             screens: {
               Auth: 'auth',

@@ -185,7 +185,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   const handleShare = async () => {
     if (!product) return;
     try {
-      const shareUrl = `https://zorodelivery.com/product/${product.id}`;
+      const shareUrl = `https://zorodelivery.vercel.app/product/${product.id}`;
       const message = `Check out "${product.name}" on Zoro Delivery! Order fresh food, groceries, and packages instantly:\n\n${shareUrl}`;
       
       await Share.share({
@@ -208,7 +208,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
   const cartItem = items.find(item => 
     item.id === product.id && 
-    item.store_id === (currentStore?.id || store?.id) &&
+    item.store_id === currentStore?.id &&
     JSON.stringify(item.selected_options) === JSON.stringify(selectedOptions)
   );
   const quantity = cartItem ? cartItem.quantity : 0;
@@ -226,12 +226,6 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity 
-            onPress={handleShare} 
-            style={styles.favButton}
-          >
-            <Icon name="share-variant" size={20} color={Colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity 
             onPress={toggleFavourite} 
             style={styles.favButton}
             disabled={favLoading}
@@ -245,6 +239,12 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                 color={isFavourite ? Colors.error : Colors.primary} 
               />
             )}
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={handleShare} 
+            style={styles.favButton}
+          >
+            <Icon name="share-variant" size={20} color={Colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -450,14 +450,14 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           <View style={styles.cartControls}>
             <TouchableOpacity 
               style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product, -1, selectedOptions, currentStore?.id || store?.id)}
+              onPress={() => updateQuantity(product, -1, selectedOptions, currentStore?.id)}
             >
               <Icon name="minus" size={20} color={Colors.white} />
             </TouchableOpacity>
             <Text style={styles.quantityText}>{quantity}</Text>
             <TouchableOpacity 
               style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product, 1, selectedOptions, currentStore?.id || store?.id)}
+              onPress={() => updateQuantity(product, 1, selectedOptions, currentStore?.id)}
             >
               <Icon name="plus" size={20} color={Colors.white} />
             </TouchableOpacity>
@@ -479,7 +479,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                     }
                   });
                 }
-              addItem({ ...product, price: currentPrice, selectedOptions }, store, isFromStore);
+              addItem({ ...product, price: currentPrice, selectedOptions }, currentStore, isFromStore);
             }}
           >
             <Icon name="cart-plus" size={20} color={Colors.white} style={{ marginRight: 8 }} />

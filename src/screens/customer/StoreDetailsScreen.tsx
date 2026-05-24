@@ -302,7 +302,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   const handleShare = async () => {
     if (!store) return;
     try {
-      const shareUrl = `https://zorodelivery.com/store/${store.id}`;
+      const shareUrl = `https://zorodelivery.vercel.app/store/${store.id}`;
       const message = `Check out "${store.name}" on Zoro Delivery! Order fresh food, groceries, and packages instantly:\n\n${shareUrl}`;
       
       await Share.share({
@@ -674,12 +674,6 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity 
-            onPress={handleShare} 
-            style={styles.favButton}
-          >
-            <Icon name="share-variant" size={22} color={Colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity 
             onPress={toggleFavourite} 
             style={styles.favButton}
             disabled={favLoading}
@@ -693,6 +687,12 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
                 color={isFavourite ? Colors.error : Colors.primary} 
               />
             )}
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={handleShare} 
+            style={styles.favButton}
+          >
+            <Icon name="share-variant" size={22} color={Colors.primary} />
           </TouchableOpacity>
         </View>
       </View>

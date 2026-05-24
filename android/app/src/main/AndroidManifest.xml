@@ -41,6 +41,17 @@
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="com.zorodelivery.app" />
         </intent-filter>
+        <intent-filter android:autoVerify="true" android:label="App Web Links">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="http" />
+            <data android:scheme="https" />
+            <data android:host="zorodelivery.vercel.app" />
+            <data android:host="www.zorodelivery.vercel.app" />
+            <data android:pathPrefix="/store" />
+            <data android:pathPrefix="/product" />
+        </intent-filter>
       </activity>
 
       <meta-data  android:name="com.dieam.reactnativepushnotification.notification_channel_name" android:value="Delivery Platform Notifications"/>
