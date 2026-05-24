@@ -113,11 +113,17 @@ function AppContent() {
       <NavigationContainer
         ref={navigationRef}
         linking={{
-          prefixes: ['com.zorodelivery.app://'],
+          prefixes: ['com.zorodelivery.app://', 'https://zorodelivery.com', 'https://www.zorodelivery.com'],
           config: {
             screens: {
               Auth: 'auth',
               ResetPassword: 'reset-password',
+              Home: {
+                screens: {
+                  StoreDetails: 'store/:storeId',
+                  ProductDetail: 'product/:productId',
+                }
+              }
             },
           },
         }}

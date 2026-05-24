@@ -9,6 +9,7 @@ import {
   StatusBar,
   Dimensions,
   ActivityIndicator,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
@@ -24,54 +25,99 @@ const { width } = Dimensions.get('window');
 import { formatPriceFull } from '../../utils/format';
 
 export const ProductDetailScreen = ({ route, navigation }: any) => {
-  const { product, store, isFromStore = false } = route.params;
+  const { product: initialProduct, store: initialStore, productId, isFromStore = false } = route.params || {};
   const insets = useSafeAreaInsets();
   const { addItem, updateQuantity, items } = useCart();
+  const [product, setProduct] = React.useState<any>(initialProduct);
+  const [currentStore, setCurrentStore] = React.useState(initialStore);
+  const [loading, setLoading] = React.useState(!initialProduct);
   const [isFavourite, setIsFavourite] = React.useState(false);
   const [favLoading, setFavLoading] = React.useState(false);
   const [selectedOptions, setSelectedOptions] = React.useState<Record<string, string>>({});
   const [returnPolicySummary, setReturnPolicySummary] = React.useState<string>('');
-  const [currentStore, setCurrentStore] = React.useState(store);
   const [otherStores, setOtherStores] = React.useState<any[]>([]);
   const [loadingOtherStores, setLoadingOtherStores] = React.useState(false);
   const { showAlert } = useAlert();
 
-  const currentPrice = calculateProductPrice(product, selectedOptions);
-  const currentWeight = calculateProductWeight(product, selectedOptions);
+  const currentPrice = product ? calculateProductPrice(product, selectedOptions) : 0;
+  const currentWeight = product ? calculateProductWeight(product, selectedOptions) : null;
 
   React.useEffect(() => {
-    checkFavourite();
-    setReturnPolicySummary('Available for Return with Exchange within 24 Hours');
+    const loadProductAndStore = async () => {
+      let activeProduct = initialProduct;
+      let activeStore = initialStore;
+      
+      if (!activeProduct && productId) {
+        try {
+          setLoading(true);
+          const { data: prod, error: prodError } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', productId)
+            .single();
+          if (prodError) throw prodError;
+          setProduct(prod);
+          activeProduct = prod;
+        } catch (e) {
+          console.error('Error loading product for deep link:', e);
+          showAlert?.({
+            title: 'Product Not Found',
+            message: 'This product could not be found or is no longer available.',
+            type: 'error',
+            primaryAction: {
+              text: 'Go Home',
+              onPress: () => navigation.navigate('HomeMain')
+            }
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      
+      if (activeProduct) {
+        // Fetch store details if missing
+        if (!activeStore && activeProduct.store_id) {
+          try {
+            const { data: st, error: stError } = await supabase
+              .from('stores')
+              .select('*')
+              .eq('id', activeProduct.store_id)
+              .single();
+            if (stError) throw stError;
+            setCurrentStore(st);
+          } catch (e) {
+            console.error('Error fetching store for product deep link:', e);
+          }
+        }
+        
+        checkFavourite(activeProduct.id);
+        setReturnPolicySummary('Available for Return with Exchange within 24 Hours');
+        
+        if (activeProduct.master_product_id) {
+          fetchOtherStores(activeProduct.master_product_id, activeProduct.id);
+        }
+      }
+      setLoading(false);
+    };
     
-    // Ensure we have store data
-    if (!currentStore && product.store_id) {
-      const fetchStore = async () => {
-        const { data: st } = await supabase
-          .from('stores')
-          .select('*')
-          .eq('id', product.store_id)
-          .single();
-        if (st) setCurrentStore(st);
-      };
-      fetchStore();
-    }
+    loadProductAndStore();
+  }, [productId]);
 
-    if (product.master_product_id) {
-      fetchOtherStores();
-    }
-  }, [product.id, product.master_product_id]);
+  const fetchOtherStores = async (masterProductId?: string, activeProductId?: string) => {
+    const targetMasterId = masterProductId || product?.master_product_id;
+    const targetProdId = activeProductId || product?.id;
+    if (!targetMasterId || !targetProdId) return;
 
-  const fetchOtherStores = async () => {
     try {
       setLoadingOtherStores(true);
       const { data, error } = await supabase
         .from('products')
         .select('*, stores:stores_view(*)')
-        .eq('master_product_id', product.master_product_id)
+        .eq('master_product_id', targetMasterId)
         .eq('is_info_complete', true)
         .eq('in_stock', true)
         .eq('is_deleted', false)
-        .neq('id', product.id);
+        .neq('id', targetProdId);
 
       if (error) throw error;
       setOtherStores(data || []);
@@ -82,17 +128,19 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
     }
   };
 
-
-  const checkFavourite = async () => {
+  const checkFavourite = async (activeProductId?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
+      const targetProdId = activeProductId || product?.id;
+      if (!targetProdId) return;
 
       const { data, error } = await supabase
         .from('favourites')
         .select('id')
         .eq('user_id', user.id)
-        .eq('product_id', product.id)
+        .eq('product_id', targetProdId)
         .maybeSingle();
 
       if (error) throw error;
@@ -103,6 +151,7 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
   };
 
   const toggleFavourite = async () => {
+    if (!product) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -133,6 +182,30 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
     }
   };
 
+  const handleShare = async () => {
+    if (!product) return;
+    try {
+      const shareUrl = `https://zorodelivery.com/product/${product.id}`;
+      const message = `Check out "${product.name}" on Zoro Delivery! Order fresh food, groceries, and packages instantly:\n\n${shareUrl}`;
+      
+      await Share.share({
+        message: message,
+        url: shareUrl,
+        title: `Share ${product.name}`,
+      });
+    } catch (error: any) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  if (loading || !product) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.background }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
   const cartItem = items.find(item => 
     item.id === product.id && 
     item.store_id === (currentStore?.id || store?.id) &&
@@ -151,21 +224,29 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Product Details</Text>
         </View>
-        <TouchableOpacity 
-          onPress={toggleFavourite} 
-          style={styles.favButton}
-          disabled={favLoading}
-        >
-          {favLoading ? (
-            <ActivityIndicator size="small" color={Colors.primary} />
-          ) : (
-            <Icon 
-              name={isFavourite ? "heart" : "heart-outline"} 
-              size={24} 
-              color={isFavourite ? Colors.error : Colors.primary} 
-            />
-          )}
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity 
+            onPress={handleShare} 
+            style={styles.favButton}
+          >
+            <Icon name="share-variant" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={toggleFavourite} 
+            style={styles.favButton}
+            disabled={favLoading}
+          >
+            {favLoading ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : (
+              <Icon 
+                name={isFavourite ? "heart" : "heart-outline"} 
+                size={24} 
+                color={isFavourite ? Colors.error : Colors.primary} 
+              />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
