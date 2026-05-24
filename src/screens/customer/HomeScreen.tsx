@@ -356,90 +356,89 @@ export const HomeScreen = ({ navigation }: any) => {
       setBestSellersLoading(true);
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // Get top identities sold in last 24h
+      // 1. Get recent sales in the last 24h
       const { data: recentSales, error: salesError } = await supabase
         .from('order_items')
-        .select('product_id, products(barcode, master_product_id, product_type), quantity, orders!inner(created_at, status)')
+        .select('product_id, quantity, orders!inner(created_at, status)')
         .gte('orders.created_at', twentyFourHoursAgo)
         .neq('orders.status', 'cancelled');
 
       if (salesError) throw salesError;
 
-      const identitySalesMap = new Map<string, number>();
+      // 2. Build sales count Map (product_id ➔ total sales quantity)
+      const productSalesMap = new Map<string, number>();
       recentSales?.forEach((item: any) => {
-        let key = `id_${item.product_id}`;
-        if (item.products?.product_type === 'barcode' && item.products.barcode) {
-          key = `barcode_${item.products.barcode}`;
-        } else if (item.products?.product_type === 'common' && item.products.master_product_id) {
-          key = `master_${item.products.master_product_id}`;
+        if (item.product_id) {
+          productSalesMap.set(item.product_id, (productSalesMap.get(item.product_id) || 0) + (item.quantity || 0));
         }
-        identitySalesMap.set(key, (identitySalesMap.get(key) || 0) + item.quantity);
       });
 
-      const topIdentities = Array.from(identitySalesMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([id]) => id);
+      // 3. Fetch all active products in stock from active and approved stores
+      const { data: allProducts, error: productsError } = await supabase
+        .from('products')
+        .select('*, stores:stores_view!inner(*)')
+        .eq('stores.is_active', true)
+        .eq('stores.is_approved', true)
+        .eq('is_deleted', false)
+        .eq('is_info_complete', true)
+        .eq('in_stock', true);
 
-      let productData: any[] = [];
+      if (productsError) throw productsError;
+
+      const products = allProducts || [];
+
+      // 4. Group all products by their store_id
+      const storeProductsMap = new Map<string, any[]>();
+      products.forEach((product: any) => {
+        const storeId = product.store_id;
+        if (!storeProductsMap.has(storeId)) {
+          storeProductsMap.set(storeId, []);
+        }
+        
+        // Attach the 24h sales count to each product
+        product._salesCount24h = productSalesMap.get(product.id) || 0;
+        storeProductsMap.get(storeId)?.push(product);
+      });
+
+      // 5. Sort each store's products list:
+      // - Primary: 24h sales count descending
+      // - Secondary: created_at descending (latest first)
+      storeProductsMap.forEach((storeProducts) => {
+        storeProducts.sort((a, b) => {
+          if (b._salesCount24h !== a._salesCount24h) {
+            return b._salesCount24h - a._salesCount24h;
+          }
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+      });
+
+      // 6. Build the best sellers list following the algorithm:
+      // Cycle through all stores round-robin to pick the i-th best product from each store until we hit exactly 10 (or run out of products).
+      const finalBestSellers: any[] = [];
+      const storeIds = Array.from(storeProductsMap.keys());
       
-      if (topIdentities.length > 0) {
-        // Build query for top identities
-        const ids = topIdentities.filter(id => id.startsWith('id_')).map(id => id.replace('id_', ''));
-        const barcodes = topIdentities.filter(id => id.startsWith('barcode_')).map(id => id.replace('barcode_', ''));
-        const masterIds = topIdentities.filter(id => id.startsWith('master_')).map(id => id.replace('master_', ''));
+      let roundIndex = 0;
+      let addedInRound = true;
 
-        let query = supabase
-          .from('products')
-          .select('*, stores:stores_view!inner(*)')
-          .eq('stores.is_active', true)
-          .eq('stores.is_approved', true)
-          .eq('is_deleted', false)
-          .eq('is_info_complete', true)
-          .eq('in_stock', true);
-
-        // This is a bit complex for a single query, so we'll use OR logic
-        const orConditions = [];
-        if (ids.length > 0) orConditions.push(`id.in.(${ids.join(',')})`);
-        if (barcodes.length > 0) orConditions.push(`barcode.in.(${barcodes.join(',')})`);
-        if (masterIds.length > 0) orConditions.push(`master_product_id.in.(${masterIds.join(',')})`);
-
-        if (orConditions.length > 0) {
-          const { data: topProducts } = await query.or(orConditions.join(','));
-          productData = topProducts || [];
-        }
-      }
-
-      // If less than 10 unique identities after deduplication, fill with latest products
-      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
-      let processed = deduplicateProducts(productData, userCoords);
-
-      if (processed.length < 10) {
-        const excludeIds = processed.map(p => p.id).filter(id => !!id);
-        let fallbackQuery = supabase
-          .from('products')
-          .select('*, stores:stores_view!inner(*)')
-          .eq('stores.is_active', true)
-          .eq('stores.is_approved', true)
-          .eq('is_deleted', false)
-          .eq('is_info_complete', true)
-          .eq('in_stock', true)
-          .order('created_at', { ascending: false })
-          .limit(15); // Fetch a few more to allow for deduplication
+      while (finalBestSellers.length < 10 && addedInRound) {
+        addedInRound = false;
         
-        if (excludeIds.length > 0) {
-          fallbackQuery = fallbackQuery.not('id', 'in', `(${excludeIds.join(',')})`);
+        for (const storeId of storeIds) {
+          if (finalBestSellers.length >= 10) break;
+          
+          const storeProducts = storeProductsMap.get(storeId) || [];
+          if (roundIndex < storeProducts.length) {
+            finalBestSellers.push(storeProducts[roundIndex]);
+            addedInRound = true;
+          }
         }
         
-        const { data: fallbackData } = await fallbackQuery;
-        if (fallbackData) {
-          processed = [...processed, ...deduplicateProducts(fallbackData, userCoords)];
-        }
+        roundIndex++;
       }
 
-      setBestSellers(processed.slice(0, 10));
+      setBestSellers(finalBestSellers);
     } catch (e) {
-      // Silent
+      console.log('Error fetching custom best sellers:', e);
     } finally {
       setBestSellersLoading(false);
     }
