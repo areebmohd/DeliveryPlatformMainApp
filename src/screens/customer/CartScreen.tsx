@@ -158,7 +158,8 @@ const DeliveryTypeSection = React.memo(({
   isBatchAllowed,
   deliverySlot,
   setSlotModalVisible,
-  setDeliverySlot
+  setDeliverySlot,
+  appConfig
 }: any) => {
   return (
     <View style={styles.deliveryTypeSection}>
@@ -217,7 +218,7 @@ const DeliveryTypeSection = React.memo(({
               !isBatchAllowed && styles.deliveryTypeDescDisabled
             ]}>
               {!isBatchAllowed 
-                ? (isLargeVehicle ? 'Not available for Truck Delivery' : 'All shops must be under 1km') 
+                ? (isLargeVehicle ? 'Not available for Truck Delivery' : `All shops must be under ${appConfig ? Number(appConfig.max_batch_distance) : 1}km`) 
                 : 'Schedule for a time slot'}
             </Text>
             {deliveryType === 'batch' && deliverySlot && isBatchAllowed && (
@@ -257,8 +258,18 @@ const BillingSection = React.memo(({
   platformFee,
   grandTotal,
   baseGrandTotal,
-  setInfoModal
+  setInfoModal,
+  appConfig
 }: any) => {
+  const helperFeeVal = appConfig ? Number(appConfig.helper_fee) : 300;
+  const bikeFirstKm = appConfig ? Number(appConfig.bike_first_km_fee) : 20;
+  const bikeNextKm = appConfig ? Number(appConfig.bike_next_km_fee) : 10;
+  const truckFirstKm = appConfig ? Number(appConfig.truck_first_km_fee) : 300;
+  const truckNextKm = appConfig ? Number(appConfig.truck_next_km_fee) : 30;
+  const platformFeeTier1 = appConfig ? Number(appConfig.platform_fee_tier1) : 5;
+  const platformFeeTier2 = appConfig ? Number(appConfig.platform_fee_tier2) : 10;
+  const platformFeeTier3 = appConfig ? Number(appConfig.platform_fee_tier3) : 20;
+
   return (
     <View style={styles.billingSection}>
       <Text style={styles.sectionTitle}>Payment Details</Text>
@@ -280,8 +291,8 @@ const BillingSection = React.memo(({
               visible: true,
               title: 'Delivery Fee',
               content: isLargeVehicle 
-                ? `₹300 (fixed for 1st km) + ₹30 per extra km\n(Large Vehicle)\n\nDistance: ${distance.toFixed(2)} km`
-                : `₹20 (fixed for 1st km) + ₹10 per extra km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
+                ? `₹${truckFirstKm} (fixed for 1st km) + ₹${truckNextKm} per extra km\n(Large Vehicle)\n\nDistance: ${distance.toFixed(2)} km`
+                : `₹${bikeFirstKm} (fixed for 1st km) + ₹${bikeNextKm} per extra km\n(Standard Bike)\n\nDistance: ${distance.toFixed(2)} km`
             })}>
               <Icon name="information-outline" size={16} color={Colors.primary} />
             </TouchableOpacity>
@@ -306,7 +317,7 @@ const BillingSection = React.memo(({
               onPress={() => setHasHelper(!hasHelper)}
             >
               <View style={styles.helperInfo}>
-                <Text style={styles.helperTitle}>Add Helper (₹300)</Text>
+                <Text style={styles.helperTitle}>Add Helper (₹{helperFeeVal})</Text>
                 <Text style={styles.helperSubtitle}>A professional to help load/unload large items.</Text>
               </View>
               <Icon 
@@ -331,7 +342,7 @@ const BillingSection = React.memo(({
             <TouchableOpacity onPress={() => setInfoModal({
               visible: true,
               title: 'Platform Fee',
-              content: 'This fee is used to maintain the platform.\n\n• ₹5 for orders below ₹500\n• ₹10 for orders between ₹500 - ₹1000\n• ₹20 for orders above ₹1000'
+              content: `This fee is used to maintain the platform.\n\n• ₹${platformFeeTier1} for orders below ₹500\n• ₹${platformFeeTier2} for orders between ₹500 - ₹1000\n• ₹${platformFeeTier3} for orders above ₹1000`
             })}>
               <Icon name="information-outline" size={16} color={Colors.primary} />
             </TouchableOpacity>
@@ -369,9 +380,12 @@ const CartStoreSection = React.memo(({
   setAppliedOffers,
   storeDistances,
   isLargeVehicle,
-  deliveryType
+  deliveryType,
+  appConfig
 }: any) => {
   const distance = storeDistances?.[storeId];
+  const maxBikeDistance = appConfig ? Number(appConfig.bike_max_distance) : 2;
+  const maxBatchDistance = appConfig ? Number(appConfig.max_batch_distance) : 1;
 
   return (
     <View key={storeId} style={styles.storeSection}>
@@ -385,14 +399,14 @@ const CartStoreSection = React.memo(({
             <Text style={[styles.storeName, { marginLeft: 0 }]} numberOfLines={1} ellipsizeMode="tail">{storeData.name}</Text>
             {distance !== undefined && distance !== null && (
               <View style={styles.distanceBadgeContainer}>
-                {!isLargeVehicle && distance >= 2 && (
+                {!isLargeVehicle && distance >= maxBikeDistance && (
                   <View style={styles.warningPill}>
-                    <Text style={styles.warningPillText}>Out of Bike Range (Max 2km)</Text>
+                    <Text style={styles.warningPillText}>Out of Bike Range (Max {maxBikeDistance}km)</Text>
                   </View>
                 )}
-                {!isLargeVehicle && deliveryType === 'batch' && distance >= 1 && distance < 2 && (
+                {!isLargeVehicle && deliveryType === 'batch' && distance >= maxBatchDistance && distance < maxBikeDistance && (
                   <View style={styles.warningPill}>
-                    <Text style={styles.warningPillText}>Out of Batch Range (Max 1km)</Text>
+                    <Text style={styles.warningPillText}>Out of Batch Range (Max {maxBatchDistance}km)</Text>
                   </View>
                 )}
               </View>
@@ -1735,13 +1749,31 @@ export const CartScreen = ({ navigation }: any) => {
 
   const handleCheckout = async () => {
     console.log('Checkout button pressed');
-    if (appConfig?.maintenance_mode) {
-      showAlert({
-        title: 'Platform Under Maintenance',
-        message: appConfig.maintenance_message || 'Platform is currently undergoing scheduled maintenance. Ordering is temporarily disabled.',
-        type: 'warning'
-      });
-      return;
+    
+    try {
+      setLoading(true);
+      const { data: liveConfig, error: configErr } = await supabase
+        .from('app_config')
+        .select('maintenance_mode, maintenance_message')
+        .single();
+
+      if (!configErr && liveConfig) {
+        setAppConfig((prev: any) => prev ? { ...prev, ...liveConfig } : liveConfig);
+
+        if (liveConfig.maintenance_mode) {
+          setLoading(false);
+          showAlert({
+            title: 'Platform Under Maintenance',
+            message: liveConfig.maintenance_message || 'Platform is currently undergoing scheduled maintenance. Ordering is temporarily disabled.',
+            type: 'warning'
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      console.log('Error verifying real-time maintenance mode:', err);
+    } finally {
+      setLoading(false);
     }
 
     if (items.length === 0) {
@@ -1911,6 +1943,22 @@ export const CartScreen = ({ navigation }: any) => {
   const finalizeOrderCreation = async (payment_status: string, utr_number: string | null = null, reservedOrderNumber: string | null = null) => {
     try {
       setLoading(true);
+
+      // Final real-time check to prevent order insertion if maintenance mode was enabled while confirming
+      const { data: liveConfig, error: configErr } = await supabase
+        .from('app_config')
+        .select('maintenance_mode, maintenance_message')
+        .single();
+
+      if (!configErr && liveConfig?.maintenance_mode) {
+        setLoading(false);
+        showAlert({
+          title: 'Platform Under Maintenance',
+          message: liveConfig.maintenance_message || 'Platform is currently undergoing scheduled maintenance. Ordering is temporarily disabled.',
+          type: 'warning'
+        });
+        return;
+      }
 
       if (deliveryType === 'batch' && !deliverySlot) {
         showAlert({ title: 'Slot Required', message: 'Please select a delivery slot for Batch Delivery.', type: 'warning' });
@@ -2112,6 +2160,7 @@ export const CartScreen = ({ navigation }: any) => {
             storeDistances={storeDistances}
             isLargeVehicle={isLargeVehicle}
             deliveryType={deliveryType}
+            appConfig={appConfig}
           />
         ))}
 
@@ -2165,10 +2214,13 @@ export const CartScreen = ({ navigation }: any) => {
                         return;
                       }
 
-                      if (subtotal < 149) {
+                      const minPriceOffersFast = appConfig ? Number(appConfig.min_price_offers_fast) : 149;
+                      const maxOfferDistanceFast = appConfig ? Number(appConfig.max_offer_distance_fast) : 1;
+
+                      if (subtotal < minPriceOffersFast) {
                         showAlert({
                           title: 'Min. Order Not Met',
-                          message: 'Free fast delivery requires a minimum order of ₹149.',
+                          message: `Free fast delivery requires a minimum order of ₹${minPriceOffersFast}.`,
                           type: 'warning'
                         });
                         return;
@@ -2184,11 +2236,11 @@ export const CartScreen = ({ navigation }: any) => {
                       }
 
                       const distances = Object.values(storeDistances);
-                      const isTooFar = distances.some(d => d >= 1);
+                      const isTooFar = distances.some(d => d >= maxOfferDistanceFast);
                       if (isTooFar || distances.length === 0) {
                         showAlert({
                           title: 'Distance Restriction',
-                          message: 'Only applicable for shops under 1km distance from delivery location',
+                          message: `Only applicable for shops under ${maxOfferDistanceFast}km distance from delivery location`,
                           type: 'warning'
                         });
                         return;
@@ -2285,10 +2337,13 @@ export const CartScreen = ({ navigation }: any) => {
                       return;
                     }
 
-                    if (subtotal < 49) {
+                    const minOfferPriceBatch = appConfig ? Number(appConfig.min_price_offers_batch) : 49;
+                    const maxOfferDistanceBatch = appConfig ? Number(appConfig.max_offer_distance_batch) : 1;
+
+                    if (subtotal < minOfferPriceBatch) {
                       showAlert({
                         title: 'Min. Order Not Met',
-                        message: 'Free batch delivery requires a minimum order of ₹49.',
+                        message: `Free batch delivery requires a minimum order of ₹${minOfferPriceBatch}.`,
                         type: 'warning'
                       });
                       return;
@@ -2304,11 +2359,11 @@ export const CartScreen = ({ navigation }: any) => {
                     }
 
                     const distances = Object.values(storeDistances);
-                    const isTooFar = distances.some(d => d >= 1);
+                    const isTooFar = distances.some(d => d >= maxOfferDistanceBatch);
                     if (isTooFar || distances.length === 0) {
                       showAlert({
                         title: 'Distance Restriction',
-                        message: 'Only applicable for shops under 1km distance from delivery location',
+                        message: `Only applicable for shops under ${maxOfferDistanceBatch}km distance from delivery location`,
                         type: 'warning'
                       });
                       return;
@@ -2322,7 +2377,7 @@ export const CartScreen = ({ navigation }: any) => {
                       name: 'Free Batch Delivery',
                       type: 'free_delivery' as any,
                       amount: 0,
-                      conditions: { min_price: 49, max_distance: 1 },
+                      conditions: { min_price: minOfferPriceBatch, max_distance: maxOfferDistanceBatch },
                       status: 'active',
                       store_id: 'platform',
                       created_at: new Date().toISOString()
@@ -2374,7 +2429,7 @@ export const CartScreen = ({ navigation }: any) => {
             <View style={{ flex: 1, marginLeft: 10 }}>
               <Text style={styles.outOfRangeTitle}>Bike Delivery Unavailable</Text>
               <Text style={styles.outOfRangeDesc}>
-                Some stores in your cart are further than 2km. Bike delivery is only supported under 2km. Please remove these items or switch to a Large Vehicle.
+                Some stores in your cart are further than {appConfig ? Number(appConfig.bike_max_distance) : 2}km. Bike delivery is only supported under {appConfig ? Number(appConfig.bike_max_distance) : 2}km. Please remove these items or switch to a Large Vehicle.
               </Text>
             </View>
           </View>
@@ -2386,7 +2441,7 @@ export const CartScreen = ({ navigation }: any) => {
             <View style={{ flex: 1, marginLeft: 10 }}>
               <Text style={[styles.outOfRangeTitle, { color: '#D97706' }]}>Batch Delivery Unavailable</Text>
               <Text style={[styles.outOfRangeDesc, { color: '#B45309' }]}>
-                Batch delivery is only supported for stores within 1km. Please select Fast Delivery or remove these items.
+                Batch delivery is only supported for stores within {appConfig ? Number(appConfig.max_batch_distance) : 1}km. Please select Fast Delivery or remove these items.
               </Text>
             </View>
           </View>
@@ -2400,6 +2455,7 @@ export const CartScreen = ({ navigation }: any) => {
           deliverySlot={deliverySlot}
           setSlotModalVisible={setSlotModalVisible}
           setDeliverySlot={setDeliverySlot}
+          appConfig={appConfig}
         />
 
         <BillingSection
@@ -2418,6 +2474,7 @@ export const CartScreen = ({ navigation }: any) => {
           grandTotal={grandTotal}
           baseGrandTotal={baseGrandTotal}
           setInfoModal={setInfoModal}
+          appConfig={appConfig}
         />
 
         <View style={styles.paymentSection}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -361,11 +361,40 @@ export const StoreScreen = ({ navigation }: any) => {
   const [productsLoading, setProductsLoading] = useState(false);
 
   const { showAlert, showToast } = useAlert();
+  const maintenanceShownRef = useRef(false);
+
+  // Check maintenance mode and show alert for business accounts
+  const checkMaintenanceMode = useCallback(async () => {
+    if (maintenanceShownRef.current) return;
+    try {
+      const { data, error } = await supabase
+        .from('app_config')
+        .select('maintenance_mode, maintenance_message')
+        .single();
+
+      if (!error && data?.maintenance_mode) {
+        maintenanceShownRef.current = true;
+        showAlert({
+          title: 'System Under Maintenance',
+          message: data.maintenance_message || 'Platform is currently undergoing scheduled maintenance. Ordering is temporarily disabled.',
+          type: 'warning',
+          primaryAction: {
+            text: 'Got it',
+            onPress: () => {},
+          }
+        });
+      }
+    } catch (err) {
+      console.log('Error checking maintenance mode:', err);
+    }
+  }, [showAlert]);
 
   useEffect(() => {
+    checkMaintenanceMode();
     const unsubscribe = navigation.addListener('focus', () => {
       refreshStores();
       fetchProducts();
+      checkMaintenanceMode();
     });
     return unsubscribe;
   }, [navigation, store?.id]);

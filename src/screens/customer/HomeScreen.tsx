@@ -130,6 +130,33 @@ export const HomeScreen = ({ navigation }: any) => {
   const bannerScrollViewRef = useRef<ScrollView>(null);
   const autoScrollTimer = useRef<any>(null);
   const glowAnim = useRef(new Animated.Value(1)).current;
+  const maintenanceShownRef = useRef(false);
+
+  // Check maintenance mode and show alert
+  const checkMaintenanceMode = useCallback(async () => {
+    if (maintenanceShownRef.current) return;
+    try {
+      const { data, error } = await supabase
+        .from('app_config')
+        .select('maintenance_mode, maintenance_message')
+        .single();
+
+      if (!error && data?.maintenance_mode) {
+        maintenanceShownRef.current = true;
+        showAlert({
+          title: 'System Under Maintenance',
+          message: data.maintenance_message || 'Platform is currently undergoing scheduled maintenance. Ordering is temporarily disabled.',
+          type: 'warning',
+          primaryAction: {
+            text: 'Got it',
+            onPress: () => {},
+          }
+        });
+      }
+    } catch (err) {
+      console.log('Error checking maintenance mode:', err);
+    }
+  }, [showAlert]);
 
   useEffect(() => {
     Animated.loop(
@@ -187,6 +214,7 @@ export const HomeScreen = ({ navigation }: any) => {
     };
 
     initData();
+    checkMaintenanceMode();
 
     if (user) {
       fetchAddresses();
@@ -198,6 +226,7 @@ export const HomeScreen = ({ navigation }: any) => {
         checkNotifications();
         fetchHomeBanners();
       }
+      checkMaintenanceMode();
     });
 
     return unsubscribe;
