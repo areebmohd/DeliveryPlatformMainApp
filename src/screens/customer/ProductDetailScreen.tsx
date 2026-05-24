@@ -181,6 +181,26 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
               <Icon name="package-variant" size={80} color={Colors.border} />
             </View>
           )}
+          {product.product_type === 'common' && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.commonImageBadge}
+              onPress={() => {
+                showAlert?.({
+                  title: 'Common Product Image',
+                  message: 'This image is a common image for the product, real product may look different.',
+                  type: 'info',
+                  primaryAction: {
+                    text: 'Got it',
+                    onPress: () => {}
+                  }
+                });
+              }}
+            >
+              <Text style={styles.commonImageText}>Common product image</Text>
+              <Icon name="information" size={16} color={Colors.white} style={styles.infoIcon} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Info Section */}
@@ -445,6 +465,28 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: width,
     height: width, // Square image
+  },
+  commonImageBadge: {
+    position: 'absolute',
+    bottom: Spacing.sm,
+    right: Spacing.sm,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  commonImageText: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  infoIcon: {
+    marginLeft: 2,
   },
   image: {
     width: '100%',

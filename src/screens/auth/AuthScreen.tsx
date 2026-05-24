@@ -306,7 +306,7 @@ export const AuthScreen = ({ navigation }: any) => {
 
       {/* Footer - fixed at bottom, outside KeyboardAvoidingView */}
       <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
-        <Text style={styles.footerText} numberOfLines={1} adjustsFontSizeToFit>
+        <Text style={styles.footerText}>
           By continuing, you agree to our{' '}
           <Text style={styles.footerLink} onPress={() => handleOpenLink('https://zorodeliveryapp.vercel.app/terms.html')}>
             Terms of Service
@@ -460,10 +460,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 12,
+    fontSize: 15,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
   },
   footerLink: {
     color: Colors.primary,

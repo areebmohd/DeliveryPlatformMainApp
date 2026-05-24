@@ -54,6 +54,11 @@ export const Button = ({
     }
   };
 
+  // Activity Indicator color
+  const getLoaderColor = () => {
+    return variant === 'outline' ? Colors.primary : Colors.white;
+  };
+
   return (
     <TouchableOpacity
       style={[styles.base, getButtonStyle(), (disabled || loading) && styles.disabled, style]}
@@ -62,13 +67,13 @@ export const Button = ({
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color={Colors.primary} />
+        <ActivityIndicator color={getLoaderColor()} />
       ) : (
-        <View style={styles.contentContainer} pointerEvents="none">
+        <>
           {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
           <Text style={[styles.textBase, getTextStyle(), textStyle]}>{title}</Text>
           {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
-        </View>
+        </>
       )}
     </TouchableOpacity>
   );
@@ -78,10 +83,12 @@ const styles = StyleSheet.create({
   base: {
     height: 56,
     borderRadius: borderRadius.lg,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
+    alignSelf: 'stretch',
   },
   primary: {
     backgroundColor: Colors.primary,
@@ -115,13 +122,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     shadowOpacity: 0,
     elevation: 0,
-  },
-  contentContainer: {
-    width: '100%',
-    height: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   iconLeft: {
     marginRight: Spacing.sm,

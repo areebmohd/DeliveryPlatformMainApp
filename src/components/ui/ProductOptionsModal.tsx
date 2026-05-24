@@ -170,12 +170,17 @@ export const ProductOptionsModal = ({
           </ScrollView>
 
           <View style={styles.footer}>
-            <Button
-              title="Add to Cart"
-              onPress={handleConfirm}
+            <TouchableOpacity
+              activeOpacity={0.8}
               disabled={!isAllSelected}
-              style={!isAllSelected ? { backgroundColor: '#999', opacity: 0.7 } : undefined}
-            />
+              onPress={handleConfirm}
+              style={[
+                styles.confirmBtn,
+                !isAllSelected && { backgroundColor: '#999', opacity: 0.7, shadowOpacity: 0, elevation: 0 }
+              ]}
+            >
+              <Text style={styles.confirmBtnText}>Add to Cart</Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </View>
@@ -258,6 +263,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   optionsScroll: {
+    flexShrink: 1,
     marginBottom: Spacing.xs,
   },
   optionGroup: {
@@ -310,5 +316,26 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xs,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+  },
+  confirmBtn: {
+    backgroundColor: Colors.primary,
+    height: 56,
+    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: Spacing.sm,
+    width: '100%',
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  confirmBtnText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });
