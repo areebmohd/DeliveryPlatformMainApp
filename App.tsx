@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { GOOGLE_WEB_CLIENT_ID } from '@env';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { CartProvider } from './src/context/CartContext';
-import { AlertProvider } from './src/context/AlertContext';
+import { AlertProvider, useAlert } from './src/context/AlertContext';
 import { BusinessStoreProvider } from './src/context/BusinessStoreContext';
 import { MainNavigator } from './src/navigation/MainNavigator';
 import { useNotificationListener } from './src/hooks/useNotificationListener';
@@ -38,8 +38,10 @@ function App() {
 
 function AppContent() {
   const { session, profile, loading, isResettingPassword } = useAuth();
+  const { showAlert } = useAlert();
   const [updateRequired, setUpdateRequired] = useState(false);
   const [apkUrl, setApkUrl] = useState('https://github.com/areebmohd/DeliveryPlatformWebsite/releases/download/v1.0.0/Zoro.apk');
+  const [maintenanceAlertShown, setMaintenanceAlertShown] = useState(false);
 
   useNotificationListener();
 
@@ -57,28 +59,44 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    const checkVersion = async () => {
-      if (Platform.OS !== 'android') return;
+    const checkAppConfig = async () => {
       try {
         const { data, error } = await supabase
           .from('app_config')
-          .select('min_version_code, apk_url')
+          .select('min_version_code, apk_url, maintenance_mode, maintenance_message')
           .eq('id', 1)
           .single();
 
         if (data && !error) {
-          if (data.min_version_code > CURRENT_VERSION_CODE) {
+          // Version Check (Android only)
+          if (Platform.OS === 'android' && data.min_version_code > CURRENT_VERSION_CODE) {
             setApkUrl(data.apk_url);
             setUpdateRequired(true);
           }
+
+          // Maintenance Alert for both Customer and Business when they open account / app
+          if (data.maintenance_mode && profile && !maintenanceAlertShown) {
+            setMaintenanceAlertShown(true);
+            showAlert({
+              title: 'System Under Maintenance',
+              message: data.maintenance_message || 'Platform is currently undergoing scheduled maintenance. Ordering is temporarily disabled.',
+              type: 'warning',
+              primaryAction: {
+                text: 'Got it',
+                onPress: () => {},
+              }
+            });
+          }
         }
       } catch (err) {
-        console.log('Error checking app version:', err);
+        console.log('Error checking app config:', err);
       }
     };
 
-    checkVersion();
-  }, []);
+    if (profile) {
+      checkAppConfig();
+    }
+  }, [profile, maintenanceAlertShown]);
 
   if (loading || (session && !profile && !isResettingPassword)) {
     return (

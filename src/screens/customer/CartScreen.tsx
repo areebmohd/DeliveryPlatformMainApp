@@ -543,6 +543,25 @@ export const CartScreen = ({ navigation }: any) => {
   const [isOfferAlreadyUsedOnDevice, setIsOfferAlreadyUsedOnDevice] = useState(false);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [isCheckingOffer, setIsCheckingOffer] = useState(false);
+  const [appConfig, setAppConfig] = useState<any>(null);
+
+  // Fetch app config from backend
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_config')
+          .select('*')
+          .single();
+        if (!error && data) {
+          setAppConfig(data);
+        }
+      } catch (err) {
+        console.error('Error fetching app config in CartScreen:', err);
+      }
+    };
+    fetchConfig();
+  }, []);
 
   // Fetch device ID and check if Free Fast Delivery has been used on this device
   useEffect(() => {
@@ -1307,11 +1326,12 @@ export const CartScreen = ({ navigation }: any) => {
           return;
         }
 
-        const isTooFar = Object.values(storeDistances).some(d => d >= 1);
+        const maxOfferDistance = appConfig ? Number(appConfig.max_offer_distance_batch) : 1;
+        const isTooFar = Object.values(storeDistances).some(d => d >= maxOfferDistance);
         if (isTooFar) {
           delete newOffers[offerKey];
           changed = true;
-          showToast('App offer removed: Only applicable for shops under 1km.', 'info');
+          showToast(`App offer removed: Only applicable for shops under ${maxOfferDistance}km.`, 'info');
           return;
         }
       }
@@ -1331,11 +1351,12 @@ export const CartScreen = ({ navigation }: any) => {
           return;
         }
 
-        const isTooFar = Object.values(storeDistances).some(d => d >= 1);
+        const maxOfferDistance = appConfig ? Number(appConfig.max_offer_distance_fast) : 1;
+        const isTooFar = Object.values(storeDistances).some(d => d >= maxOfferDistance);
         if (isTooFar) {
           delete newOffers[offerKey];
           changed = true;
-          showToast('App offer removed: Only applicable for shops under 1km.', 'info');
+          showToast(`App offer removed: Only applicable for shops under ${maxOfferDistance}km.`, 'info');
           return;
         }
       }
@@ -1464,48 +1485,81 @@ export const CartScreen = ({ navigation }: any) => {
   }, [items]);
 
   const isBatchAllowed = React.useMemo(() => {
+    const maxBatchDistance = appConfig ? Number(appConfig.max_batch_distance) : 1;
     return !isLargeVehicle && 
            Object.keys(storeDistances).length > 0 &&
-           Object.values(storeDistances).every(d => d < 1);
-  }, [isLargeVehicle, storeDistances]);
+           Object.values(storeDistances).every(d => d < maxBatchDistance);
+  }, [isLargeVehicle, storeDistances, appConfig]);
 
   const tooFarBikeStores = React.useMemo(() => {
     if (isLargeVehicle) return [];
+    const maxBikeDistance = appConfig ? Number(appConfig.bike_max_distance) : 2;
     return Object.entries(storeDistances)
-      .filter(([_, dist]) => dist >= 2)
+      .filter(([_, dist]) => dist >= maxBikeDistance)
       .map(([id]) => id);
-  }, [isLargeVehicle, storeDistances]);
+  }, [isLargeVehicle, storeDistances, appConfig]);
 
   const tooFarBatchStores = React.useMemo(() => {
     if (isLargeVehicle || deliveryType !== 'batch') return [];
+    const maxBatchDistance = appConfig ? Number(appConfig.max_batch_distance) : 1;
     return Object.entries(storeDistances)
-      .filter(([_, dist]) => dist >= 1)
+      .filter(([_, dist]) => dist >= maxBatchDistance)
       .map(([id]) => id);
-  }, [isLargeVehicle, deliveryType, storeDistances]);
+  }, [isLargeVehicle, deliveryType, storeDistances, appConfig]);
 
   const isAppOfferActive = React.useMemo(() => {
+    const minOfferPriceBatch = appConfig ? Number(appConfig.min_price_offers_batch) : 49;
+    const minOfferPriceFast = appConfig ? Number(appConfig.min_price_offers_fast) : 149;
+    const maxOfferDistanceBatch = appConfig ? Number(appConfig.max_offer_distance_batch) : 1;
+    const maxOfferDistanceFast = appConfig ? Number(appConfig.max_offer_distance_fast) : 1;
+
     const isBatchActive = !!appliedOffers['app_batch_offer'] && 
                          deliveryType === 'batch' &&
-                         subtotal >= 49 && 
+                         subtotal >= minOfferPriceBatch && 
                          isBatchAllowed;
     
     const isFastActive = !!appliedOffers['app_fast_offer'] && 
                         deliveryType === 'fast' &&
-                        subtotal >= 149 && 
+                        subtotal >= minOfferPriceFast && 
                         !isLargeVehicle &&
-                        Object.values(storeDistances).every(d => d < 1);
+                        Object.values(storeDistances).every(d => d < maxOfferDistanceFast);
                         
     return isBatchActive || isFastActive;
-  }, [appliedOffers, deliveryType, subtotal, isBatchAllowed, isLargeVehicle, storeDistances]);
+  }, [appliedOffers, deliveryType, subtotal, isBatchAllowed, isLargeVehicle, storeDistances, appConfig]);
 
   const billingData = React.useMemo(() => {
-    const pFee = subtotal < 500 ? 5 : (subtotal <= 1000 ? 10 : 20);
+    // Tiered Platform Service Fees with fallbacks
+    const tier1Fee = appConfig ? Number(appConfig.platform_fee_tier1) : 5;
+    const tier2Fee = appConfig ? Number(appConfig.platform_fee_tier2) : 10;
+    const tier3Fee = appConfig ? Number(appConfig.platform_fee_tier3) : 20;
+    
+    const pFee = subtotal < 500 ? tier1Fee : (subtotal <= 1000 ? tier2Fee : tier3Fee);
+
+    // Vehicle specific parameters with fallbacks to original mainApp hardcoded defaults
+    const bikeFirstKm = appConfig ? Number(appConfig.bike_first_km_fee) : 20;
+    const bikeNextKm = appConfig ? Number(appConfig.bike_next_km_fee) : 10;
+    
+    const truckFirstKm = appConfig ? Number(appConfig.truck_first_km_fee) : 300;
+    const truckNextKm = appConfig ? Number(appConfig.truck_next_km_fee) : 30;
+    
+    const helperFeeDb = appConfig ? Number(appConfig.helper_fee) : 300;
+
+    let baseDeliveryFee = 0;
+    let nextKmRate = 0;
+
+    if (isLargeVehicle) {
+      baseDeliveryFee = truckFirstKm;
+      nextKmRate = truckNextKm;
+    } else {
+      baseDeliveryFee = bikeFirstKm;
+      nextKmRate = bikeNextKm;
+    }
+
     const actualTravelFee = items.length === 0 ? 0 : (
-      isLargeVehicle 
-        ? 300 + Math.ceil(Math.max(0, distance - 1)) * 30
-        : 20 + Math.ceil(Math.max(0, distance - 1)) * 10
+      baseDeliveryFee + Math.ceil(Math.max(0, distance - 1)) * nextKmRate
     );
-    const hFee = hasHelper ? 300 : 0;
+
+    const hFee = hasHelper ? helperFeeDb : 0;
     
     let storeContribs: Record<string, number> = {};
     let totalStoreSponsorship = 0;
@@ -1526,8 +1580,8 @@ export const CartScreen = ({ navigation }: any) => {
       if (offer.type === 'free_delivery') {
         const dist = storeDistances[offer.store_id] || 0;
         const storeFee = isLargeVehicle 
-          ? 300 + Math.ceil(Math.max(0, dist - 1)) * 30
-          : 20 + Math.ceil(Math.max(0, dist - 1)) * 10;
+          ? truckFirstKm + Math.ceil(Math.max(0, dist - 1)) * truckNextKm
+          : bikeFirstKm + Math.ceil(Math.max(0, dist - 1)) * bikeNextKm;
         
         storeContribs[offer.store_id] = storeFee;
         totalStoreSponsorship += storeFee;
@@ -1681,6 +1735,15 @@ export const CartScreen = ({ navigation }: any) => {
 
   const handleCheckout = async () => {
     console.log('Checkout button pressed');
+    if (appConfig?.maintenance_mode) {
+      showAlert({
+        title: 'Platform Under Maintenance',
+        message: appConfig.maintenance_message || 'Platform is currently undergoing scheduled maintenance. Ordering is temporarily disabled.',
+        type: 'warning'
+      });
+      return;
+    }
+
     if (items.length === 0) {
       showAlert({ title: 'Cart Empty', message: 'Add some items first!', type: 'warning' });
       return;
@@ -1785,9 +1848,10 @@ export const CartScreen = ({ navigation }: any) => {
 
       // Check distance rules for bike deliveries
       if (!isLargeVehicle) {
-        // 1. Batch Delivery under 1km rule
+        const maxBatchDistance = appConfig ? Number(appConfig.max_batch_distance) : 1;
+        // 1. Batch Delivery under max batch distance rule
         if (deliveryType === 'batch') {
-          const tooFarBatch = Object.entries(storeDistances).filter(([_, dist]) => dist >= 1);
+          const tooFarBatch = Object.entries(storeDistances).filter(([_, dist]) => dist >= maxBatchDistance);
           if (tooFarBatch.length > 0) {
             const farStoreNames = items
               .filter(item => tooFarBatch.some(([id]) => id === item.store_id))
@@ -1796,15 +1860,16 @@ export const CartScreen = ({ navigation }: any) => {
 
             showAlert({
               title: 'Out of Batch Range',
-              message: `Batch delivery is only available for stores within 1km of your location.\n\nThe following store(s) are too far:\n• ${uniqueFarStoreNames}\n\nPlease switch to Fast Delivery or remove these items.`,
+              message: `Batch delivery is only available for stores within ${maxBatchDistance}km of your location.\n\nThe following store(s) are too far:\n• ${uniqueFarStoreNames}\n\nPlease switch to Fast Delivery or remove these items.`,
               type: 'warning'
             });
             return;
           }
         }
 
-        // 2. Bike Delivery under 2km rule
-        const tooFarBike = Object.entries(storeDistances).filter(([_, dist]) => dist >= 2);
+        // 2. Bike Delivery under max bike distance rule
+        const maxBikeDistance = appConfig ? Number(appConfig.bike_max_distance) : 2;
+        const tooFarBike = Object.entries(storeDistances).filter(([_, dist]) => dist >= maxBikeDistance);
         if (tooFarBike.length > 0) {
           const farStoreNames = items
             .filter(item => tooFarBike.some(([id]) => id === item.store_id))
@@ -1813,7 +1878,7 @@ export const CartScreen = ({ navigation }: any) => {
 
           showAlert({
             title: 'Out of Delivery Range',
-            message: `Standard bike delivery is only available for stores within 2km of your location.\n\nThe following store(s) are too far:\n• ${uniqueFarStoreNames}\n\nPlease remove these items or switch to a Large Vehicle.`,
+            message: `Standard bike delivery is only available for stores within ${maxBikeDistance}km of your location.\n\nThe following store(s) are too far:\n• ${uniqueFarStoreNames}\n\nPlease remove these items or switch to a Large Vehicle.`,
             type: 'warning'
           });
           return;
