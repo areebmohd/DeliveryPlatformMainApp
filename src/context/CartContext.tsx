@@ -136,6 +136,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [items, appliedOffers, sessionAddress, isLoaded]);
 
   const addItem = (product: any, store: any, isStoreSpecific: boolean = false) => {
+    // 0. Stock validation
+    if (product.in_stock === false || (product.stock_quantity !== undefined && product.stock_quantity <= 0)) {
+      showAlert({
+        title: 'Stock is zero',
+        message: `Sorry, "${product.name}" is currently out of stock.`,
+        type: 'warning'
+      });
+      return;
+    }
+
     // 1. Parse store location
     let storeLat = 0;
     let storeLng = 0;
@@ -256,6 +266,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateQuantity = (productOrId: any, delta: number, selectedOptions?: Record<string, string>, storeId?: string) => {
+    if (delta > 0 && typeof productOrId === 'object') {
+      if (productOrId.in_stock === false || (productOrId.stock_quantity !== undefined && productOrId.stock_quantity <= 0)) {
+        showAlert({
+          title: 'Stock is zero',
+          message: `Sorry, "${productOrId.name || 'this product'}" is currently out of stock.`,
+          type: 'warning'
+        });
+        return;
+      }
+    }
+
     setItems(prev => {
       const productId = typeof productOrId === 'string' ? productOrId : productOrId.id;
       const targetStoreId = storeId || (typeof productOrId === 'object' ? productOrId.store_id : undefined);

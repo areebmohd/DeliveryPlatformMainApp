@@ -534,11 +534,11 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   }, [sessionAddress, showAlert, navigation, addItem, store]);
 
   const handleIncrease = useCallback((product: any) => {
-    updateQuantity(product.id, 1, undefined, store.id);
+    updateQuantity(product, 1, undefined, store.id);
   }, [updateQuantity, store.id]);
 
   const handleDecrease = useCallback((product: any) => {
-    updateQuantity(product.id, -1, undefined, store.id);
+    updateQuantity(product, -1, undefined, store.id);
   }, [updateQuantity, store.id]);
 
   const handleProductPress = useCallback((product: any) => {

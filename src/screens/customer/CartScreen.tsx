@@ -1960,6 +1960,31 @@ export const CartScreen = ({ navigation }: any) => {
         return;
       }
 
+      // Real-time stock verification before placing order
+      const productIds = items.map(item => item.id);
+      const { data: dbProducts, error: dbProdError } = await supabase
+        .from('products')
+        .select('id, name, in_stock, stock_quantity')
+        .in('id', productIds);
+
+      if (dbProdError) throw dbProdError;
+
+      const outOfStockItems = items.filter(item => {
+        const dbProd = dbProducts?.find(p => p.id === item.id);
+        return dbProd ? (dbProd.in_stock === false || dbProd.stock_quantity <= 0) : true;
+      });
+
+      if (outOfStockItems.length > 0) {
+        setLoading(false);
+        const itemNames = outOfStockItems.map(item => `• ${item.name}`).join('\n');
+        showAlert({
+          title: 'Items Out of Stock',
+          message: `The following items in your cart are currently out of stock:\n\n${itemNames}\n\nPlease remove them from your cart to proceed with the order.`,
+          type: 'warning'
+        });
+        return;
+      }
+
       if (deliveryType === 'batch' && !deliverySlot) {
         showAlert({ title: 'Slot Required', message: 'Please select a delivery slot for Batch Delivery.', type: 'warning' });
         setSlotModalVisible(true);
