@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthNavigator } from './src/navigation/AuthNavigator';
-import { View, ActivityIndicator, StatusBar, Modal, Text, StyleSheet, Linking, TouchableOpacity, Platform } from 'react-native';
+import { View, ActivityIndicator, StatusBar, Modal, Text, StyleSheet, Linking, TouchableOpacity, Platform, NativeModules } from 'react-native';
 import { Colors, Spacing, borderRadius, Typography } from './src/theme/colors';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -18,7 +18,9 @@ import { supabase } from './src/api/supabase';
 
 export const navigationRef = createNavigationContainerRef();
 
-const CURRENT_VERSION_CODE = 1; // Increment this whenever you release a new app build
+const CURRENT_VERSION_CODE = Platform.OS === 'android'
+  ? (NativeModules.DeviceModule?.versionCode ?? 2)
+  : 2; // Dynamically synced with native versionCode from build.gradle!
 
 function App() {
   return (

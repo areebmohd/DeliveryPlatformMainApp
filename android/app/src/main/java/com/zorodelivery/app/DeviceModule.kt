@@ -12,6 +12,25 @@ class DeviceModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
         return "DeviceModule"
     }
 
+    override fun getConstants(): MutableMap<String, Any> {
+        val constants = mutableMapOf<String, Any>()
+        try {
+            val pInfo = reactApplicationContext.packageManager.getPackageInfo(reactApplicationContext.packageName, 0)
+            val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                pInfo.longVersionCode.toInt()
+            } else {
+                @Suppress("DEPRECATION")
+                pInfo.versionCode
+            }
+            constants["versionCode"] = versionCode
+            constants["versionName"] = pInfo.versionName ?: ""
+        } catch (e: Exception) {
+            constants["versionCode"] = 1
+            constants["versionName"] = "1.0.0"
+        }
+        return constants
+    }
+
     @ReactMethod
     fun getAndroidId(promise: Promise) {
         try {
