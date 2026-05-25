@@ -1426,6 +1426,7 @@ const styles = StyleSheet.create({
   getStartedBtn: {
     marginTop: 24,
     width: 200,
+    alignSelf: 'center',
   },
   modalOverlay: {
     flex: 1,
