@@ -97,11 +97,11 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [isBarcodeMatched, setIsBarcodeMatched] = useState(!!product?.name);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(product?.raw_image_url || null);
-  const showAllFields = !isBarcodeMode || isBarcodeMatched || !!category;
-  
+  const [isBarcodeFromAnotherStore, setIsBarcodeFromAnotherStore] = useState(false);
   const [capturingRaw, setCapturingRaw] = useState(false);
   const [searchingBarcode, setSearchingBarcode] = useState(false);
   const [hasSearchedBarcode, setHasSearchedBarcode] = useState(false);
+  const showAllFields = true;
 
   const { showAlert, showToast } = useAlert();
   
@@ -116,6 +116,53 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       setProductType(passedType);
     }
   }, [route.params?.selectedType, route.params?.initialType, route.params?.type, route.params?.mode]);
+
+  // Reset form fields when product type is changed (only when adding a new product)
+  useEffect(() => {
+    if (!isEditing) {
+      setName('');
+      setPrice('');
+      setWeight('');
+      setCategory('');
+      setImageUrl('');
+      setRawImageUrl(null);
+      setBarcode('');
+      setStockQuantity('0');
+      setPreparationTime('0');
+      setDescriptionPairs([{ title: '', text: '' }]);
+      setProductOptions([{ title: '', values: [{ value: '', price_adjustment: 0, weight_adjustment: 0 }], currentInput: '' }]);
+      setTags([]);
+      setIsBarcodeMatched(false);
+      setHasSearchedBarcode(false);
+      setIsBarcodeFromAnotherStore(false);
+      setSelectedMasterId(null);
+      setHasMadeCommonChoice(false);
+    }
+  }, [productType, isEditing]);
+
+  // Check if editing barcode product is from another store
+  useEffect(() => {
+    const checkInitialBarcodeSource = async () => {
+      if (isEditing && product?.product_type === 'barcode' && product?.barcode) {
+        try {
+          const { data } = await supabase
+            .from('products')
+            .select('store_id')
+            .eq('barcode', product.barcode)
+            .order('created_at', { ascending: true })
+            .limit(1);
+          if (data && data.length > 0 && data[0].store_id !== storeId) {
+            setIsBarcodeFromAnotherStore(true);
+          } else {
+            setIsBarcodeFromAnotherStore(false);
+          }
+        } catch (err) {
+          console.error('Error checking initial barcode source:', err);
+        }
+      }
+    };
+    checkInitialBarcodeSource();
+  }, [isEditing, product?.barcode, storeId]);
 
   // FRESH FETCH STRATEGY: If editing, fetch the latest data from DB to avoid staleness
   useEffect(() => {
@@ -166,6 +213,21 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             if (data.tags) {
               setTags(data.tags);
             }
+            
+            // Check ownership of barcode product on fresh fetch
+            if (data.product_type === 'barcode' && data.barcode) {
+              const { data: oldest } = await supabase
+                .from('products')
+                .select('store_id')
+                .eq('barcode', data.barcode)
+                .order('created_at', { ascending: true })
+                .limit(1);
+              if (oldest && oldest.length > 0 && oldest[0].store_id !== storeId) {
+                setIsBarcodeFromAnotherStore(true);
+              } else {
+                setIsBarcodeFromAnotherStore(false);
+              }
+            }
           }
         } catch (err) {
           console.error('Error fetching fresh product:', err);
@@ -197,6 +259,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         .from('products')
         .select('*')
         .eq('barcode', barcode)
+        .order('is_deleted', { ascending: true })
         .limit(1)
         .maybeSingle();
 
@@ -205,6 +268,21 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       setHasSearchedBarcode(true);
       if (data) {
         setHasSearchedBarcode(true);
+        
+        // Find if the oldest barcode product belongs to another store
+        const { data: oldest } = await supabase
+          .from('products')
+          .select('store_id')
+          .eq('barcode', barcode)
+          .order('created_at', { ascending: true })
+          .limit(1);
+        
+        if (oldest && oldest.length > 0 && oldest[0].store_id !== storeId) {
+          setIsBarcodeFromAnotherStore(true);
+        } else {
+          setIsBarcodeFromAnotherStore(false);
+        }
+        
         setName(data.name);
         
         // Handle description pairs from barcode lookup
@@ -233,6 +311,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       } else {
         setHasSearchedBarcode(true);
         setIsBarcodeMatched(false);
+        setIsBarcodeFromAnotherStore(false);
         showAlert({ 
           title: 'Product Not Found', 
           message: 'We will soon add product details. Please submit a clear picture of product from front side.', 
@@ -272,7 +351,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         .select('id, name, category, image_url, tags')
         .eq('product_type', 'common')
         .eq('is_info_complete', true)
-        .eq('is_deleted', false)
+        // is_deleted omitted so stores can search and add soft-deleted common products
         .or(`name.ilike.*${text}*,description.ilike.*${text}*,tags_search_text.ilike.*${text}*`)
         .limit(30);
 
@@ -330,20 +409,23 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   };
 
 
+  // Determine if common or barcode is from another store
+  const isCommonFromAnotherStore = isCommon && (selectedMasterId !== null || (isEditing && product?.master_product_id !== null));
+  
   // Admin details: category, image, tags, delivery vehicle
-  const canEditAdminDetails = isPersonal;
+  const canEditAdminDetails = isPersonal || (isCommon && !isCommonFromAnotherStore) || (isBarcode && !isBarcodeFromAnotherStore);
   
   // Name field
-  const canEditName = isPersonal || (isBarcode && !isBarcodeMatched) || (isCommon && !hasMadeCommonChoice);
+  const canEditName = isPersonal || (isCommon && !isCommonFromAnotherStore) || (isBarcode && !isBarcodeFromAnotherStore);
   
-  // Store specific fields: price, weight, description, options
-  const canEditPriceWeight = isPersonal || (isCommon && hasMadeCommonChoice);
+  // Store specific fields: price, weight, description, options, preparation time
+  const canEditPriceWeight = isPersonal || isCommon || (isBarcode && !isBarcodeFromAnotherStore);
   
   // Stock field
-  const canEditStock = isPersonal || isBarcode || (isCommon && hasMadeCommonChoice);
+  const canEditStock = true;
 
   // Visibility flags
-  const showAdminDetails = isPersonal || (isBarcode && (isBarcodeMatched || !!category)) || (isCommon && hasMadeCommonChoice);
+  const showAdminDetails = true;
 
   const takeRawPhoto = async () => {
     try {
@@ -428,9 +510,12 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   };
 
   const handleSaveProduct = async () => {
-    // For barcode products, name and price are not strictly required from store
-    // Validation for Personal and Common products
-    if (isPersonal || isCommon) {
+    // Validate based on Product Type
+    if (isPersonal) {
+      if (!imageUrl) {
+        showAlert({ title: 'Required Fields', message: 'Please upload a product photo.', type: 'warning' });
+        return;
+      }
       if (!name.trim()) {
         showAlert({ title: 'Required Fields', message: 'Please enter product name.', type: 'warning' });
         return;
@@ -443,23 +528,31 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         showAlert({ title: 'Required Fields', message: 'Please enter a valid weight.', type: 'warning' });
         return;
       }
-      if (stockQuantity === '' || isNaN(parseInt(stockQuantity))) {
-        showAlert({ title: 'Required Fields', message: 'Please enter a valid stock amount.', type: 'warning' });
+    } else if (isCommon) {
+      if (!name.trim()) {
+        showAlert({ title: 'Required Fields', message: 'Please enter product name.', type: 'warning' });
         return;
       }
-    }
-    
-    if (isBarcodeMode) {
-      if (!barcode) {
-        showAlert({ title: 'Required Fields', message: 'Please enter a barcode.', type: 'warning' });
+      if (!price || parseFloat(price) <= 0) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a valid price.', type: 'warning' });
         return;
       }
-      if (!isBarcodeMatched && !rawImageUrl) {
-        showAlert({ title: 'Required Fields', message: 'Please capture a raw photo of the product.', type: 'warning' });
+      if (!weight || parseFloat(weight) <= 0) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a valid weight.', type: 'warning' });
         return;
       }
-      if (!stockQuantity || parseInt(stockQuantity) <= 0) {
-        showAlert({ title: 'Required Fields', message: 'Please enter a valid stock quantity.', type: 'warning' });
+    } else if (isBarcode) {
+      if (!barcode.trim()) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a barcode number.', type: 'warning' });
+        return;
+      }
+      // If it's a new barcode product (not matched/not from another store), raw image is mandatory
+      if (!isBarcodeMatched && !isBarcodeFromAnotherStore && !rawImageUrl) {
+        showAlert({ title: 'Required Fields', message: 'Please capture a raw photo of the product front side.', type: 'warning' });
+        return;
+      }
+      if (!price || parseFloat(price) <= 0) {
+        showAlert({ title: 'Required Fields', message: 'Please enter a valid price.', type: 'warning' });
         return;
       }
     }
@@ -668,6 +761,71 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             ))}
           </View>
           <Text style={styles.typeDescription}>{getProductTypeDescription()}</Text>
+
+          {/* Blue themed box for Common product from another store */}
+          {isCommon && isCommonFromAnotherStore && (
+            <View style={styles.blueInfoBox}>
+              <Icon name="information-outline" size={20} color={Colors.primary} style={styles.blueInfoIcon} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.blueInfoTitle}>Common Product Customization</Text>
+                <Text style={styles.blueInfoText}>
+                  This product is shared across stores. You <Text style={{ fontWeight: '700' }}>cannot edit</Text> the Name, Image, Category, and Delivery details.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Blue themed box for Barcode product from another store */}
+          {isBarcode && isBarcodeFromAnotherStore && (
+            <View style={styles.blueInfoBox}>
+              <Icon name="information-outline" size={20} color={Colors.primary} style={styles.blueInfoIcon} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.blueInfoTitle}>Global Barcode Product</Text>
+                <Text style={styles.blueInfoText}>
+                  This barcode product is managed globally. You <Text style={{ fontWeight: '700' }}>can edit only</Text> the Stock quantity.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Blue themed box for Personal product added first time */}
+          {isPersonal && !isEditing && (
+            <View style={styles.blueInfoBox}>
+              <Icon name="information-outline" size={20} color={Colors.primary} style={styles.blueInfoIcon} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.blueInfoTitle}>Mandatory Details</Text>
+                <Text style={styles.blueInfoText}>
+                  For personal products, the <Text style={{ fontWeight: '700' }}>Image, Name, Price, and Weight</Text> are mandatory.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Blue themed box for Common product added first time */}
+          {isCommon && !isCommonFromAnotherStore && !isEditing && (
+            <View style={styles.blueInfoBox}>
+              <Icon name="information-outline" size={20} color={Colors.primary} style={styles.blueInfoIcon} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.blueInfoTitle}>Mandatory Details</Text>
+                <Text style={styles.blueInfoText}>
+                  For common products, the <Text style={{ fontWeight: '700' }}>Name, Price, and Weight</Text> are mandatory.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Blue themed box for Barcode product added first time */}
+          {isBarcode && !isBarcodeFromAnotherStore && !isEditing && (
+            <View style={styles.blueInfoBox}>
+              <Icon name="information-outline" size={20} color={Colors.primary} style={styles.blueInfoIcon} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.blueInfoTitle}>Mandatory Details</Text>
+                <Text style={styles.blueInfoText}>
+                  For barcode products, the <Text style={{ fontWeight: '700' }}>Raw Image, Barcode Number, and Price</Text> are mandatory.
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -772,19 +930,6 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Product Details</Text>
-          {isBarcodeMode && (
-            <Text style={styles.barcodeHelperText}>
-              {isBarcodeMatched 
-                ? "You can only set stock amount and rest will be filled by admin."
-                : "Product details and image will be added by admin. You can only add stock amount."
-              }
-            </Text>
-          )}
-          {isCommon && !isEditing && (
-            <Text style={styles.barcodeHelperText}>
-              You can only fill some details and rest will be filled by admin.
-            </Text>
-          )}
           {showAllFields && (
             <>
               <View style={{ zIndex: 1000 }}>
@@ -858,12 +1003,12 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               {showAdminDetails && (
                 <TouchableOpacity 
                   style={styles.categoryTrigger}
-                  onPress={() => !isBarcode && setCategoryModalVisible(true)}
+                  onPress={() => canEditAdminDetails && setCategoryModalVisible(true)}
                   activeOpacity={0.7}
-                  disabled={isBarcode}
+                  disabled={!canEditAdminDetails}
                 >
                   <Text style={styles.label}>Category</Text>
-                  <View style={styles.categoryValueRow}>
+                  <View style={[styles.categoryValueRow, !canEditAdminDetails && styles.disabledInput]}>
                     <Text style={[styles.categoryValueText, !category && { color: Colors.textSecondary }]}>
                       {category || 'Select a category'}
                     </Text>
@@ -1288,9 +1433,9 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               placeholder="Type a tag..."
               value={tagInput}
               onChangeText={setTagInput}
-              editable={canEditAdminDetails}
+              editable={canEditPriceWeight}
               onSubmitEditing={() => {
-                if (tagInput.trim() && canEditAdminDetails) {
+                if (tagInput.trim() && canEditPriceWeight) {
                   setTags(prev => [...new Set([...prev, tagInput.trim().toLowerCase()])]);
                   setTagInput('');
                 }
@@ -1298,13 +1443,13 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               rightIcon={
                 <TouchableOpacity 
                   onPress={() => {
-                    if (tagInput.trim() && canEditAdminDetails) {
+                    if (tagInput.trim() && canEditPriceWeight) {
                       setTags(prev => [...new Set([...prev, tagInput.trim().toLowerCase()])]);
                       setTagInput('');
                     }
                   }}
-                  disabled={!canEditAdminDetails}
-                  style={[styles.inlineAddBtn, !canEditAdminDetails && { opacity: 0.5 }]}
+                  disabled={!canEditPriceWeight}
+                  style={[styles.inlineAddBtn, !canEditPriceWeight && { opacity: 0.5 }]}
                 >
                   <Text style={styles.inlineAddBtnText}>Add</Text>
                 </TouchableOpacity>
@@ -1315,7 +1460,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               {tags.map((tag, index) => (
                 <View key={index} style={styles.tagChip}>
                   <Text style={styles.tagText}>{tag}</Text>
-                  {canEditAdminDetails && (
+                  {canEditPriceWeight && (
                     <TouchableOpacity 
                       onPress={() => setTags(prev => prev.filter((_, i) => i !== index))}
                       style={styles.removeTagBtn}
@@ -2103,5 +2248,30 @@ const styles = StyleSheet.create({
     color: '#3B82F6', // Vibrant blue
     fontWeight: '700',
     flex: 1,
+  },
+  blueInfoBox: {
+    backgroundColor: '#E7F1FF',
+    borderWidth: 1,
+    borderColor: '#B3D7FF',
+    borderRadius: borderRadius.md,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  blueInfoIcon: {
+    marginRight: Spacing.sm,
+    marginTop: 2,
+  },
+  blueInfoTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0056b3',
+    marginBottom: 4,
+  },
+  blueInfoText: {
+    fontSize: 12,
+    color: '#0056b3',
+    lineHeight: 18,
   },
 });
