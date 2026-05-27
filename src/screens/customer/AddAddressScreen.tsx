@@ -27,7 +27,8 @@ const InputField = ({ label, value, onChangeText, placeholder, keyboardType = 'd
     <TextInput
       style={[styles.input, !editable && { backgroundColor: '#F1F3F5', color: Colors.textSecondary }]}
       value={value}
-      onChangeText={onChangeText}
+      onChangeText={(text) => onChangeText?.(text.trimStart())}
+      onBlur={() => onChangeText?.(value?.trim())}
       placeholder={placeholder}
       placeholderTextColor={Colors.textSecondary}
       keyboardType={keyboardType}

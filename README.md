@@ -109,6 +109,15 @@ src/
 
 ---
 
+## 🕒 Scheduled Database Policies & Tasks
+
+The platform enforces automatic database maintenance policies via Postgres scheduled jobs:
+- **5-Day Incomplete Store Deletion**: 
+  - **Rule**: If a newly registered store has not completed filling out all their required details for verification within 5 days of profile creation, it is automatically deleted.
+  - **Implementation**: Managed by the PostgreSQL extension `pg_cron` executing the secure `delete_incomplete_stores()` routine every day at midnight (`0 0 * * *`). This ensures active, healthy data sets while automatically cascading deletions for any drafts, product listings, or favorites associated with the orphaned store.
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

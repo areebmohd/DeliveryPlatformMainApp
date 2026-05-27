@@ -25,7 +25,10 @@ export const ForgotPasswordScreen = ({ navigation }: any) => {
   const [success, setSuccess] = useState(false);
 
   const handleResetPassword = async () => {
-    if (!email) {
+    const trimmedEmail = email.trim();
+    setEmail(trimmedEmail);
+
+    if (!trimmedEmail) {
       setError('Please enter your email address');
       return;
     }

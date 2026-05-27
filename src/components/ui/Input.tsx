@@ -39,7 +39,15 @@ export const Input = forwardRef<TextInput, InputProps>(({
 
   const handleBlur = (e: any) => {
     setIsFocused(false);
+    if (props.onChangeText && props.value) {
+      props.onChangeText(props.value.trim());
+    }
     onBlur?.(e);
+  };
+
+  const handleChangeText = (text: string) => {
+    const cleanedText = text.trimStart();
+    props.onChangeText?.(cleanedText);
   };
 
   const togglePasswordVisibility = () => {
@@ -72,8 +80,9 @@ export const Input = forwardRef<TextInput, InputProps>(({
             style={styles.input}
             placeholderTextColor={Colors.textSecondary}
             onFocus={handleFocus}
-            onBlur={handleBlur}
             {...props}
+            onBlur={handleBlur}
+            onChangeText={handleChangeText}
             secureTextEntry={secureTextEntry}
           />
           {isPasswordInput ? (

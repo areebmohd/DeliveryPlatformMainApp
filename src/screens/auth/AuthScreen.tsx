@@ -38,15 +38,22 @@ export const AuthScreen = ({ navigation }: any) => {
   // ─── Email / Password: unified Continue handler ───────────────────────────
   const handleContinue = async () => {
     setError('');
-    if (!email.trim() || !password) {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    // Synchronize states to update the UI text fields with trimmed values
+    setEmail(trimmedEmail);
+    setPassword(trimmedPassword);
+
+    if (!trimmedEmail || !trimmedPassword) {
       setError('Please fill in all fields');
       return;
     }
-    if (!validateEmail(email)) {
+    if (!validateEmail(trimmedEmail)) {
       setError('Please enter a valid email address');
       return;
     }
-    if (password.length < 6) {
+    if (trimmedPassword.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
@@ -81,7 +88,7 @@ export const AuthScreen = ({ navigation }: any) => {
 
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: email.toLowerCase().trim(),
-          password,
+          password: trimmedPassword,
         });
         if (signInError) {
           const msg = signInError.message.toLowerCase();
@@ -95,7 +102,7 @@ export const AuthScreen = ({ navigation }: any) => {
         // ── NEW USER → Sign Up ──
         const { error: signUpError } = await supabase.auth.signUp({
           email: email.toLowerCase().trim(),
-          password,
+          password: trimmedPassword,
           options: { data: { role, full_name: 'New User' } },
         });
         if (signUpError) {

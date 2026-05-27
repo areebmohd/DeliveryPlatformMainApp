@@ -27,7 +27,10 @@ export const VerifyResetOTPScreen = ({ navigation, route }: any) => {
   const [error, setError] = useState('');
 
   const handleVerifyOTP = async () => {
-    if (!token || token.length < 6) {
+    const trimmedToken = token.trim();
+    setToken(trimmedToken);
+
+    if (!trimmedToken || trimmedToken.length < 6) {
       setError('Please enter the verification code');
       return;
     }

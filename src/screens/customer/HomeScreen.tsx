@@ -30,6 +30,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
 import { deduplicateProducts, parseWKT, getHaversineDistance } from '../../utils/productUtils';
+import { useScrollToTop } from '@react-navigation/native';
 
 const CATEGORIES = PRODUCT_CATEGORIES;
 
@@ -100,6 +101,9 @@ const HomeBanners = React.memo(({ banners, activeIndex, onBannerScroll, onTouchS
 });
 
 export const HomeScreen = ({ navigation }: any) => {
+  const flatListRef = useRef<any>(null);
+  useScrollToTop(flatListRef);
+
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -756,7 +760,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
     return (
       <View style={styles.footerContainer}>
-        <Text style={styles.footerText}>Use search bar for other products</Text>
+        <Text style={styles.footerText}>Use search bar for other products.</Text>
       </View>
     );
   }, [suggestions.length, visibleSuggestionsCount]);
@@ -828,6 +832,7 @@ export const HomeScreen = ({ navigation }: any) => {
       </LinearGradient>
 
       <FlatList
+        ref={flatListRef}
         data={suggestions.slice(0, visibleSuggestionsCount)}
         renderItem={renderSuggestion}
         keyExtractor={(item) => item.id}
@@ -1117,17 +1122,12 @@ const styles = StyleSheet.create({
   showMoreButton: {
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: Colors.primary,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   showMoreText: {
     fontSize: 14,

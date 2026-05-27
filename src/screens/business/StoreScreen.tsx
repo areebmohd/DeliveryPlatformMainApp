@@ -14,6 +14,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useScrollToTop } from '@react-navigation/native';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { useAlert } from '../../context/AlertContext';
 import { Input } from '../../components/ui/Input';
@@ -350,6 +351,9 @@ const BusinessInfoSection = React.memo(({
 
 
 export const StoreScreen = ({ navigation }: any) => {
+  const scrollRef = useRef<any>(null);
+  useScrollToTop(scrollRef);
+
   const { user, profile } = useAuth();
   const { activeStore: store, loading: storeLoading, refreshStores, setActiveStore: setStore } = useBusinessStore();
   const [loading, setLoading] = useState(false);
@@ -628,6 +632,7 @@ export const StoreScreen = ({ navigation }: any) => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       <View style={{ height: insets.top, backgroundColor: Colors.background }} />
       <ScrollView
+        ref={scrollRef}
         stickyHeaderIndices={[4]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -804,6 +809,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700',
     textTransform: 'uppercase',
+    paddingRight: 3,
   },
   scrollContent: {
     flexGrow: 1,

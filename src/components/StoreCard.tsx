@@ -128,5 +128,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700',
     textTransform: 'uppercase',
+    paddingRight: 3,
   },
 });

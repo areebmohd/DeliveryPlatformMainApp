@@ -30,17 +30,24 @@ export const ResetPasswordScreen = ({ navigation }: any) => {
   const [alertVisible, setAlertVisible] = useState(false);
 
   const handleUpdatePassword = async () => {
-    if (!password || !confirmPassword) {
+    const trimmedPassword = password.trim();
+    const trimmedConfirmPassword = confirmPassword.trim();
+
+    // Synchronize states to update the UI text fields with trimmed values
+    setPassword(trimmedPassword);
+    setConfirmPassword(trimmedConfirmPassword);
+
+    if (!trimmedPassword || !trimmedConfirmPassword) {
       setError('Please fill in both fields');
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (trimmedPassword !== trimmedConfirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
-    if (password.length < 6) {
+    if (trimmedPassword.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
@@ -50,7 +57,7 @@ export const ResetPasswordScreen = ({ navigation }: any) => {
     
     try {
       const { error } = await supabase.auth.updateUser({
-        password: password,
+        password: trimmedPassword,
       });
 
       if (error) throw error;

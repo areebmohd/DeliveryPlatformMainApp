@@ -209,7 +209,8 @@ export const SearchScreen = ({ navigation, route }: any) => {
             placeholder="Search products or stores..."
             placeholderTextColor={Colors.textSecondary}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(text) => setSearchQuery(text.trimStart())}
+            onBlur={() => setSearchQuery(searchQuery.trim())}
             autoFocus={true}
           />
           {searchQuery.length > 0 && (

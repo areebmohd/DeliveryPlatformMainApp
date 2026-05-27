@@ -453,14 +453,14 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
                 style={styles.quantityBtnSmall} 
                 onPress={() => updateQuantity(product, -1, selectedOptions, currentStore?.id)}
               >
-                <Icon name="minus" size={18} color={Colors.white} />
+                <Icon name="minus" size={18} color={Colors.primary} />
               </TouchableOpacity>
               <Text style={styles.quantityTextSmall}>{quantity}</Text>
               <TouchableOpacity 
                 style={styles.quantityBtnSmall} 
                 onPress={() => updateQuantity(product, 1, selectedOptions, currentStore?.id)}
               >
-                <Icon name="plus" size={18} color={Colors.white} />
+                <Icon name="plus" size={18} color={Colors.primary} />
               </TouchableOpacity>
             </View>
             <TouchableOpacity 
@@ -624,6 +624,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '700',
     textTransform: 'uppercase',
+    paddingRight: 3,
   },
   price: {
     fontSize: 22,
@@ -804,16 +805,12 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 16,
     paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: Colors.primary + '30',
   },
   quantityBtnSmall: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: Colors.primary,
   },
   quantityTextSmall: {
     color: Colors.primary,
@@ -823,15 +820,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   goToCartBtn: {
-    flex: 1.2,
-    backgroundColor: Colors.success,
+    flex: 1.3,
+    backgroundColor: Colors.primary,
     height: 56,
     borderRadius: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 4,
-    shadowColor: Colors.success,
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

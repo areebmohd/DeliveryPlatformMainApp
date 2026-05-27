@@ -42,7 +42,8 @@ const CartItemRow = React.memo(({
   appliedOffers, 
   offerProductDetails, 
   updateQuantity, 
-  checkOfferConditions 
+  checkOfferConditions,
+  isLast
 }: any) => {
   const standardOffer = appliedOffers[storeId];
   let discountedPrice = item.price;
@@ -110,7 +111,7 @@ const CartItemRow = React.memo(({
   const itemKey = `${item.id}_${JSON.stringify(item.selected_options || {})}`;
 
   return (
-    <View key={itemKey} style={{ marginBottom: Spacing.md }}>
+    <View key={itemKey} style={{ marginBottom: isLast ? Spacing.sm : Spacing.md }}>
       <View style={styles.itemCard}>
         <View style={styles.itemInfo}>
           <Text style={styles.itemName}>
@@ -390,49 +391,64 @@ const CartStoreSection = React.memo(({
   return (
     <View key={storeId} style={styles.storeSection}>
       <View style={styles.storeHeader}>
-        <TouchableOpacity 
-          style={styles.storeHeaderLeft}
-          onPress={() => navigateToStore(storeId)}
-        >
-          <Icon name="storefront-outline" size={20} color={Colors.primary} style={{ marginTop: 2 }} />
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={[styles.storeName, { marginLeft: 0 }]} numberOfLines={1} ellipsizeMode="tail">{storeData.name}</Text>
-            {distance !== undefined && distance !== null && (
-              <View style={styles.distanceBadgeContainer}>
-                {!isLargeVehicle && distance >= maxBikeDistance && (
-                  <View style={styles.warningPill}>
-                    <Text style={styles.warningPillText}>Out of Bike Range (Max {maxBikeDistance}km)</Text>
-                  </View>
-                )}
-                {!isLargeVehicle && deliveryType === 'batch' && distance >= maxBatchDistance && distance < maxBikeDistance && (
-                  <View style={styles.warningPill}>
-                    <Text style={styles.warningPillText}>Out of Batch Range (Max {maxBatchDistance}km)</Text>
-                  </View>
-                )}
-              </View>
-            )}
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: Spacing.sm }}
+              onPress={() => navigateToStore(storeId)}
+            >
+              <Icon name="storefront-outline" size={20} color={Colors.primary} style={{ marginTop: 2 }} />
+              <Text style={[styles.storeName, { marginLeft: 8, flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">{storeData.name}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.viewOffersBtn}
+              onPress={() => fetchStoreOffers(storeId)}
+            >
+              <Text style={styles.viewOffersText}>View Offers</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.viewOffersBtn}
-          onPress={() => fetchStoreOffers(storeId)}
-        >
-          <Text style={styles.viewOffersText}>View Offers</Text>
-        </TouchableOpacity>
+          {distance !== undefined && distance !== null && (
+            <View style={[styles.distanceBadgeContainer, { marginLeft: 28 }]}>
+              {!isLargeVehicle && distance >= maxBikeDistance && (
+                <View style={styles.warningPill}>
+                  <Text style={styles.warningPillText}>Out of Bike Range (Max {maxBikeDistance}km)</Text>
+                </View>
+              )}
+              {!isLargeVehicle && deliveryType === 'batch' && distance >= maxBatchDistance && distance < maxBikeDistance && (
+                <View style={styles.warningPill}>
+                  <Text style={styles.warningPillText}>Out of Batch Range (Max {maxBatchDistance}km)</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
       </View>
       <View style={styles.storeItemsList}>
-        {storeData.items.map((item: any) => (
-          <CartItemRow
-            key={`${item.id}_${JSON.stringify(item.selected_options || {})}`}
-            item={item}
-            storeId={storeId}
-            items={items}
-            appliedOffers={appliedOffers}
-            offerProductDetails={offerProductDetails}
-            updateQuantity={updateQuantity}
-            checkOfferConditions={checkOfferConditions}
-          />
-        ))}
+        {storeData.items.map((item: any, index: number) => {
+          const isLastItem = index === storeData.items.length - 1;
+          const offer = appliedOffers[storeId];
+          const hasFreeReward = offer?.type === 'free_product' && checkOfferConditions(offer).length === 0;
+
+          const standardKey = storeId;
+          const deliveryKey = `${storeId}_delivery`;
+          const hasOffers = [appliedOffers[standardKey], appliedOffers[deliveryKey]].filter(Boolean).length > 0;
+
+          const isLast = isLastItem && !hasFreeReward && !hasOffers;
+
+          return (
+            <CartItemRow
+              key={`${item.id}_${JSON.stringify(item.selected_options || {})}`}
+              item={item}
+              storeId={storeId}
+              items={items}
+              appliedOffers={appliedOffers}
+              offerProductDetails={offerProductDetails}
+              updateQuantity={updateQuantity}
+              checkOfferConditions={checkOfferConditions}
+              isLast={isLast}
+            />
+          );
+        })}
 
         {/* Free Product Reward */}
         {(() => {
@@ -443,8 +459,12 @@ const CartStoreSection = React.memo(({
             const pName = (offer.reward_data as any)?.product_name || manualItem?.name || 'Gift Item';
             const pPrice = (offer.reward_data as any)?.product_price || manualItem?.price;
 
+            const standardKey = storeId;
+            const deliveryKey = `${storeId}_delivery`;
+            const hasOffers = [appliedOffers[standardKey], appliedOffers[deliveryKey]].filter(Boolean).length > 0;
+
             return (
-              <View style={[styles.itemCard, styles.freeItemCard, { marginBottom: Spacing.md }]}>
+              <View style={[styles.itemCard, styles.freeItemCard, { marginBottom: hasOffers ? Spacing.md : Spacing.sm }]}>
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName} numberOfLines={1}>
                     {pName}
@@ -2954,7 +2974,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   storeItemsList: {
-    paddingLeft: Spacing.md,
+    paddingLeft: 0,
   },
   itemPrice: {
     fontSize: 14,

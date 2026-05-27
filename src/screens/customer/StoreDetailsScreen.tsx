@@ -1093,6 +1093,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 12,
     fontWeight: '700',
+    paddingRight: 3,
   },
   bannerContainer: {
     width: '100%',
