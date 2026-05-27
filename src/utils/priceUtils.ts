@@ -63,23 +63,6 @@ export const calculateProductWeight = (product: any, selectedOptions: Record<str
  * Example: price 20, weight 0.5 -> " (+₹20, +0.5kg)"
  */
 export const getPriceAdjustmentLabel = (optionValue: any): string => {
-  if (typeof optionValue !== 'object') {
-    return '';
-  }
-
-  const parts = [];
-  const adj = parseFloat(optionValue.price_adjustment);
-  if (adj && adj > 0) {
-    parts.push(`+₹${adj}`);
-  }
-  const wAdj = parseFloat(optionValue.weight_adjustment);
-  if (wAdj && wAdj > 0) {
-    parts.push(`+${wAdj}kg`);
-  }
-
-  if (parts.length > 0) {
-    return ` (${parts.join(', ')})`;
-  }
   return '';
 };
 

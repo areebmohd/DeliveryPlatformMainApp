@@ -105,15 +105,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [bestSellers, setBestSellers] = useState<any[]>([]);
-  const [bestSellersLoading, setBestSellersLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [suggestionsPage, setSuggestionsPage] = useState(0);
-  const [isMoreSuggestionsLoading, setIsMoreSuggestionsLoading] = useState(false);
-  const [hasMoreSuggestions, setHasMoreSuggestions] = useState(true);
-  const [rankedBoughtIds, setRankedBoughtIds] = useState<string[]>([]);
-  const [allTimeBoughtIds, setAllTimeBoughtIds] = useState<Set<string>>(new Set());
-  const [historyIdentities, setHistoryIdentities] = useState<any>(null);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
@@ -199,14 +191,204 @@ export const HomeScreen = ({ navigation }: any) => {
     }
   }, [addItem, sessionAddress, showAlert]);
 
+  const getLocalDateString = useCallback(() => {
+    const d = new Date();
+    const offset = d.getTimezoneOffset();
+    const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+  }, []);
+
+  const loadCachedHomeData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const cacheKey = `home_data_cache_${user?.id || 'guest'}_${sessionAddress?.id || 'default'}`;
+      const today = getLocalDateString();
+
+      // Retrieve cached data
+      const cachedString = await AsyncStorage.getItem(cacheKey);
+      if (cachedString) {
+        try {
+          const cache = JSON.parse(cachedString);
+          if (cache.date === today) {
+            setStores(cache.stores || []);
+            setBestSellers(cache.bestSellers || []);
+            setSuggestions(cache.suggestions || []);
+            setLoading(false);
+            return;
+          }
+        } catch (parseErr) {
+          console.log('Error parsing cache:', parseErr);
+        }
+      }
+
+      // 1. NEAREST STORES
+      const { data: dbStores, error: storesError } = await supabase
+        .from('stores_view')
+        .select('*')
+        .eq('is_active', true)
+        .eq('is_approved', true);
+
+      if (storesError) throw storesError;
+
+      const userCoords = sessionAddress
+        ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location))
+        : null;
+
+      let sortedStores = dbStores || [];
+      if (userCoords) {
+        sortedStores = sortedStores
+          .map((store: any) => {
+            const storeLoc = parseWKT(store.location_wkt);
+            const distance = storeLoc
+              ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLoc.lat, storeLoc.lng)
+              : Infinity;
+            return { ...store, _distance: distance };
+          })
+          .sort((a: any, b: any) => a._distance - b._distance);
+      }
+      const nearest10Stores = sortedStores.slice(0, 10);
+      const nearest10StoreIds = nearest10Stores.map((s: any) => s.id);
+
+      if (nearest10Stores.length === 0) {
+        setStores([]);
+        setBestSellers([]);
+        setSuggestions([]);
+        await AsyncStorage.setItem(cacheKey, JSON.stringify({
+          date: today,
+          stores: [],
+          bestSellers: [],
+          suggestions: []
+        }));
+        setLoading(false);
+        return;
+      }
+
+      // 2. BEST SELLERS
+      const startOfYesterday = new Date();
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      startOfYesterday.setHours(0, 0, 0, 0);
+
+      const endOfYesterday = new Date();
+      endOfYesterday.setDate(endOfYesterday.getDate() - 1);
+      endOfYesterday.setHours(23, 59, 59, 999);
+
+      const { data: yesterdaySales, error: salesError } = await supabase
+        .from('order_items')
+        .select('product_id, quantity, orders!inner(created_at, status)')
+        .gte('orders.created_at', startOfYesterday.toISOString())
+        .lte('orders.created_at', endOfYesterday.toISOString())
+        .neq('orders.status', 'cancelled');
+
+      const yesterdaySalesMap = new Map<string, number>();
+      if (!salesError && yesterdaySales) {
+        yesterdaySales.forEach((item: any) => {
+          if (item.product_id) {
+            yesterdaySalesMap.set(item.product_id, (yesterdaySalesMap.get(item.product_id) || 0) + (item.quantity || 0));
+          }
+        });
+      }
+
+      const { data: storeProducts, error: productsError } = await supabase
+        .from('products')
+        .select('*, stores:stores_view!inner(*)')
+        .in('store_id', nearest10StoreIds)
+        .eq('is_deleted', false)
+        .eq('is_info_complete', true)
+        .eq('in_stock', true);
+
+      const productsFromNearby = storeProducts || [];
+
+      // Group products by store
+      const storeProductsMap = new Map<string, any[]>();
+      productsFromNearby.forEach((product: any) => {
+        const storeId = product.store_id;
+        if (!storeProductsMap.has(storeId)) {
+          storeProductsMap.set(storeId, []);
+        }
+        product._salesCountYesterday = yesterdaySalesMap.get(product.id) || 0;
+        storeProductsMap.get(storeId)?.push(product);
+      });
+
+      const finalBestSellers: any[] = [];
+      nearest10Stores.forEach((store: any) => {
+        const products = storeProductsMap.get(store.id) || [];
+        if (products.length > 0) {
+          products.sort((a: any, b: any) => {
+            if (b._salesCountYesterday !== a._salesCountYesterday) {
+              return b._salesCountYesterday - a._salesCountYesterday;
+            }
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          });
+          finalBestSellers.push(products[0]);
+        }
+      });
+
+      // 3. SUGGESTED PRODUCTS
+      let user7DaySalesMap = new Map<string, number>();
+      if (user?.id) {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const { data: recentPurchases } = await supabase
+          .from('order_items')
+          .select('product_id, quantity, orders!inner(customer_id, status, created_at)')
+          .eq('orders.customer_id', user.id)
+          .gte('orders.created_at', sevenDaysAgo.toISOString())
+          .neq('orders.status', 'cancelled')
+          .eq('is_removed', false);
+
+        (recentPurchases || []).forEach((item: any) => {
+          if (item.product_id) {
+            user7DaySalesMap.set(item.product_id, (user7DaySalesMap.get(item.product_id) || 0) + (item.quantity || 0));
+          }
+        });
+      }
+
+      const finalSuggestions: any[] = [];
+      nearest10Stores.forEach((store: any) => {
+        const products = storeProductsMap.get(store.id) || [];
+        if (products.length > 0) {
+          products.forEach((p: any) => {
+            p._userBoughtCount = user7DaySalesMap.get(p.id) || 0;
+          });
+
+          const sortedStoreProducts = [...products].sort((a: any, b: any) => {
+            if (b._userBoughtCount !== a._userBoughtCount) {
+              return b._userBoughtCount - a._userBoughtCount;
+            }
+            if (b._salesCountYesterday !== a._salesCountYesterday) {
+              return b._salesCountYesterday - a._salesCountYesterday;
+            }
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          });
+
+          const selected3 = sortedStoreProducts.slice(0, 3);
+          finalSuggestions.push(...selected3);
+        }
+      });
+
+      // Cache and save everything
+      await AsyncStorage.setItem(cacheKey, JSON.stringify({
+        date: today,
+        stores: nearest10Stores,
+        bestSellers: finalBestSellers,
+        suggestions: finalSuggestions
+      }));
+
+      setStores(nearest10Stores);
+      setBestSellers(finalBestSellers);
+      setSuggestions(finalSuggestions);
+    } catch (e) {
+      console.log('Error calculating cached home data:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, sessionAddress?.id, sessionAddress?.address_line, getLocalDateString]);
+
   // Initial data fetch
   useEffect(() => {
     const initData = async () => {
       setLoading(true);
       await Promise.all([
-        fetchStores(),
-        fetchBestSellers(),
-        initSuggestions(),
+        loadCachedHomeData(),
         fetchHomeBanners(),
         fetchCategoryImages()
       ]);
@@ -227,35 +409,31 @@ export const HomeScreen = ({ navigation }: any) => {
         fetchHomeBanners();
       }
       checkMaintenanceMode();
+      loadCachedHomeData();
     });
 
     return unsubscribe;
-  }, [user, navigation]);
+  }, [user, navigation, loadCachedHomeData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([
-      fetchStores(),
-      fetchBestSellers(),
-      initSuggestions(),
+      loadCachedHomeData(),
       fetchHomeBanners(),
       fetchCategoryImages(),
       user ? fetchAddresses() : Promise.resolve(),
       user ? checkNotifications() : Promise.resolve()
     ]);
     setRefreshing(false);
-  }, [user]);
+  }, [user, loadCachedHomeData]);
 
   // Refresh data when delivery address changes, but ONLY if we have an address
   useEffect(() => {
     if (sessionAddress) {
-      fetchStores();
-      // Best sellers and suggestions are less sensitive to location, 
-      // but we might want to refresh them if stores change.
-      fetchBestSellers();
-      initSuggestions();
+      loadCachedHomeData();
     }
-  }, [sessionAddress?.id, sessionAddress?.address_line]); // Stable dependency
+  }, [sessionAddress?.id, sessionAddress?.address_line, loadCachedHomeData]);
+
 
 
 
@@ -345,302 +523,7 @@ export const HomeScreen = ({ navigation }: any) => {
     }
   };
 
-  const fetchStores = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('stores_view')
-        .select('*')
-        .eq('is_active', true)
-        .eq('is_approved', true);
 
-      if (error) throw error;
-
-      // Get user location for distance sorting
-      const userCoords = sessionAddress
-        ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location))
-        : null;
-
-      let sortedStores = data || [];
-      if (userCoords) {
-        sortedStores = sortedStores
-          .map((store: any) => {
-            const storeLoc = parseWKT(store.location_wkt);
-            const distance = storeLoc
-              ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLoc.lat, storeLoc.lng)
-              : Infinity;
-            return { ...store, _distance: distance };
-          })
-          .sort((a: any, b: any) => a._distance - b._distance);
-      }
-
-      // Limit to 10 nearest stores
-      setStores(sortedStores.slice(0, 10));
-    } catch (e) {
-      // Silent in production
-    }
-  };
-
-  const fetchBestSellers = async () => {
-    try {
-      setBestSellersLoading(true);
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-      // 1. Get recent sales in the last 24h
-      const { data: recentSales, error: salesError } = await supabase
-        .from('order_items')
-        .select('product_id, quantity, orders!inner(created_at, status)')
-        .gte('orders.created_at', twentyFourHoursAgo)
-        .neq('orders.status', 'cancelled');
-
-      if (salesError) throw salesError;
-
-      // 2. Build sales count Map (product_id ➔ total sales quantity)
-      const productSalesMap = new Map<string, number>();
-      recentSales?.forEach((item: any) => {
-        if (item.product_id) {
-          productSalesMap.set(item.product_id, (productSalesMap.get(item.product_id) || 0) + (item.quantity || 0));
-        }
-      });
-
-      // 3. Fetch all active products in stock from active and approved stores
-      const { data: allProducts, error: productsError } = await supabase
-        .from('products')
-        .select('*, stores:stores_view!inner(*)')
-        .eq('stores.is_active', true)
-        .eq('stores.is_approved', true)
-        .eq('is_deleted', false)
-        .eq('is_info_complete', true)
-        .eq('in_stock', true);
-
-      if (productsError) throw productsError;
-
-      const products = allProducts || [];
-
-      // 4. Group all products by their store_id
-      const storeProductsMap = new Map<string, any[]>();
-      products.forEach((product: any) => {
-        const storeId = product.store_id;
-        if (!storeProductsMap.has(storeId)) {
-          storeProductsMap.set(storeId, []);
-        }
-        
-        // Attach the 24h sales count to each product
-        product._salesCount24h = productSalesMap.get(product.id) || 0;
-        storeProductsMap.get(storeId)?.push(product);
-      });
-
-      // 5. Sort each store's products list:
-      // - Primary: 24h sales count descending
-      // - Secondary: created_at descending (latest first)
-      storeProductsMap.forEach((storeProducts) => {
-        storeProducts.sort((a, b) => {
-          if (b._salesCount24h !== a._salesCount24h) {
-            return b._salesCount24h - a._salesCount24h;
-          }
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-      });
-
-      // 6. Build the best sellers list following the algorithm:
-      // Cycle through all stores round-robin to pick the i-th best product from each store until we hit exactly 10 (or run out of products).
-      const finalBestSellers: any[] = [];
-      const storeIds = Array.from(storeProductsMap.keys());
-      
-      let roundIndex = 0;
-      let addedInRound = true;
-
-      while (finalBestSellers.length < 10 && addedInRound) {
-        addedInRound = false;
-        
-        for (const storeId of storeIds) {
-          if (finalBestSellers.length >= 10) break;
-          
-          const storeProducts = storeProductsMap.get(storeId) || [];
-          if (roundIndex < storeProducts.length) {
-            finalBestSellers.push(storeProducts[roundIndex]);
-            addedInRound = true;
-          }
-        }
-        
-        roundIndex++;
-      }
-
-      setBestSellers(finalBestSellers);
-    } catch (e) {
-      console.log('Error fetching custom best sellers:', e);
-    } finally {
-      setBestSellersLoading(false);
-    }
-  };
-
-  const fetchUserHistory = async () => {
-    if (!user?.id) return { rankedIds: [], allTimeSet: new Set<string>() };
-
-    try {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      // Fetch all-time bought products with identity info
-      const { data: allTimeData } = await supabase
-        .from('order_items')
-        .select('product_id, products(barcode, master_product_id), orders!inner(customer_id, status)')
-        .eq('orders.customer_id', user.id)
-        .neq('orders.status', 'cancelled')
-        .eq('is_removed', false);
-
-      const allTimeSet = new Set((allTimeData || []).map((item: any) => item.product_id).filter(Boolean));
-      
-      const historyIdentities = {
-        productIds: allTimeSet,
-        barcodes: new Set((allTimeData || []).map((item: any) => item.products?.barcode).filter(Boolean)),
-        masterIds: new Set((allTimeData || []).map((item: any) => item.products?.master_product_id).filter(Boolean))
-      };
-
-      // Fetch last 7 days bought products with quantity for ranking
-      const { data: recentData } = await supabase
-        .from('order_items')
-        .select('product_id, quantity, orders!inner(customer_id, status, created_at)')
-        .eq('orders.customer_id', user.id)
-        .gte('orders.created_at', sevenDaysAgo)
-        .neq('orders.status', 'cancelled')
-        .eq('is_removed', false);
-
-      const recentMap = new Map<string, number>();
-      (recentData || []).forEach((item: any) => {
-        if (item.product_id) {
-          recentMap.set(item.product_id, (recentMap.get(item.product_id) || 0) + item.quantity);
-        }
-      });
-
-      // Rank by quantity (desc)
-      const rankedIds = Array.from(recentMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .map(([id]) => id);
-
-      // Add other all-time bought products at the end of the ranked list (if not already in recent)
-      const otherBoughtIds = Array.from(allTimeSet).filter(id => !recentMap.has(id));
-      // Optionally sort these by all-time quantity too, but for now we'll just append them
-      const finalRankedIds = [...rankedIds, ...otherBoughtIds];
-
-      return { rankedIds: finalRankedIds, allTimeSet, historyIdentities };
-    } catch (e) {
-      return { rankedIds: [], allTimeSet: new Set<string>(), historyIdentities: { productIds: new Set(), barcodes: new Set(), masterIds: new Set() } };
-    }
-  };
-
-  const initSuggestions = async () => {
-    setSuggestionsPage(0);
-    setHasMoreSuggestions(true);
-    // DO NOT clear suggestions here to avoid image flickering
-    const { rankedIds, historyIdentities } = await fetchUserHistory();
-    setRankedBoughtIds(rankedIds);
-    setHistoryIdentities(historyIdentities);
-    fetchSuggestions(0, rankedIds, historyIdentities);
-  };
-
-  const fetchSuggestions = async (page: number, currentRankedIds?: string[], currentHistoryIdentities?: any) => {
-    try {
-      if (page === 0) setSuggestionsLoading(true);
-      else setIsMoreSuggestionsLoading(true);
-
-      const activeRankedIds = currentRankedIds || rankedBoughtIds;
-      const activeHistoryIdentities = currentHistoryIdentities || historyIdentities;
-      const userCoords = sessionAddress ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location)) : null;
-
-      const PAGE_SIZE = 15;
-      const offset = page * PAGE_SIZE;
-
-      // Simple approach: Fetch products, and sort them in memory if they match user history
-      // Fetch products. We increase the limit on page 0 to ensure we have enough candidates for deduplication
-      const FETCH_PAGE_SIZE = page === 0 ? 50 : PAGE_SIZE;
-      const { data: products, error } = await supabase
-        .from('products')
-        .select('*, stores:stores_view!inner(*)')
-        .eq('stores.is_active', true)
-        .eq('stores.is_approved', true)
-        .eq('is_deleted', false)
-        .eq('is_info_complete', true)
-        .eq('in_stock', true)
-        .range(offset, offset + FETCH_PAGE_SIZE - 1);
-
-      if (error) throw error;
-
-      let processed = deduplicateProducts(products || [], userCoords);
-
-      // Sort by identity-based history (Ranked if ID, Barcode, or Master ID matches)
-      if (activeHistoryIdentities) {
-        processed.sort((a, b) => {
-          const isRankedA = activeHistoryIdentities.productIds.has(a.id) || 
-                           (a.barcode && activeHistoryIdentities.barcodes.has(a.barcode)) || 
-                           (a.master_product_id && activeHistoryIdentities.masterIds.has(a.master_product_id));
-          
-          const isRankedB = activeHistoryIdentities.productIds.has(b.id) || 
-                           (b.barcode && activeHistoryIdentities.barcodes.has(b.barcode)) || 
-                           (b.master_product_id && activeHistoryIdentities.masterIds.has(b.master_product_id));
-          
-          if (isRankedA && !isRankedB) return -1;
-          if (!isRankedA && isRankedB) return 1;
-          
-          // If both or neither are ranked, sort by proximity for the "suggested" feel
-          const storeLocA = a.stores?.location ? parseWKT(a.stores.location) : null;
-          const storeLocB = b.stores?.location ? parseWKT(b.stores.location) : null;
-          const distA = (userCoords && storeLocA) ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLocA.lat, storeLocA.lng) : Infinity;
-          const distB = (userCoords && storeLocB) ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLocB.lat, storeLocB.lng) : Infinity;
-          
-          return distA - distB;
-        });
-      } else if (activeRankedIds.length > 0) {
-        // Fallback for subsequent pages where we might only have IDs
-        processed.sort((a, b) => {
-          const indexA = activeRankedIds.indexOf(a.id);
-          const indexB = activeRankedIds.indexOf(b.id);
-          if (indexA === -1 && indexB === -1) return 0;
-          if (indexA === -1) return 1;
-          if (indexB === -1) return -1;
-          return indexA - indexB;
-        });
-      }
-
-      setSuggestions(prev => {
-        const combined = page === 0 ? processed : [...prev, ...processed];
-        const nameMap = new Map<string, any>();
-        
-        combined.forEach(item => {
-          const nameKey = (item.name || '').toLowerCase().trim();
-          const existing = nameMap.get(nameKey);
-          
-          // Calculate distance for the current item to use as a ranking factor
-          const storeLoc = item.stores?.location ? parseWKT(item.stores.location) : null;
-          const dist = (userCoords && storeLoc) 
-            ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLoc.lat, storeLoc.lng)
-            : Infinity;
-          
-          // Store distance temporarily on the item for comparison
-          item._tempDist = dist;
-
-          // Deduplication rule: Keep the version from the nearest store
-          if (!existing || dist < (existing._tempDist ?? Infinity)) {
-            nameMap.set(nameKey, item);
-          }
-        });
-        
-        return Array.from(nameMap.values());
-      });
-
-      setHasMoreSuggestions(products?.length === PAGE_SIZE);
-      setSuggestionsPage(page);
-    } catch (e) {
-      // Silent
-    } finally {
-      setSuggestionsLoading(false);
-      setIsMoreSuggestionsLoading(false);
-    }
-  };
-
-  const handleLoadMoreSuggestions = () => {
-    if (!isMoreSuggestionsLoading && hasMoreSuggestions && !suggestionsLoading && suggestions.length > 0) {
-      fetchSuggestions(suggestionsPage + 1);
-    }
-  };
 
   const fetchHomeBanners = async () => {
     try {
@@ -804,7 +687,7 @@ export const HomeScreen = ({ navigation }: any) => {
       {/* Featured Stores */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Nearby Stores</Text>
-        <TouchableOpacity onPress={fetchStores}>
+        <TouchableOpacity onPress={loadCachedHomeData}>
           <Text style={styles.seeAll}>Refresh</Text>
         </TouchableOpacity>
       </View>
@@ -839,16 +722,16 @@ export const HomeScreen = ({ navigation }: any) => {
         </View>
       )}
     </>
-  ), [homeBanners, activeBannerIndex, bestSellers, loading, stores, suggestions.length, renderCategory, renderBestSeller, renderStore, stopAutoScroll, startAutoScroll]);
+  ), [homeBanners, activeBannerIndex, bestSellers, loading, stores, suggestions.length, renderCategory, renderBestSeller, renderStore, stopAutoScroll, startAutoScroll, loadCachedHomeData]);
 
   const MemoizedFooter = useMemo(() => {
-    if (!isMoreSuggestionsLoading || suggestions.length === 0) return null;
+    if (suggestions.length === 0) return null;
     return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color={Colors.primary} />
+      <View style={styles.footerContainer}>
+        <Text style={styles.footerText}>Use search bar for other products</Text>
       </View>
     );
-  }, [isMoreSuggestionsLoading, suggestions.length]);
+  }, [suggestions.length]);
 
   return (
     <View style={styles.container}>
@@ -923,8 +806,6 @@ export const HomeScreen = ({ navigation }: any) => {
         numColumns={3}
         ListHeaderComponent={MemoizedHeader}
         ListFooterComponent={MemoizedFooter}
-        onEndReached={handleLoadMoreSuggestions}
-        onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl 
@@ -939,7 +820,7 @@ export const HomeScreen = ({ navigation }: any) => {
           { paddingBottom: insets.bottom + 100 }
         ]}
         columnWrapperStyle={styles.suggestionsRow}
-        ListEmptyComponent={suggestionsLoading ? (
+        ListEmptyComponent={loading ? (
           <ActivityIndicator size="large" color={Colors.primary} style={styles.loadingIndicator} />
         ) : null}
       />
@@ -1193,10 +1074,17 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 10,
   },
-  footerLoader: {
+  footerContainer: {
     paddingVertical: Spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
+  },
+  footerText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,

@@ -447,19 +447,29 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
       {/* Bottom Sticky Button */}
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + Spacing.md }]}>
         {quantity > 0 ? (
-          <View style={styles.cartControls}>
+          <View style={styles.cartActionsRow}>
+            <View style={styles.quantitySelectorContainer}>
+              <TouchableOpacity 
+                style={styles.quantityBtnSmall} 
+                onPress={() => updateQuantity(product, -1, selectedOptions, currentStore?.id)}
+              >
+                <Icon name="minus" size={18} color={Colors.white} />
+              </TouchableOpacity>
+              <Text style={styles.quantityTextSmall}>{quantity}</Text>
+              <TouchableOpacity 
+                style={styles.quantityBtnSmall} 
+                onPress={() => updateQuantity(product, 1, selectedOptions, currentStore?.id)}
+              >
+                <Icon name="plus" size={18} color={Colors.white} />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity 
-              style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product, -1, selectedOptions, currentStore?.id)}
+              activeOpacity={0.8}
+              style={styles.goToCartBtn}
+              onPress={() => navigation.navigate('Cart')}
             >
-              <Icon name="minus" size={20} color={Colors.white} />
-            </TouchableOpacity>
-            <Text style={styles.quantityText}>{quantity}</Text>
-            <TouchableOpacity 
-              style={styles.quantityBtn} 
-              onPress={() => updateQuantity(product, 1, selectedOptions, currentStore?.id)}
-            >
-              <Icon name="plus" size={20} color={Colors.white} />
+              <Icon name="cart" size={20} color={Colors.white} style={{ marginRight: 8 }} />
+              <Text style={styles.goToCartText}>View Cart</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -780,24 +790,55 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
-  cartControls: {
+  cartActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  quantitySelectorContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
     height: 56,
     borderRadius: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
   },
-  quantityBtn: {
-    width: 40,
-    height: 40,
+  quantityBtnSmall: {
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
   },
-  quantityText: {
+  quantityTextSmall: {
+    color: Colors.primary,
+    fontSize: 18,
+    fontWeight: '800',
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  goToCartBtn: {
+    flex: 1.2,
+    backgroundColor: Colors.success,
+    height: 56,
+    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: Colors.success,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  goToCartText: {
     color: Colors.white,
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '800',
   },
   returnPolicyContainer: {

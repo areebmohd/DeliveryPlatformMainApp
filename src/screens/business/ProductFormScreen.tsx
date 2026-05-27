@@ -98,6 +98,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(product?.raw_image_url || null);
   const [isBarcodeFromAnotherStore, setIsBarcodeFromAnotherStore] = useState(false);
+  const [isInfoComplete, setIsInfoComplete] = useState(product?.is_info_complete || false);
   const [capturingRaw, setCapturingRaw] = useState(false);
   const [searchingBarcode, setSearchingBarcode] = useState(false);
   const [hasSearchedBarcode, setHasSearchedBarcode] = useState(false);
@@ -135,6 +136,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       setIsBarcodeMatched(false);
       setHasSearchedBarcode(false);
       setIsBarcodeFromAnotherStore(false);
+      setIsInfoComplete(false);
       setSelectedMasterId(null);
       setHasMadeCommonChoice(false);
     }
@@ -188,6 +190,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
             setPreparationTime(data.preparation_time?.toString() || '0');
             setRawImageUrl(data.raw_image_url || null);
             setIsOversized(data.needs_large_vehicle || false);
+            setIsInfoComplete(data.is_info_complete || false);
             
             // Re-initialize lists with fresh data
             if (data.description) {
@@ -307,6 +310,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
         setImageUrl(data.image_url || '');
         setRawImageUrl(data.raw_image_url || null);
         setIsBarcodeMatched(true);
+        setIsInfoComplete(data.is_info_complete || false);
         showToast('Product Found', 'success');
       } else {
         setHasSearchedBarcode(true);
@@ -413,13 +417,19 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   const isCommonFromAnotherStore = isCommon && (selectedMasterId !== null || (isEditing && product?.master_product_id !== null));
   
   // Admin details: category, image, tags, delivery vehicle
-  const canEditAdminDetails = isPersonal || (isCommon && !isCommonFromAnotherStore) || (isBarcode && !isBarcodeFromAnotherStore);
+  const canEditAdminDetails = isPersonal || 
+    (isCommon && !isCommonFromAnotherStore && !isInfoComplete) || 
+    (isBarcode && !isBarcodeFromAnotherStore && !isInfoComplete);
   
   // Name field
-  const canEditName = isPersonal || (isCommon && !isCommonFromAnotherStore) || (isBarcode && !isBarcodeFromAnotherStore);
+  const canEditName = isPersonal || 
+    (isCommon && !isCommonFromAnotherStore && !isInfoComplete) || 
+    (isBarcode && !isBarcodeFromAnotherStore && !isInfoComplete);
   
   // Store specific fields: price, weight, description, options, preparation time
-  const canEditPriceWeight = isPersonal || isCommon || (isBarcode && !isBarcodeFromAnotherStore);
+  const canEditPriceWeight = isPersonal || 
+    isCommon || 
+    (isBarcode && !isBarcodeFromAnotherStore && !isInfoComplete);
   
   // Stock field
   const canEditStock = true;
@@ -762,21 +772,21 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           </View>
           <Text style={styles.typeDescription}>{getProductTypeDescription()}</Text>
 
-          {/* Blue themed box for Common product from another store */}
-          {isCommon && isCommonFromAnotherStore && (
+          {/* Blue themed box for Common product from another store or approved */}
+          {isCommon && (isCommonFromAnotherStore || isInfoComplete) && (
             <View style={styles.blueInfoBox}>
               <Icon name="information-outline" size={20} color={Colors.primary} style={styles.blueInfoIcon} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.blueInfoTitle}>Common Product Customization</Text>
                 <Text style={styles.blueInfoText}>
-                  This product is shared across stores. You <Text style={{ fontWeight: '700' }}>cannot edit</Text> the Name, Image, Category, and Delivery details.
+                  This product is {isInfoComplete ? 'already approved and ' : ''}shared across stores. You <Text style={{ fontWeight: '700' }}>cannot edit</Text> the Name, Image, Category, and Delivery details.
                 </Text>
               </View>
             </View>
           )}
 
-          {/* Blue themed box for Barcode product from another store */}
-          {isBarcode && isBarcodeFromAnotherStore && (
+          {/* Blue themed box for Barcode product from another store or approved */}
+          {isBarcode && (isBarcodeFromAnotherStore || isInfoComplete) && (
             <View style={styles.blueInfoBox}>
               <Icon name="information-outline" size={20} color={Colors.primary} style={styles.blueInfoIcon} />
               <View style={{ flex: 1 }}>

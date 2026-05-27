@@ -22,7 +22,7 @@ interface StoreCardProps {
     city?: string;
     banner_url?: string;
   };
-  onPress: () => void;
+  onPress: (store: any) => void;
   width?: DimensionValue;
   horizontal?: boolean;
 }
