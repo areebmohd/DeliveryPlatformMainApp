@@ -106,6 +106,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [bestSellers, setBestSellers] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [visibleSuggestionsCount, setVisibleSuggestionsCount] = useState(15);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
@@ -204,6 +205,9 @@ export const HomeScreen = ({ navigation }: any) => {
       const cacheKey = `home_data_cache_${user?.id || 'guest'}_${sessionAddress?.id || 'default'}`;
       const today = getLocalDateString();
 
+      // Reset visibleSuggestionsCount to 15 when recalculating or loading from cache
+      setVisibleSuggestionsCount(15);
+
       // Retrieve cached data
       const cachedString = await AsyncStorage.getItem(cacheKey);
       if (cachedString) {
@@ -263,7 +267,7 @@ export const HomeScreen = ({ navigation }: any) => {
         return;
       }
 
-      // 2. BEST SELLERS
+      // 2. BEST SELLERS (Global Top 10 from the 10 nearby stores)
       const startOfYesterday = new Date();
       startOfYesterday.setDate(startOfYesterday.getDate() - 1);
       startOfYesterday.setHours(0, 0, 0, 0);
@@ -297,35 +301,26 @@ export const HomeScreen = ({ navigation }: any) => {
         .eq('in_stock', true);
 
       const productsFromNearby = storeProducts || [];
-
-      // Group products by store
-      const storeProductsMap = new Map<string, any[]>();
       productsFromNearby.forEach((product: any) => {
-        const storeId = product.store_id;
-        if (!storeProductsMap.has(storeId)) {
-          storeProductsMap.set(storeId, []);
-        }
         product._salesCountYesterday = yesterdaySalesMap.get(product.id) || 0;
-        storeProductsMap.get(storeId)?.push(product);
       });
 
-      const finalBestSellers: any[] = [];
-      nearest10Stores.forEach((store: any) => {
-        const products = storeProductsMap.get(store.id) || [];
-        if (products.length > 0) {
-          products.sort((a: any, b: any) => {
-            if (b._salesCountYesterday !== a._salesCountYesterday) {
-              return b._salesCountYesterday - a._salesCountYesterday;
-            }
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-          });
-          finalBestSellers.push(products[0]);
+      // Sort globally from all 10 nearby stores combined
+      productsFromNearby.sort((a: any, b: any) => {
+        if (b._salesCountYesterday !== a._salesCountYesterday) {
+          return b._salesCountYesterday - a._salesCountYesterday;
         }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
 
-      // 3. SUGGESTED PRODUCTS
+      const finalBestSellers = productsFromNearby.slice(0, 10);
+
+      // 3. SUGGESTED PRODUCTS (Sequential Platform Paging)
       let user7DaySalesMap = new Map<string, number>();
+      let userAllTimeSalesMap = new Map<string, number>();
+
       if (user?.id) {
+        // Query 7 day history
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
         const { data: recentPurchases } = await supabase
           .from('order_items')
@@ -340,29 +335,47 @@ export const HomeScreen = ({ navigation }: any) => {
             user7DaySalesMap.set(item.product_id, (user7DaySalesMap.get(item.product_id) || 0) + (item.quantity || 0));
           }
         });
+
+        // Query all time history
+        const { data: allTimePurchases } = await supabase
+          .from('order_items')
+          .select('product_id, quantity, orders!inner(customer_id, status)')
+          .eq('orders.customer_id', user.id)
+          .neq('orders.status', 'cancelled')
+          .eq('is_removed', false);
+
+        (allTimePurchases || []).forEach((item: any) => {
+          if (item.product_id) {
+            userAllTimeSalesMap.set(item.product_id, (userAllTimeSalesMap.get(item.product_id) || 0) + (item.quantity || 0));
+          }
+        });
       }
 
-      const finalSuggestions: any[] = [];
-      nearest10Stores.forEach((store: any) => {
-        const products = storeProductsMap.get(store.id) || [];
-        if (products.length > 0) {
-          products.forEach((p: any) => {
-            p._userBoughtCount = user7DaySalesMap.get(p.id) || 0;
-          });
+      // Fetch all active, in-stock products from the entire platform
+      const { data: allPlatformProducts, error: platformProductsError } = await supabase
+        .from('products')
+        .select('*, stores:stores_view!inner(*)')
+        .eq('stores.is_active', true)
+        .eq('stores.is_approved', true)
+        .eq('is_deleted', false)
+        .eq('is_info_complete', true)
+        .eq('in_stock', true);
 
-          const sortedStoreProducts = [...products].sort((a: any, b: any) => {
-            if (b._userBoughtCount !== a._userBoughtCount) {
-              return b._userBoughtCount - a._userBoughtCount;
-            }
-            if (b._salesCountYesterday !== a._salesCountYesterday) {
-              return b._salesCountYesterday - a._salesCountYesterday;
-            }
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-          });
+      const finalSuggestions = allPlatformProducts || [];
+      finalSuggestions.forEach((p: any) => {
+        p._userBoughtCount7Days = user7DaySalesMap.get(p.id) || 0;
+        p._userBoughtCountAllTime = userAllTimeSalesMap.get(p.id) || 0;
+      });
 
-          const selected3 = sortedStoreProducts.slice(0, 3);
-          finalSuggestions.push(...selected3);
+      // Sort globally: 7-day purchases (desc) -> all-time purchases (desc) -> latest in-stock (desc)
+      finalSuggestions.sort((a: any, b: any) => {
+        if (b._userBoughtCount7Days !== a._userBoughtCount7Days) {
+          return b._userBoughtCount7Days - a._userBoughtCount7Days;
         }
+        if (b._userBoughtCountAllTime !== a._userBoughtCountAllTime) {
+          return b._userBoughtCountAllTime - a._userBoughtCountAllTime;
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
 
       // Cache and save everything
@@ -726,12 +739,27 @@ export const HomeScreen = ({ navigation }: any) => {
 
   const MemoizedFooter = useMemo(() => {
     if (suggestions.length === 0) return null;
+
+    if (visibleSuggestionsCount < suggestions.length) {
+      return (
+        <View style={styles.footerContainer}>
+          <TouchableOpacity 
+            style={styles.showMoreButton} 
+            onPress={() => setVisibleSuggestionsCount(prev => prev + 15)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.showMoreText}>Show more</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.footerContainer}>
         <Text style={styles.footerText}>Use search bar for other products</Text>
       </View>
     );
-  }, [suggestions.length]);
+  }, [suggestions.length, visibleSuggestionsCount]);
 
   return (
     <View style={styles.container}>
@@ -800,7 +828,7 @@ export const HomeScreen = ({ navigation }: any) => {
       </LinearGradient>
 
       <FlatList
-        data={suggestions}
+        data={suggestions.slice(0, visibleSuggestionsCount)}
         renderItem={renderSuggestion}
         keyExtractor={(item) => item.id}
         numColumns={3}
@@ -1085,6 +1113,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.textSecondary,
     textAlign: 'center',
+  },
+  showMoreButton: {
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  showMoreText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.primary,
   },
   modalOverlay: {
     flex: 1,
