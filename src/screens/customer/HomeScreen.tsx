@@ -29,7 +29,7 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import { PRODUCT_CATEGORIES } from '../../theme/categories';
-import { deduplicateProducts, parseWKT, getHaversineDistance } from '../../utils/productUtils';
+import { parseWKT } from '../../utils/productUtils';
 import { useScrollToTop } from '@react-navigation/native';
 
 const CATEGORIES = PRODUCT_CATEGORIES;
@@ -203,184 +203,55 @@ export const HomeScreen = ({ navigation }: any) => {
     return localDate.toISOString().split('T')[0];
   }, []);
 
-  const loadCachedHomeData = useCallback(async () => {
+  const loadCachedHomeData = useCallback(async (forceRefresh = false) => {
     try {
       setLoading(true);
-      const cacheKey = `home_data_cache_${user?.id || 'guest'}_${sessionAddress?.id || 'default'}`;
+      const cacheKey = `home_data_v2_cache_${user?.id || 'guest'}_${sessionAddress?.id || 'default'}`;
       const today = getLocalDateString();
 
       // Reset visibleSuggestionsCount to 15 when recalculating or loading from cache
       setVisibleSuggestionsCount(15);
 
       // Retrieve cached data
-      const cachedString = await AsyncStorage.getItem(cacheKey);
-      if (cachedString) {
-        try {
-          const cache = JSON.parse(cachedString);
-          if (cache.date === today) {
-            setStores(cache.stores || []);
-            setBestSellers(cache.bestSellers || []);
-            setSuggestions(cache.suggestions || []);
-            setLoading(false);
-            return;
+      if (!forceRefresh) {
+        const cachedString = await AsyncStorage.getItem(cacheKey);
+        if (cachedString) {
+          try {
+            const cache = JSON.parse(cachedString);
+            if (cache.date === today) {
+              setStores(cache.stores || []);
+              setBestSellers(cache.bestSellers || []);
+              setSuggestions(cache.suggestions || []);
+              setLoading(false);
+              return;
+            }
+          } catch (parseErr) {
+            console.log('Error parsing cache:', parseErr);
           }
-        } catch (parseErr) {
-          console.log('Error parsing cache:', parseErr);
         }
       }
 
-      // 1. NEAREST STORES
-      const { data: dbStores, error: storesError } = await supabase
-        .from('stores_view')
-        .select('*')
-        .eq('is_active', true)
-        .eq('is_approved', true);
-
-      if (storesError) throw storesError;
-
-      const userCoords = sessionAddress
-        ? (sessionAddress.location_wkt ? parseWKT(sessionAddress.location_wkt) : parseWKT(sessionAddress.location))
-        : null;
-
-      let sortedStores = dbStores || [];
-      if (userCoords) {
-        sortedStores = sortedStores
-          .map((store: any) => {
-            const storeLoc = parseWKT(store.location_wkt);
-            const distance = storeLoc
-              ? getHaversineDistance(userCoords.lat, userCoords.lng, storeLoc.lat, storeLoc.lng)
-              : Infinity;
-            return { ...store, _distance: distance };
-          })
-          .sort((a: any, b: any) => a._distance - b._distance);
-      }
-      const nearest10Stores = sortedStores.slice(0, 10);
-      const nearest10StoreIds = nearest10Stores.map((s: any) => s.id);
-
-      if (nearest10Stores.length === 0) {
-        setStores([]);
-        setBestSellers([]);
-        setSuggestions([]);
-        await AsyncStorage.setItem(cacheKey, JSON.stringify({
-          date: today,
-          stores: [],
-          bestSellers: [],
-          suggestions: []
-        }));
-        setLoading(false);
-        return;
+      let userCoords = null;
+      if (sessionAddress) {
+        userCoords = sessionAddress.location_wkt 
+          ? parseWKT(sessionAddress.location_wkt) 
+          : (sessionAddress.location ? parseWKT(sessionAddress.location) : null);
       }
 
-      // 2. BEST SELLERS (Global Top 10 from the 10 nearby stores)
-      const startOfYesterday = new Date();
-      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-      startOfYesterday.setHours(0, 0, 0, 0);
+      const { data, error } = await supabase.rpc('get_home_screen_data', {
+        p_lat: userCoords?.lat || null,
+        p_lng: userCoords?.lng || null,
+        p_user_id: user?.id || null
+      });
 
-      const endOfYesterday = new Date();
-      endOfYesterday.setDate(endOfYesterday.getDate() - 1);
-      endOfYesterday.setHours(23, 59, 59, 999);
-
-      const { data: yesterdaySales, error: salesError } = await supabase
-        .from('order_items')
-        .select('product_id, quantity, orders!inner(created_at, status)')
-        .gte('orders.created_at', startOfYesterday.toISOString())
-        .lte('orders.created_at', endOfYesterday.toISOString())
-        .neq('orders.status', 'cancelled');
-
-      const yesterdaySalesMap = new Map<string, number>();
-      if (!salesError && yesterdaySales) {
-        yesterdaySales.forEach((item: any) => {
-          if (item.product_id) {
-            yesterdaySalesMap.set(item.product_id, (yesterdaySalesMap.get(item.product_id) || 0) + (item.quantity || 0));
-          }
-        });
+      if (error) {
+        console.error('Error fetching home screen data via RPC:', error);
+        throw error;
       }
 
-      const { data: storeProducts, error: productsError } = await supabase
-        .from('products')
-        .select('*, stores:stores_view!inner(*)')
-        .in('store_id', nearest10StoreIds)
-        .eq('is_deleted', false)
-        .eq('is_info_complete', true)
-        .eq('in_stock', true);
-
-      const productsFromNearby = storeProducts || [];
-      productsFromNearby.forEach((product: any) => {
-        product._salesCountYesterday = yesterdaySalesMap.get(product.id) || 0;
-      });
-
-      // Sort globally from all 10 nearby stores combined
-      productsFromNearby.sort((a: any, b: any) => {
-        if (b._salesCountYesterday !== a._salesCountYesterday) {
-          return b._salesCountYesterday - a._salesCountYesterday;
-        }
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
-
-      const finalBestSellers = productsFromNearby.slice(0, 10);
-
-      // 3. SUGGESTED PRODUCTS (Sequential Platform Paging)
-      let user7DaySalesMap = new Map<string, number>();
-      let userAllTimeSalesMap = new Map<string, number>();
-
-      if (user?.id) {
-        // Query 7 day history
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const { data: recentPurchases } = await supabase
-          .from('order_items')
-          .select('product_id, quantity, orders!inner(customer_id, status, created_at)')
-          .eq('orders.customer_id', user.id)
-          .gte('orders.created_at', sevenDaysAgo.toISOString())
-          .neq('orders.status', 'cancelled')
-          .eq('is_removed', false);
-
-        (recentPurchases || []).forEach((item: any) => {
-          if (item.product_id) {
-            user7DaySalesMap.set(item.product_id, (user7DaySalesMap.get(item.product_id) || 0) + (item.quantity || 0));
-          }
-        });
-
-        // Query all time history
-        const { data: allTimePurchases } = await supabase
-          .from('order_items')
-          .select('product_id, quantity, orders!inner(customer_id, status)')
-          .eq('orders.customer_id', user.id)
-          .neq('orders.status', 'cancelled')
-          .eq('is_removed', false);
-
-        (allTimePurchases || []).forEach((item: any) => {
-          if (item.product_id) {
-            userAllTimeSalesMap.set(item.product_id, (userAllTimeSalesMap.get(item.product_id) || 0) + (item.quantity || 0));
-          }
-        });
-      }
-
-      // Fetch all active, in-stock products from the entire platform
-      const { data: allPlatformProducts, error: platformProductsError } = await supabase
-        .from('products')
-        .select('*, stores:stores_view!inner(*)')
-        .eq('stores.is_active', true)
-        .eq('stores.is_approved', true)
-        .eq('is_deleted', false)
-        .eq('is_info_complete', true)
-        .eq('in_stock', true);
-
-      const finalSuggestions = allPlatformProducts || [];
-      finalSuggestions.forEach((p: any) => {
-        p._userBoughtCount7Days = user7DaySalesMap.get(p.id) || 0;
-        p._userBoughtCountAllTime = userAllTimeSalesMap.get(p.id) || 0;
-      });
-
-      // Sort globally: 7-day purchases (desc) -> all-time purchases (desc) -> latest in-stock (desc)
-      finalSuggestions.sort((a: any, b: any) => {
-        if (b._userBoughtCount7Days !== a._userBoughtCount7Days) {
-          return b._userBoughtCount7Days - a._userBoughtCount7Days;
-        }
-        if (b._userBoughtCountAllTime !== a._userBoughtCountAllTime) {
-          return b._userBoughtCountAllTime - a._userBoughtCountAllTime;
-        }
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
+      const nearest10Stores = data?.stores || [];
+      const finalBestSellers = data?.best_sellers || [];
+      const finalSuggestions = data?.suggestions || [];
 
       // Cache and save everything
       await AsyncStorage.setItem(cacheKey, JSON.stringify({
@@ -435,7 +306,7 @@ export const HomeScreen = ({ navigation }: any) => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([
-      loadCachedHomeData(),
+      loadCachedHomeData(true),
       fetchHomeBanners(),
       fetchCategoryImages(),
       user ? fetchAddresses() : Promise.resolve(),
