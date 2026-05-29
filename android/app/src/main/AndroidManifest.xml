@@ -44,7 +44,6 @@
             <data android:scheme="http" />
             <data android:scheme="https" />
             <data android:host="zorodelivery.vercel.app" />
-            <data android:host="www.zorodelivery.vercel.app" />
             <data android:pathPrefix="/store" />
             <data android:pathPrefix="/product" />
         </intent-filter>

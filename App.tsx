@@ -19,7 +19,7 @@ import { supabase } from './src/api/supabase';
 export const navigationRef = createNavigationContainerRef();
 
 // IMPORTANT: Update this manually on every release to match versionCode in android/app/build.gradle
-const CURRENT_VERSION_CODE = 3;
+const CURRENT_VERSION_CODE = 4;
 
 function App() {
   return (
@@ -114,7 +114,7 @@ function AppContent() {
       <NavigationContainer
         ref={navigationRef}
         linking={{
-          prefixes: ['com.zorodelivery.app://', 'https://zorodelivery.vercel.app', 'https://www.zorodelivery.vercel.app'],
+          prefixes: ['com.zorodelivery.app://', 'https://zorodelivery.vercel.app'],
           config: {
             screens: {
               Auth: 'auth',
