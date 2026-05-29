@@ -33,6 +33,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
 
   // Product Type state
   const [productType, setProductType] = useState<string>(product?.product_type || selectedType || initialType || mode || 'barcode');
+  const lastSelectedName = React.useRef('');
   
   const [name, setName] = useState(product?.name || '');
   
@@ -304,11 +305,31 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           setDescriptionPairs([{ title: 'Description', text: data.description || '' }]);
         }
 
+        if (data.options) {
+          try {
+            const parsedOptions = typeof data.options === 'string' ? JSON.parse(data.options) : data.options;
+            if (Array.isArray(parsedOptions) && parsedOptions.length > 0) {
+              setProductOptions(parsedOptions.map((opt: any) => ({
+                ...opt,
+                values: opt.values?.length 
+                  ? opt.values.map((v: any) => typeof v === 'string' 
+                      ? { value: v, price_adjustment: 0, weight_adjustment: 0 } 
+                      : { ...v, price_adjustment: parseFloat(v.price_adjustment) || 0, weight_adjustment: parseFloat(v.weight_adjustment) || 0 })
+                  : [{ value: '', price_adjustment: 0, weight_adjustment: 0 }],
+                currentInput: ''
+              })));
+            }
+          } catch (e) {}
+        }
+
         setPrice(data.price?.toString() || '');
         setWeight(data.weight_kg?.toString() || '');
         setCategory(data.category || '');
         setImageUrl(data.image_url || '');
         setRawImageUrl(data.raw_image_url || null);
+        if (data.tags) setTags(data.tags);
+        if (data.preparation_time) setPreparationTime(data.preparation_time.toString());
+        setIsOversized(data.needs_large_vehicle || false);
         setIsBarcodeMatched(true);
         setIsInfoComplete(data.is_info_complete || false);
         showToast('Product Found', 'success');
@@ -352,7 +373,7 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
       // Using PostgREST syntax for .or() - searching name, description and tags_search_text
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, category, image_url, tags')
+        .select('id, name, category, image_url, tags, description, price, weight_kg, options, preparation_time, needs_large_vehicle')
         .eq('product_type', 'common')
         .eq('is_info_complete', true)
         // is_deleted omitted so stores can search and add soft-deleted common products
@@ -382,11 +403,49 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
   };
 
   const handleSelectMasterProduct = (master: any) => {
+    lastSelectedName.current = master.name;
     setSelectedMasterId(master.id);
     setName(master.name);
     setCategory(master.category);
     setTags(master.tags || []);
     setImageUrl(master.image_url || '');
+    
+    // Populate other details so they don't have to start from scratch
+    if (master.price) setPrice(master.price.toString());
+    if (master.weight_kg) setWeight(master.weight_kg.toString());
+    if (master.preparation_time) setPreparationTime(master.preparation_time.toString());
+    setIsOversized(master.needs_large_vehicle || false);
+    
+    try {
+      if (master.description) {
+        const parsed = JSON.parse(master.description);
+        if (Array.isArray(parsed)) {
+          setDescriptionPairs(parsed);
+        } else {
+          setDescriptionPairs([{ title: 'Description', text: master.description }]);
+        }
+      }
+    } catch (e) {
+      setDescriptionPairs([{ title: 'Description', text: master.description || '' }]);
+    }
+
+    if (master.options) {
+      try {
+        const parsedOptions = typeof master.options === 'string' ? JSON.parse(master.options) : master.options;
+        if (Array.isArray(parsedOptions) && parsedOptions.length > 0) {
+          setProductOptions(parsedOptions.map((opt: any) => ({
+            ...opt,
+            values: opt.values?.length 
+              ? opt.values.map((v: any) => typeof v === 'string' 
+                  ? { value: v, price_adjustment: 0, weight_adjustment: 0 } 
+                  : { ...v, price_adjustment: parseFloat(v.price_adjustment) || 0, weight_adjustment: parseFloat(v.weight_adjustment) || 0 })
+              : [{ value: '', price_adjustment: 0, weight_adjustment: 0 }],
+            currentInput: ''
+          })));
+        }
+      } catch (e) {}
+    }
+
     setMasterSuggestions([]);
     setHasMadeCommonChoice(true);
     showToast('Master product selected', 'success');
@@ -950,7 +1009,12 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                   onChangeText={(text) => {
                     setName(text);
                     if (isCommon) {
+                      if (lastSelectedName.current === text) {
+                        return; // Ignore programmatic updates from selection
+                      }
+                      lastSelectedName.current = '';
                       setHasMadeCommonChoice(false);
+                      if (selectedMasterId) setSelectedMasterId(null);
                       searchMasterCatalog(text);
                     }
                   }}
@@ -961,6 +1025,18 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
                       <TouchableOpacity onPress={() => {
                         setSelectedMasterId(null);
                         setHasMadeCommonChoice(false);
+                        setName('');
+                        setPrice('');
+                        setWeight('');
+                        setCategory('');
+                        setImageUrl('');
+                        setTags([]);
+                        setPreparationTime('0');
+                        setIsOversized(false);
+                        setDescriptionPairs([{ title: '', text: '' }]);
+                        setProductOptions([{ title: '', values: [{ value: '', price_adjustment: 0, weight_adjustment: 0 }], currentInput: '' }]);
+                        setMasterSuggestions([]);
+                        lastSelectedName.current = '';
                       }}>
                         <Icon name="close-circle" size={20} color={Colors.textSecondary} />
                       </TouchableOpacity>

@@ -18,9 +18,8 @@ import { supabase } from './src/api/supabase';
 
 export const navigationRef = createNavigationContainerRef();
 
-const CURRENT_VERSION_CODE = Platform.OS === 'android'
-  ? (NativeModules.DeviceModule?.versionCode ?? 2)
-  : 2; // Dynamically synced with native versionCode from build.gradle!
+// IMPORTANT: Update this manually on every release to match versionCode in android/app/build.gradle
+const CURRENT_VERSION_CODE = 3;
 
 function App() {
   return (
