@@ -14,6 +14,7 @@ import {
   Image,
   Animated,
   RefreshControl,
+  Platform,
 } from 'react-native';
 const { width } = Dimensions.get('window');
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,7 +58,40 @@ const MemoizedStoreItem = React.memo(({ item, onPress }: any) => (
   />
 ));
 
-const HomeBanners = React.memo(({ banners, activeIndex, onBannerScroll, onTouchStart, onTouchEnd, scrollViewRef }: any) => {
+const HomeBanners = React.memo(({ banners }: { banners: any[] }) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const timerRef = useRef<any>(null);
+  const activeIndexRef = useRef(0);
+
+  useEffect(() => {
+    activeIndexRef.current = activeIndex;
+  }, [activeIndex]);
+
+  const startAutoScroll = useCallback(() => {
+    if (!banners || banners.length <= 1) return;
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      const nextIndex = (activeIndexRef.current + 1) % banners.length;
+      scrollViewRef.current?.scrollTo({
+        x: nextIndex * width,
+        animated: true,
+      });
+      setActiveIndex(nextIndex);
+    }, 5000);
+  }, [banners]);
+
+  const stopAutoScroll = useCallback(() => {
+    clearInterval(timerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (banners && banners.length > 1) {
+      startAutoScroll();
+    }
+    return () => clearInterval(timerRef.current);
+  }, [banners, startAutoScroll]);
+
   if (!banners || banners.length === 0) return null;
 
   return (
@@ -69,10 +103,10 @@ const HomeBanners = React.memo(({ banners, activeIndex, onBannerScroll, onTouchS
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) => {
           const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
-          onBannerScroll(newIndex);
+          setActiveIndex(newIndex);
         }}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
+        onTouchStart={stopAutoScroll}
+        onTouchEnd={startAutoScroll}
         scrollEventThrottle={16}
       >
         {banners.map((banner: any) => (
@@ -122,10 +156,6 @@ export const HomeScreen = ({ navigation }: any) => {
   const { addItem, items, updateQuantity, sessionAddress, setSessionAddress, getQuantity } = useCart();
   const { user } = useAuth();
   const { showAlert } = useAlert();
-  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const activeBannerIndexRef = useRef(0);
-  const bannerScrollViewRef = useRef<ScrollView>(null);
-  const autoScrollTimer = useRef<any>(null);
   const glowAnim = useRef(new Animated.Value(1)).current;
   const maintenanceShownRef = useRef(false);
 
@@ -325,36 +355,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
 
 
-  useEffect(() => {
-    if (homeBanners.length > 1) {
-      startAutoScroll();
-    }
-    return () => stopAutoScroll();
-  }, [homeBanners]);
 
-  useEffect(() => {
-    activeBannerIndexRef.current = activeBannerIndex;
-  }, [activeBannerIndex]);
-
-  const startAutoScroll = useCallback(() => {
-    stopAutoScroll();
-    autoScrollTimer.current = setInterval(() => {
-      if (homeBanners.length > 0) {
-        const nextIndex = (activeBannerIndexRef.current + 1) % homeBanners.length;
-        bannerScrollViewRef.current?.scrollTo({
-          x: nextIndex * width,
-          animated: true,
-        });
-        setActiveBannerIndex(nextIndex);
-      }
-    }, 5000);
-  }, [homeBanners.length]);
-
-  const stopAutoScroll = useCallback(() => {
-    if (autoScrollTimer.current) {
-      clearInterval(autoScrollTimer.current);
-    }
-  }, []);
 
   const checkNotifications = async () => {
     try {
@@ -529,14 +530,7 @@ export const HomeScreen = ({ navigation }: any) => {
 
   const MemoizedHeader = useMemo(() => (
     <>
-      <HomeBanners 
-        banners={homeBanners}
-        activeIndex={activeBannerIndex}
-        onBannerScroll={setActiveBannerIndex}
-        onTouchStart={stopAutoScroll}
-        onTouchEnd={startAutoScroll}
-        scrollViewRef={bannerScrollViewRef}
-      />
+      <HomeBanners banners={homeBanners} />
 
       {/* Categories */}
       <View style={styles.sectionHeader}>
@@ -575,7 +569,7 @@ export const HomeScreen = ({ navigation }: any) => {
       {/* Featured Stores */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Nearby Stores</Text>
-        <TouchableOpacity onPress={loadCachedHomeData}>
+        <TouchableOpacity onPress={() => loadCachedHomeData(true)}>
           <Text style={styles.seeAll}>Refresh</Text>
         </TouchableOpacity>
       </View>
@@ -610,7 +604,7 @@ export const HomeScreen = ({ navigation }: any) => {
         </View>
       )}
     </>
-  ), [homeBanners, activeBannerIndex, bestSellers, loading, stores, suggestions.length, renderCategory, renderBestSeller, renderStore, stopAutoScroll, startAutoScroll, loadCachedHomeData]);
+  ), [homeBanners, bestSellers, loading, stores, suggestions.length, renderCategory, renderBestSeller, renderStore, loadCachedHomeData]);
 
   const MemoizedFooter = useMemo(() => {
     if (suggestions.length === 0) return null;
@@ -711,6 +705,10 @@ export const HomeScreen = ({ navigation }: any) => {
         ListHeaderComponent={MemoizedHeader}
         ListFooterComponent={MemoizedFooter}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={9}
+        maxToRenderPerBatch={9}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
