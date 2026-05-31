@@ -57,15 +57,20 @@ export const CustomerProductCard = React.memo(({
     >
       <View style={styles.imageContainer}>
         {product.image_url ? (
-          <Image source={{ uri: product.image_url }} style={styles.image} />
+          <Image 
+            source={{ uri: product.image_url, cache: 'force-cache' }} 
+            style={styles.image} 
+            resizeMode="cover"
+            resizeMethod="resize"
+          />
         ) : (
           <View style={[styles.image, styles.imagePlaceholder]}>
             <Icon name="package-variant" size={30} color={Colors.border} />
           </View>
         )}
-        
-        {isOutOfStock && (
-          <View style={styles.outOfStockBadge}>
+
+      {isOutOfStock && (
+        <View style={styles.outOfStockBadge}>
             <Text style={styles.outOfStockBadgeText}>Out of stock</Text>
           </View>
         )}

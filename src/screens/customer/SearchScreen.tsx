@@ -344,7 +344,7 @@ export const SearchScreen = ({ navigation, route }: any) => {
           initialNumToRender={10}
           maxToRenderPerBatch={10}
           windowSize={10}
-          removeClippedSubviews={true}
+          removeClippedSubviews={false} // Disabled to fix blank images bug on Android
           refreshControl={
             <RefreshControl 
               refreshing={loading} 

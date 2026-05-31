@@ -578,7 +578,7 @@ export const HomeScreen = ({ navigation }: any) => {
             initialNumToRender={5}
             maxToRenderPerBatch={10}
             windowSize={5}
-            removeClippedSubviews={true}
+            removeClippedSubviews={false} // Disabled to fix blank images bug on Android
           />
         </>
       )}
@@ -604,7 +604,7 @@ export const HomeScreen = ({ navigation }: any) => {
           initialNumToRender={3}
           maxToRenderPerBatch={5}
           windowSize={5}
-          removeClippedSubviews={true}
+          removeClippedSubviews={false} // Disabled to fix blank images bug on Android
         />
       ) : (
         <View style={styles.emptyContainer}>
@@ -725,7 +725,7 @@ export const HomeScreen = ({ navigation }: any) => {
         initialNumToRender={9}
         maxToRenderPerBatch={9}
         windowSize={5}
-        removeClippedSubviews={Platform.OS === 'android'}
+        removeClippedSubviews={false} // Disabled to fix blank images bug on Android
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 

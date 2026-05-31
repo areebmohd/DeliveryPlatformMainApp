@@ -43,8 +43,10 @@ export const BusinessProductCard = React.memo(({
       <View style={styles.mainContent}>
         {product.image_url || product.raw_image_url ? (
           <Image 
-            source={{ uri: product.image_url || product.raw_image_url }} 
+            source={{ uri: product.image_url || product.raw_image_url, cache: 'force-cache' }} 
             style={styles.productImage} 
+            resizeMode="cover"
+            resizeMethod="resize"
           />
         ) : (
           <View style={[styles.productImage, styles.imagePlaceholder]}>

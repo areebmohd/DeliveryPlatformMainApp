@@ -40,7 +40,12 @@ export const StoreCard = React.memo(({ store, onPress, width, horizontal }: Stor
     >
       <View style={[styles.imageContainer, horizontal ? { aspectRatio: 2 / 1 } : null]}>
         {store.banner_url ? (
-          <Image source={{ uri: store.banner_url }} style={styles.image} />
+          <Image 
+            source={{ uri: store.banner_url, cache: 'force-cache' }} 
+            style={styles.image} 
+            resizeMode="cover"
+            resizeMethod="resize"
+          />
         ) : (
           <View style={[styles.image, styles.placeholderImage]}>
             <Icon name="storefront-outline" size={48} color={Colors.textSecondary} />
