@@ -49,6 +49,15 @@ export const CategoryScreen = ({ navigation, route }: any) => {
       return;
     }
 
+    if (product.in_stock === false || (product.stock_quantity !== undefined && product.stock_quantity <= 0)) {
+      showAlert({
+        title: 'Out of Stock',
+        message: 'This product is currently out of stock and cannot be added to your cart.',
+        type: 'warning'
+      });
+      return;
+    }
+
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions({ product, store });
     } else {
@@ -72,8 +81,7 @@ export const CategoryScreen = ({ navigation, route }: any) => {
         .eq('stores.is_active', true)
         .eq('stores.is_approved', true)
         .eq('is_deleted', false)
-        .eq('is_info_complete', true)
-        .eq('in_stock', true);
+        .eq('is_info_complete', true);
 
       // Fetch Stores in this category
       const { data: storeData, error: storeError } = await supabase
@@ -109,12 +117,22 @@ export const CategoryScreen = ({ navigation, route }: any) => {
         onPress={() => navigation.navigate('ProductDetail', { product: item, store: item.stores, isFromStore: false })}
         onAdd={() => handleAddToCart(item, item.stores)}
         quantity={getQuantity(item, item.store_id)}
-        onIncrease={() => updateQuantity(item, 1, undefined, item.store_id)}
+        onIncrease={() => {
+          if (item.in_stock === false || (item.stock_quantity !== undefined && item.stock_quantity <= 0)) {
+            showAlert({
+              title: 'Out of Stock',
+              message: 'This product is currently out of stock and cannot be added to your cart.',
+              type: 'warning'
+            });
+            return;
+          }
+          updateQuantity(item, 1, undefined, item.store_id);
+        }}
         onDecrease={() => updateQuantity(item, -1, undefined, item.store_id)}
         width="100%"
       />
     </View>
-  ), [navigation, handleAddToCart, getQuantity, updateQuantity]);
+  ), [navigation, handleAddToCart, getQuantity, updateQuantity, showAlert]);
 
   const renderStore = useCallback(({ item }: { item: any }) => (
     <StoreCard

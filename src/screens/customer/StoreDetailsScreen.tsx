@@ -480,8 +480,7 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
         .select('*')
         .eq('store_id', targetStoreId)
         .eq('is_deleted', false)
-        .eq('is_info_complete', true)
-        .eq('in_stock', true);
+        .eq('is_info_complete', true);
 
       if (error) throw error;
       setProducts(data || []);
@@ -526,6 +525,15 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
       return;
     }
 
+    if (product.in_stock === false || (product.stock_quantity !== undefined && product.stock_quantity <= 0)) {
+      showAlert({
+        title: 'Out of Stock',
+        message: 'This product is currently out of stock and cannot be added to your cart.',
+        type: 'warning'
+      });
+      return;
+    }
+
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions(product);
     } else {
@@ -534,8 +542,16 @@ export const StoreDetailsScreen = ({ route, navigation }: any) => {
   }, [sessionAddress, showAlert, navigation, addItem, store]);
 
   const handleIncrease = useCallback((product: any) => {
+    if (product.in_stock === false || (product.stock_quantity !== undefined && product.stock_quantity <= 0)) {
+      showAlert({
+        title: 'Out of Stock',
+        message: 'This product is currently out of stock and cannot be added to your cart.',
+        type: 'warning'
+      });
+      return;
+    }
     updateQuantity(product, 1, undefined, store.id);
-  }, [updateQuantity, store.id]);
+  }, [updateQuantity, store.id, showAlert]);
 
   const handleDecrease = useCallback((product: any) => {
     updateQuantity(product, -1, undefined, store.id);

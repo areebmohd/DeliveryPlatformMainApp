@@ -446,7 +446,21 @@ export const ProductDetailScreen = ({ route, navigation }: any) => {
 
       {/* Bottom Sticky Button */}
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + Spacing.md }]}>
-        {quantity > 0 ? (
+        {product.in_stock === false || (product.stock_quantity !== undefined && product.stock_quantity <= 0) ? (
+          <TouchableOpacity 
+            style={[styles.addToCartBtn, { backgroundColor: Colors.border }]}
+            onPress={() => {
+              showAlert?.({
+                title: 'Out of Stock',
+                message: 'This product is currently out of stock and cannot be added to your cart.',
+                type: 'warning'
+              });
+            }}
+          >
+            <Icon name="close-circle-outline" size={20} color={Colors.white} style={{ marginRight: 8 }} />
+            <Text style={styles.addToCartText}>Out of Stock</Text>
+          </TouchableOpacity>
+        ) : quantity > 0 ? (
           <View style={styles.cartActionsRow}>
             <View style={styles.quantitySelectorContainer}>
               <TouchableOpacity 

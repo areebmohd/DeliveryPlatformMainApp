@@ -22,6 +22,8 @@ interface CustomerProductCardProps {
     image_url?: string;
     barcode?: string;
     product_type?: string;
+    in_stock?: boolean;
+    stock_quantity?: number;
   };
   onAdd?: (product: any) => void;
   quantity?: number;
@@ -40,9 +42,15 @@ export const CustomerProductCard = React.memo(({
   onPress,
   width = '100%',
 }: CustomerProductCardProps) => {
+  const isOutOfStock = product.in_stock === false || (product.stock_quantity !== undefined && product.stock_quantity <= 0);
+
   return (
     <TouchableOpacity 
-      style={[styles.container, { width }]} 
+      style={[
+        styles.container, 
+        { width },
+        isOutOfStock && styles.containerOutOfStock
+      ]} 
       onPress={() => onPress?.(product)}
       activeOpacity={onPress ? 0.9 : 1}
       disabled={!onPress}
@@ -55,6 +63,13 @@ export const CustomerProductCard = React.memo(({
             <Icon name="package-variant" size={30} color={Colors.border} />
           </View>
         )}
+        
+        {isOutOfStock && (
+          <View style={styles.outOfStockBadge}>
+            <Text style={styles.outOfStockBadgeText}>Out of stock</Text>
+          </View>
+        )}
+
         {onAdd && (
           <View style={styles.controlsLayer}>
             {quantity > 0 ? (
@@ -69,11 +84,14 @@ export const CustomerProductCard = React.memo(({
               </View>
             ) : (
               <TouchableOpacity 
-                style={styles.addButton} 
+                style={[
+                  styles.addButton,
+                  isOutOfStock && styles.addButtonOutOfStock
+                ]} 
                 onPress={() => onAdd?.(product)}
                 activeOpacity={0.8}
               >
-                <Icon name="plus" size={18} color={Colors.white} />
+                <Icon name={isOutOfStock ? "alert-circle-outline" : "plus"} size={18} color={Colors.white} />
               </TouchableOpacity>
             )}
           </View>
@@ -82,15 +100,15 @@ export const CustomerProductCard = React.memo(({
 
       <View style={styles.content}>
         <View style={styles.priceRow}>
-          <Text style={styles.price}>₹{formatPriceShort(product.price)}</Text>
+          <Text style={[styles.price, isOutOfStock && styles.textOutOfStock]}>₹{formatPriceShort(product.price)}</Text>
           {product.weight_kg ? (
-            <Text style={styles.weight}>
+            <Text style={[styles.weight, isOutOfStock && styles.textOutOfStock]}>
                / {product.weight_kg < 1 ? `${product.weight_kg * 1000}gm` : `${product.weight_kg}kg`}
             </Text>
           ) : null}
         </View>
 
-        <Text style={styles.name} numberOfLines={2}>
+        <Text style={[styles.name, isOutOfStock && styles.textOutOfStock]} numberOfLines={2}>
           {product.name || `Barcode: ${product.barcode}`}
         </Text>
       </View>
@@ -107,6 +125,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     marginBottom: Spacing.sm,
+  },
+  containerOutOfStock: {
+    opacity: 0.6,
+    borderColor: '#E2E8F0',
   },
   imageContainer: {
     position: 'relative',
@@ -125,6 +147,23 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderStyle: 'dashed',
   },
+  outOfStockBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFDADA',
+  },
+  outOfStockBadgeText: {
+    color: Colors.error,
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
   controlsLayer: {
     position: 'absolute',
     bottom: -4,
@@ -142,6 +181,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+  },
+  addButtonOutOfStock: {
+    backgroundColor: '#94A3B8',
+    shadowColor: 'transparent',
+    elevation: 0,
   },
   quantityControls: {
     flexDirection: 'row',
@@ -190,5 +234,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
     height: 34,
     lineHeight: 17,
+  },
+  textOutOfStock: {
+    color: Colors.textSecondary,
   },
 });

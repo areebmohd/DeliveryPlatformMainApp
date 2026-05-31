@@ -219,6 +219,15 @@ export const HomeScreen = ({ navigation }: any) => {
       return;
     }
 
+    if (product.in_stock === false || (product.stock_quantity !== undefined && product.stock_quantity <= 0)) {
+      showAlert({
+        title: 'Out of Stock',
+        message: 'This product is currently out of stock and cannot be added to your cart.',
+        type: 'warning'
+      });
+      return;
+    }
+
     if (product.options && product.options.length > 0) {
       setSelectedProductOptions({ product, store });
     } else {
@@ -482,8 +491,16 @@ export const HomeScreen = ({ navigation }: any) => {
   }, [navigation]);
 
   const handleProductIncrease = useCallback((product: any) => {
+    if (product.in_stock === false || (product.stock_quantity !== undefined && product.stock_quantity <= 0)) {
+      showAlert({
+        title: 'Out of Stock',
+        message: 'This product is currently out of stock and cannot be added to your cart.',
+        type: 'warning'
+      });
+      return;
+    }
     updateQuantity(product, 1, undefined, product.store_id);
-  }, [updateQuantity]);
+  }, [updateQuantity, showAlert]);
 
   const handleProductDecrease = useCallback((product: any) => {
     updateQuantity(product, -1, undefined, product.store_id);
