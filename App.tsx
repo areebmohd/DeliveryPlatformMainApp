@@ -19,7 +19,7 @@ import { supabase } from './src/api/supabase';
 export const navigationRef = createNavigationContainerRef();
 
 // IMPORTANT: Update this manually on every release to match versionCode in android/app/build.gradle
-const CURRENT_VERSION_CODE = 5;
+const CURRENT_VERSION_CODE = 6;
 
 function App() {
   return (
