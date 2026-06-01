@@ -20,7 +20,7 @@ import { useCart, Offer, OfferType } from '../../context/CartContext';
 import { useAlert } from '../../context/AlertContext';
 import { Button } from '../../components/ui/Button';
 import { getOfferDescription, getOfferConditionList, validateOffer, getTheme } from '../../utils/offerUtils';
-import Geolocation from '@react-native-community/geolocation';
+import { getCurrentCoordinates } from '../../utils/locationUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -118,16 +118,14 @@ export const CustomerOffersScreen = ({ navigation }: any) => {
       setLoading(true);
       
       // Get location for Nearby sort
-      Geolocation.getCurrentPosition(
-        (position) => {
+      getCurrentCoordinates()
+        .then((coords) => {
           setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
+            lat: coords.latitude,
+            lng: coords.longitude
           });
-        },
-        (error) => console.log('Location error:', error),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-      );
+        })
+        .catch((error) => console.log('Location error:', error));
 
       const { data, error } = await supabase
         .from('offers')

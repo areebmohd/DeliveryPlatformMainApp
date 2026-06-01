@@ -14,7 +14,7 @@ import {
   Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Geolocation from '@react-native-community/geolocation';
+import { getCurrentCoordinates } from '../../utils/locationUtils';
 import { Colors, Spacing, borderRadius } from '../../theme/colors';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -139,33 +139,17 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const fetchLiveLocation = async () => {
     setIsFetchingLiveLocation(true);
     try {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          showAlert({ title: 'Permission Denied', message: 'Please enable location permissions in settings.', type: 'error' });
-          setIsFetchingLiveLocation(false);
-          return;
-        }
-      }
-
-      Geolocation.getCurrentPosition(
-        (info) => {
-          const { latitude, longitude } = info.coords;
-          setLocation({ latitude, longitude });
-          setIsFetchingLiveLocation(false);
-          showToast('Live location fetched successfully!', 'success');
-        },
-        (error) => {
-          console.error('Geolocation Error:', error);
-          showAlert({ title: 'Location Error', message: 'Could not get your current location. Please check your GPS.', type: 'error' });
-          setIsFetchingLiveLocation(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-      );
-    } catch (e) {
-      console.error('Location Error:', e);
+      const coords = await getCurrentCoordinates();
+      setLocation(coords);
+      showToast('Live location fetched successfully!', 'success');
+    } catch (error: any) {
+      console.error('Geolocation Error:', error);
+      showAlert({ 
+        title: 'Location Error', 
+        message: error.message || 'Could not get your current location. Please check your GPS.', 
+        type: 'error' 
+      });
+    } finally {
       setIsFetchingLiveLocation(false);
     }
   };

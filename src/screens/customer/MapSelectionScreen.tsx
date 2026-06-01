@@ -9,7 +9,7 @@ import {
   Platform,
   PermissionsAndroid,
 } from 'react-native';
-import Geolocation from '@react-native-community/geolocation';
+import { getCurrentCoordinates } from '../../utils/locationUtils';
 import {
   MapView,
   Camera,
@@ -52,32 +52,16 @@ export const MapSelectionScreen = ({ navigation, route }: any) => {
   const getCurrentLocation = async () => {
     setLoading(true);
     try {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          showAlert({ title: 'Permission Denied', message: 'Please enable location permissions in settings.', type: 'error' });
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Use standard Geolocation for a fresh fix
-      Geolocation.getCurrentPosition(
-        (info) => {
-          centerOnLocation(info.coords.latitude, info.coords.longitude);
-          setLoading(false);
-        },
-        (error) => {
-          console.error('Geolocation Error:', error);
-          showAlert({ title: 'Location Error', message: 'Could not get your current location. Please check your GPS.', type: 'error' });
-          setLoading(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-      );
-    } catch (e) {
-      console.error('Location Error:', e);
+      const coords = await getCurrentCoordinates();
+      centerOnLocation(coords.latitude, coords.longitude);
+    } catch (error: any) {
+      console.error('Geolocation Error:', error);
+      showAlert({ 
+        title: 'Location Error', 
+        message: error.message || 'Could not get your current location. Please check your GPS.', 
+        type: 'error' 
+      });
+    } finally {
       setLoading(false);
     }
   };
