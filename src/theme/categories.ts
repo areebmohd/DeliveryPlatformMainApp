@@ -14,7 +14,6 @@ export const PRODUCT_CATEGORIES: Category[] = [
   { id: '7', name: 'Home', icon: 'home-outline' },
   { id: '8', name: 'Kids', icon: 'baby-carriage' },
   { id: '9', name: 'Sports', icon: 'basketball' },
-  { id: '10', name: 'Vehicles', icon: 'car-side' },
   { id: '11', name: 'Hardware', icon: 'hammer-wrench' },
   { id: '12', name: 'Animals', icon: 'paw' },
   { id: '13', name: 'Art', icon: 'palette-outline' },

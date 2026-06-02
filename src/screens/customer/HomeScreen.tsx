@@ -372,7 +372,7 @@ export const HomeScreen = ({ navigation }: any) => {
       const { data, error } = await supabase
         .from('notifications')
         .select('created_at')
-        .or(`user_id.eq.${user.id},target_group.eq.customer`)
+        .or(`user_id.eq.${user.id},and(user_id.is.null,target_group.eq.customer)`)
         .order('created_at', { ascending: false })
         .limit(1);
 
