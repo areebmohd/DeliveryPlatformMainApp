@@ -127,17 +127,6 @@ export const SupportScreen = ({ navigation }: any) => {
           />
         </View>
 
-        <View style={styles.contactDetails}>
-          <View style={styles.contactItem}>
-            <Icon name="phone-outline" size={20} color={Colors.textSecondary} />
-            <Text style={styles.contactText}>{SUPPORT_PHONE}</Text>
-          </View>
-          <View style={styles.contactItem}>
-            <Icon name="email-outline" size={20} color={Colors.textSecondary} />
-            <Text style={styles.contactText}>{SUPPORT_EMAIL}</Text>
-          </View>
-        </View>
-
         <View style={styles.tipsSection}>
           <View style={styles.tipsHeader}>
             <Icon name="lightbulb-on-outline" size={24} color={Colors.primary} />
