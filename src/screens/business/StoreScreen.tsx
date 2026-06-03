@@ -769,6 +769,15 @@ export const StoreScreen = ({ navigation }: any) => {
                       Out of Stock ({products.filter(p => (p.stock_quantity ?? 0) <= 0).length})
                     </Text>
                   </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.addStockActionBtn}
+                    onPress={() => navigation.navigate('AddStock', { storeId: store?.id })}
+                    activeOpacity={0.8}
+                  >
+                    <Icon name="plus-box-multiple" size={16} color={Colors.primary} />
+                    <Text style={styles.addStockActionText}>Add Stock</Text>
+                  </TouchableOpacity>
                 </ScrollView>
               )}
 
@@ -1192,12 +1201,29 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   filterScroll: {
+    marginHorizontal: -Spacing.md,
     marginBottom: Spacing.md,
   },
   filterScrollContent: {
-    paddingHorizontal: 2,
+    paddingHorizontal: Spacing.md,
     gap: Spacing.sm,
     flexDirection: 'row',
+  },
+  addStockActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+  },
+  addStockActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginLeft: 4,
   },
   filterButton: {
     paddingHorizontal: 16,

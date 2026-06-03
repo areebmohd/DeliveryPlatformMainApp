@@ -19,6 +19,7 @@ import { StoreDetailsFormScreen } from '../screens/business/StoreDetailsFormScre
 import { PaymentsScreen } from '../screens/business/PaymentsScreen';
 import { SupportScreen } from '../screens/business/SupportScreen';
 import { MapSelectionScreen } from '../screens/customer/MapSelectionScreen';
+import { AddStockScreen } from '../screens/business/AddStockScreen';
 
 const Tab = createBottomTabNavigator();
 const StoreStackNav = createNativeStackNavigator();
@@ -32,6 +33,7 @@ const StoreStack = () => {
       <StoreStackNav.Screen name="ProductForm" component={ProductFormScreen} />
       <StoreStackNav.Screen name="StoreDetailsForm" component={StoreDetailsFormScreen} />
       <StoreStackNav.Screen name="MapSelection" component={MapSelectionScreen} />
+      <StoreStackNav.Screen name="AddStock" component={AddStockScreen} />
     </StoreStackNav.Navigator>
   );
 };
@@ -60,7 +62,7 @@ export const BusinessNavigator = () => {
         const routeName = getFocusedRouteNameFromRoute(route);
         const hideOnScreens = [
           'ManageProducts', 'ProductForm', 'StoreDetailsForm', 'MapSelection',
-          'Notifications', 'Dashboard', 'Payments', 'Returns', 'Support'
+          'Notifications', 'Dashboard', 'Payments', 'Returns', 'Support', 'AddStock'
         ];
         const isTabVisible = !hideOnScreens.includes(routeName as string);
 
