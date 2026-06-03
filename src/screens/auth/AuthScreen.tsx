@@ -315,13 +315,18 @@ export const AuthScreen = ({ navigation }: any) => {
       <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
         <Text style={styles.footerText}>
           By continuing, you agree to our{' '}
-          <Text style={styles.footerLink} onPress={() => handleOpenLink('https://zorodeliveryapp.vercel.app/terms.html')}>
+          <Text style={styles.footerLink} onPress={() => handleOpenLink('https://zorodelivery.vercel.app/terms.html')}>
             Terms of Service
           </Text>
           {' '}and{' '}
-          <Text style={styles.footerLink} onPress={() => handleOpenLink('https://zorodeliveryapp.vercel.app/privacy.html')}>
+          <Text style={styles.footerLink} onPress={() => handleOpenLink('https://zorodelivery.vercel.app/privacy.html')}>
             Privacy Policy
           </Text>
+          . For any enquiries{' '}
+          <Text style={styles.footerLink} onPress={() => handleOpenLink('https://zorodelivery.vercel.app/#contact')}>
+            Contact Us
+          </Text>
+          .
         </Text>
       </View>
     </SafeAreaView>
@@ -467,10 +472,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 15,
+    fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   footerLink: {
     color: Colors.primary,

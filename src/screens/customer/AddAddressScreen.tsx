@@ -109,8 +109,8 @@ export const AddAddressScreen = ({ navigation, route }: any) => {
     id: editingAddress?.id || null,
     label: editingAddress?.label || 'Home',
     address_line: editingAddress?.address_line || '',
-    city: editingAddress?.city || '',
-    state: editingAddress?.state || '',
+    city: editingAddress?.city || 'Gurugram',
+    state: editingAddress?.state || 'Haryana',
     location: initialLocation,
   });
 

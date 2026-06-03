@@ -52,8 +52,8 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [whatsappNumber, setWhatsappNumber] = useState(store?.whatsapp_number || '');
   const [addressLine1, setAddressLine1] = useState(store?.address_line_1 || '');
   const [pincode, setPincode] = useState(store?.pincode || '');
-  const [city, setCity] = useState(store?.city || '');
-  const [state, setState] = useState(store?.state || '');
+  const [city, setCity] = useState(store?.city || 'Gurugram');
+  const [state, setState] = useState(store?.state || 'Haryana');
   const [location, setLocation] = useState<any>(null);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [ownerName, setOwnerName] = useState(store?.owner_name || '');
