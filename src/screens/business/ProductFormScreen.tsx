@@ -1496,17 +1496,6 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
           )}
         </View>
 
-        {isEditing && isBarcodeMode && (
-          <Button
-            title="Need Changes"
-            onPress={handleNeedChanges}
-            variant="outline"
-            style={styles.needChangesBtn}
-            textStyle={styles.needChangesText}
-            leftIcon={<Icon name="alert-circle-outline" size={18} color={Colors.error} />}
-          />
-        )}
-
         {/* Tags Section */}
         {showAdminDetails && (
           <View style={styles.section}>
@@ -1558,6 +1547,17 @@ export const ProductFormScreen = ({ route, navigation }: any) => {
               ))}
             </View>
           </View>
+        )}
+
+        {isEditing && isBarcodeMode && (
+          <Button
+            title="Need Changes"
+            onPress={handleNeedChanges}
+            variant="outline"
+            style={styles.needChangesBtn}
+            textStyle={styles.needChangesText}
+            leftIcon={<Icon name="alert-circle-outline" size={18} color={Colors.error} />}
+          />
         )}
 
         <Button

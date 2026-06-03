@@ -363,6 +363,20 @@ export const StoreScreen = ({ navigation }: any) => {
 
   const [products, setProducts] = useState<any[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'out_of_stock'>('all');
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const qty = product.stock_quantity ?? 0;
+      if (stockFilter === 'in_stock') {
+        return qty > 0;
+      }
+      if (stockFilter === 'out_of_stock') {
+        return qty <= 0;
+      }
+      return true;
+    });
+  }, [products, stockFilter]);
 
   const { showAlert, showToast } = useAlert();
   const maintenanceShownRef = useRef(false);
@@ -697,20 +711,101 @@ export const StoreScreen = ({ navigation }: any) => {
         <View style={styles.tabContent}>
           {activeTab === 'products' ? (
             <View style={styles.productsContainer}>
+              {!productsLoading && products.length > 0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.filterScroll}
+                  contentContainerStyle={styles.filterScrollContent}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.filterButton,
+                      stockFilter === 'all' && styles.activeFilterButton,
+                    ]}
+                    onPress={() => setStockFilter('all')}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.filterButtonText,
+                        stockFilter === 'all' && styles.activeFilterButtonText,
+                      ]}
+                    >
+                      All ({products.length})
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterButton,
+                      stockFilter === 'in_stock' && styles.activeFilterButton,
+                    ]}
+                    onPress={() => setStockFilter('in_stock')}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.filterButtonText,
+                        stockFilter === 'in_stock' && styles.activeFilterButtonText,
+                      ]}
+                    >
+                      In Stock ({products.filter(p => (p.stock_quantity ?? 0) > 0).length})
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterButton,
+                      stockFilter === 'out_of_stock' && styles.activeFilterButton,
+                    ]}
+                    onPress={() => setStockFilter('out_of_stock')}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.filterButtonText,
+                        stockFilter === 'out_of_stock' && styles.activeFilterButtonText,
+                      ]}
+                    >
+                      Out of Stock ({products.filter(p => (p.stock_quantity ?? 0) <= 0).length})
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
+
               {productsLoading ? (
                 <View style={styles.centered}>
                   <ActivityIndicator color={Colors.primary} size="large" />
                 </View>
               ) : products.length > 0 ? (
-                products.map(item => (
-                  <BusinessProductCard
-                    key={item.id}
-                    product={item}
-                    onToggleStock={handleToggleStockMemo}
-                    onEdit={handleEditProductMemo}
-                    onDelete={handleDeleteProductMemo}
-                  />
-                ))
+                filteredProducts.length > 0 ? (
+                  filteredProducts.map(item => (
+                    <BusinessProductCard
+                      key={item.id}
+                      product={item}
+                      onToggleStock={handleToggleStockMemo}
+                      onEdit={handleEditProductMemo}
+                      onDelete={handleDeleteProductMemo}
+                    />
+                  ))
+                ) : (
+                  <View style={styles.emptyProducts}>
+                    <View style={styles.emptyIconContainer}>
+                      <Icon
+                        name="package-variant-closed"
+                        size={60}
+                        color={Colors.border}
+                      />
+                    </View>
+                    <Text style={styles.emptyTitle}>
+                      {stockFilter === 'in_stock' ? 'No Products In Stock' : 'No Out of Stock Products'}
+                    </Text>
+                    <Text style={styles.emptySubtitle}>
+                      {stockFilter === 'in_stock'
+                        ? 'All your products are currently out of stock.'
+                        : 'Great! All products are currently in stock.'}
+                    </Text>
+                  </View>
+                )
               ) : (
                 <View style={styles.emptyProducts}>
                   <View style={styles.emptyIconContainer}>
@@ -1095,5 +1190,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     marginLeft: 8,
+  },
+  filterScroll: {
+    marginBottom: Spacing.md,
+  },
+  filterScrollContent: {
+    paddingHorizontal: 2,
+    gap: Spacing.sm,
+    flexDirection: 'row',
+  },
+  filterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeFilterButton: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  activeFilterButtonText: {
+    color: Colors.white,
   },
 });
