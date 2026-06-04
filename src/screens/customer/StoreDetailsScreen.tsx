@@ -230,32 +230,7 @@ const StoreInfoSection = React.memo(({
           </>
         )}
 
-        {(store.instagram_url || store.facebook_url) && (
-          <>
-            <View style={styles.infoDivider} />
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Social Media</Text>
-              <View style={styles.socialRow}>
-                {store.instagram_url && (
-                  <TouchableOpacity 
-                    style={styles.socialButton}
-                    onPress={() => handleContact('browser', store.instagram_url)}
-                  >
-                    <Icon name="instagram" size={24} color="#E4405F" />
-                  </TouchableOpacity>
-                )}
-                {store.facebook_url && (
-                  <TouchableOpacity 
-                    style={styles.socialButton}
-                    onPress={() => handleContact('browser', store.facebook_url)}
-                  >
-                    <Icon name="facebook" size={24} color="#1877F2" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </>
-        )}
+
       </View>
     </View>
   );

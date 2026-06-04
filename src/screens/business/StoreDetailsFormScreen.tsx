@@ -46,9 +46,6 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [bannerUrl, setBannerUrl] = useState(store?.banner_url || '');
   const [openingHours, setOpeningHours] = useState(store?.opening_hours || '');
   const [phone, setPhone] = useState(store?.phone || '');
-  const [email, setEmail] = useState(store?.email || '');
-  const [instagramUrl, setInstagramUrl] = useState(store?.instagram_url || '');
-  const [facebookUrl, setFacebookUrl] = useState(store?.facebook_url || '');
   const [whatsappNumber, setWhatsappNumber] = useState(store?.whatsapp_number || '');
   const [addressLine1, setAddressLine1] = useState(store?.address_line_1 || '');
   const [pincode, setPincode] = useState(store?.pincode || '');
@@ -57,15 +54,10 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
   const [location, setLocation] = useState<any>(null);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
   const [ownerName, setOwnerName] = useState(store?.owner_name || '');
-  const [ownerNumber, setOwnerNumber] = useState(store?.owner_number || '');
   const [verificationImages, setVerificationImages] = useState<string[]>(store?.verification_images || []);
   const [isUploadingVerification, setIsUploadingVerification] = useState(false);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [isFetchingLiveLocation, setIsFetchingLiveLocation] = useState(false);
-
-  const [bankAccountNumber, setBankAccountNumber] = useState(store?.bank_account_number || '');
-  const [bankIfscCode, setBankIfscCode] = useState(store?.bank_ifsc_code || '');
-  const [bankAccountHolderName, setBankAccountHolderName] = useState(store?.bank_account_holder_name || '');
 
   const { showAlert, showToast } = useAlert();
 
@@ -107,20 +99,13 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         setBannerUrl(preservedFormData.bannerUrl);
         setOpeningHours(preservedFormData.openingHours);
         setPhone(preservedFormData.phone);
-        setEmail(preservedFormData.email);
-        setInstagramUrl(preservedFormData.instagramUrl);
-        setFacebookUrl(preservedFormData.facebookUrl);
         setWhatsappNumber(preservedFormData.whatsappNumber);
         setAddressLine1(preservedFormData.addressLine1);
         setPincode(preservedFormData.pincode);
         setCity(preservedFormData.city);
         setState(preservedFormData.state);
         setOwnerName(preservedFormData.ownerName);
-        setOwnerNumber(preservedFormData.ownerNumber);
         setVerificationImages(preservedFormData.verificationImages);
-        setBankAccountNumber(preservedFormData.bankAccountNumber);
-        setBankIfscCode(preservedFormData.bankIfscCode);
-        setBankAccountHolderName(preservedFormData.bankAccountHolderName);
         if (preservedFormData.store) setStore(preservedFormData.store);
       }
 
@@ -245,10 +230,6 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
     if (!phone) missingFields.push('Store Number');
     if (!upiId) missingFields.push('UPI ID');
     if (!ownerName) missingFields.push('Owner Name');
-    if (!ownerNumber) missingFields.push('Owner Number');
-    if (!bankAccountNumber) missingFields.push('Bank Account Number');
-    if (!bankIfscCode) missingFields.push('Bank IFSC Code');
-    if (!bankAccountHolderName) missingFields.push('Bank Account Holder Name');
 
     // Only check verification images if store is NOT active (OR if it's a new store)
     if ((!store || !store.is_active) && verificationImages.length === 0) {
@@ -280,15 +261,9 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         banner_url: bannerUrl,
         opening_hours: openingHours,
         phone,
-        email,
-        instagram_url: instagramUrl,
-        facebook_url: facebookUrl,
+        email: user?.email,
         whatsapp_number: whatsappNumber,
         owner_name: ownerName,
-        owner_number: ownerNumber,
-        bank_account_number: bankAccountNumber,
-        bank_ifsc_code: bankIfscCode,
-        bank_account_holder_name: bankAccountHolderName,
       };
 
       // Only update verification images if provided (hidden for active stores anyway)
@@ -300,8 +275,7 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
       const sensitiveFields = [
         'name', 'description', 'category', 'upi_id', 'phone', 'email', 
         'whatsapp_number', 'address_line_1', 'city', 'state', 'pincode',
-        'owner_name', 'owner_number', 'opening_hours',
-        'bank_account_number', 'bank_ifsc_code', 'bank_account_holder_name'
+        'owner_name', 'opening_hours'
       ];
       
       let sensitiveChanged = false;
@@ -444,10 +418,9 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
               returnScreen: 'StoreDetailsForm',
               preservedFormData: {
                 name, description, category, upiId, bannerUrl, openingHours, 
-                phone, email, instagramUrl, facebookUrl, whatsappNumber, 
+                phone, whatsappNumber, 
                 addressLine1, pincode, city, state, 
-                ownerName, ownerNumber, verificationImages,
-                bankAccountNumber, bankIfscCode, bankAccountHolderName,
+                ownerName, verificationImages,
                 store
               }
             })}
@@ -510,15 +483,9 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Info</Text>
+          <Input label="Owner Name *" value={ownerName} onChangeText={setOwnerName} placeholder="Full name of the owner" />
           <Input label="Store Phone *" value={phone} onChangeText={setPhone} placeholder="e.g. +91 9876543210" keyboardType="phone-pad" />
-          <Input label="Store Email" value={email} onChangeText={setEmail} placeholder="e.g. contact@store.com" keyboardType="email-address" autoCapitalize="none" />
           <Input label="WhatsApp Number" value={whatsappNumber} onChangeText={setWhatsappNumber} placeholder="For customer queries" keyboardType="phone-pad" />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Social Media</Text>
-          <Input label="Instagram URL" value={instagramUrl} onChangeText={setInstagramUrl} placeholder="instagram.com/yourstore" autoCapitalize="none" />
-          <Input label="Facebook URL" value={facebookUrl} onChangeText={setFacebookUrl} placeholder="facebook.com/yourstore" autoCapitalize="none" />
         </View>
 
         <View style={styles.section}>
@@ -528,41 +495,10 @@ export const StoreDetailsFormScreen = ({ navigation, route }: any) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>Bank Info</Text>
-          <Text style={[styles.helperText, { marginTop: 0, marginBottom: Spacing.md }]}>Your payments will be credited to this bank account when upi is not available.</Text>
-          <Input 
-            label="Bank Account Holder Name *" 
-            value={bankAccountHolderName} 
-            onChangeText={setBankAccountHolderName} 
-            placeholder="Name as per bank records" 
-          />
-          <Input 
-            label="Bank Account Number *" 
-            value={bankAccountNumber} 
-            onChangeText={setBankAccountNumber} 
-            placeholder="Enter account number" 
-            keyboardType="numeric"
-          />
-          <Input 
-            label="Bank IFSC Code *" 
-            value={bankIfscCode} 
-            onChangeText={setBankIfscCode} 
-            placeholder="e.g. SBIN0001234" 
-            autoCapitalize="characters"
-          />
-        </View>
-
-        <View style={styles.section}>
           <TimeSlotPicker 
             value={openingHours} 
             onChange={setOpeningHours} 
           />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Owner Information</Text>
-          <Input label="Owner Name *" value={ownerName} onChangeText={setOwnerName} placeholder="Full name of the owner" />
-          <Input label="Owner Number *" value={ownerNumber} onChangeText={setOwnerNumber} placeholder="Personal contact number" keyboardType="phone-pad" />
         </View>
 
         {(!store || !store.is_active) && (

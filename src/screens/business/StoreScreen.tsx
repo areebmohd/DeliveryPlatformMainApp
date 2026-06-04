@@ -211,30 +211,14 @@ const BusinessInfoSection = React.memo(({
 
         <View style={styles.infoDivider} />
 
-        {(store?.upi_id || store?.bank_account_number) && (
+        {store?.upi_id && (
           <>
             <View style={styles.infoSection}>
               <Text style={styles.infoLabel}>Payment Information</Text>
-              {store?.upi_id && (
-                <View style={styles.hoursRow}>
-                  <Icon name="qrcode-scan" size={18} color={Colors.primary} />
-                  <Text style={styles.infoValue}>{store.upi_id}</Text>
-                </View>
-              )}
-              {store?.bank_account_number && (
-                <View style={{ marginTop: 8 }}>
-                  <View style={styles.hoursRow}>
-                    <Icon name="bank-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.infoValue}>{store.bank_account_holder_name}</Text>
-                  </View>
-                  <View style={[styles.hoursRow, { marginLeft: 26, marginTop: 4 }]}>
-                    <Text style={styles.infoValue}>{store.bank_account_number}</Text>
-                  </View>
-                  <View style={[styles.hoursRow, { marginLeft: 26, marginTop: 4 }]}>
-                    <Text style={styles.infoValue}>{store.bank_ifsc_code}</Text>
-                  </View>
-                </View>
-              )}
+              <View style={styles.hoursRow}>
+                <Icon name="qrcode-scan" size={18} color={Colors.primary} />
+                <Text style={styles.infoValue}>{store.upi_id}</Text>
+              </View>
             </View>
             <View style={styles.infoDivider} />
           </>
@@ -303,46 +287,7 @@ const BusinessInfoSection = React.memo(({
           </>
         )}
 
-        {(store?.instagram_url || store?.facebook_url) && (
-          <>
-            <View style={styles.infoDivider} />
-            <View style={styles.infoSection}>
-              <Text style={styles.infoLabel}>Social Media</Text>
-              {store?.instagram_url && (
-                <TouchableOpacity 
-                  style={styles.hoursRow}
-                  onPress={() => {
-                    const url = store.instagram_url.startsWith('http') 
-                      ? store.instagram_url 
-                      : `https://${store.instagram_url}`;
-                    Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
-                  }}
-                >
-                  <Icon name="instagram" size={18} color="#E4405F" />
-                  <Text style={[styles.infoValue, { color: Colors.primary, textDecorationLine: 'underline' }]}>
-                    Instagram
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {store?.facebook_url && (
-                <TouchableOpacity 
-                  style={[styles.hoursRow, { marginTop: 8 }]}
-                  onPress={() => {
-                    const url = store.facebook_url.startsWith('http') 
-                      ? store.facebook_url 
-                      : `https://${store.facebook_url}`;
-                    Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
-                  }}
-                >
-                  <Icon name="facebook" size={18} color="#1877F2" />
-                  <Text style={[styles.infoValue, { color: Colors.primary, textDecorationLine: 'underline' }]}>
-                    Facebook
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </>
-        )}
+
       </View>
     </View>
   );
@@ -507,11 +452,7 @@ export const StoreScreen = ({ navigation }: any) => {
       (!!s.location_wkt || !!s.location) && 
       !!s.phone && 
       !!s.upi_id && 
-      !!s.bank_account_number && 
-      !!s.bank_ifsc_code && 
-      !!s.bank_account_holder_name && 
       !!s.owner_name && 
-      !!s.owner_number && 
       (s.verification_images?.length > 0) &&
       s.is_approved === false
     );
