@@ -2145,6 +2145,11 @@ export const CartScreen = ({ navigation }: any) => {
     }
   };
 
+  const minPriceOffersFastVal = appConfig ? Number(appConfig.min_price_offers_fast) : 149;
+  const minPriceOffersBatchVal = appConfig ? Number(appConfig.min_price_offers_batch) : 49;
+  const maxOfferDistanceFastVal = appConfig ? Number(appConfig.max_offer_distance_fast) : 1;
+  const maxOfferDistanceBatchVal = appConfig ? Number(appConfig.max_offer_distance_batch) : 1;
+
   if (items.length === 0) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -2236,7 +2241,7 @@ export const CartScreen = ({ navigation }: any) => {
                   styles.appOfferDesc,
                   isOfferAlreadyUsedOnDevice && { color: '#64748B' }
                 ]}>
-                  {isOfferAlreadyUsedOnDevice ? 'Already used for this device' : 'Free fast delivery above ₹149'}
+                  {isOfferAlreadyUsedOnDevice ? 'Already used for this device' : `Free fast delivery above ₹${minPriceOffersFastVal}`}
                 </Text>
               </View>
               {!isOfferAlreadyUsedOnDevice && (
@@ -2259,8 +2264,8 @@ export const CartScreen = ({ navigation }: any) => {
                         return;
                       }
 
-                      const minPriceOffersFast = appConfig ? Number(appConfig.min_price_offers_fast) : 149;
-                      const maxOfferDistanceFast = appConfig ? Number(appConfig.max_offer_distance_fast) : 1;
+                      const minPriceOffersFast = minPriceOffersFastVal;
+                      const maxOfferDistanceFast = maxOfferDistanceFastVal;
 
                       if (subtotal < minPriceOffersFast) {
                         showAlert({
@@ -2333,7 +2338,7 @@ export const CartScreen = ({ navigation }: any) => {
                         name: 'Free Fast Delivery',
                         type: 'free_delivery' as any,
                         amount: 0,
-                        conditions: { min_price: 149, max_distance: 1 },
+                        conditions: { min_price: minPriceOffersFastVal, max_distance: maxOfferDistanceFastVal },
                         status: 'active',
                         store_id: 'platform',
                         created_at: new Date().toISOString()
@@ -2363,7 +2368,7 @@ export const CartScreen = ({ navigation }: any) => {
               </View>
               <View style={styles.appOfferInfo}>
                 <Text style={styles.appOfferTitle}>Free Batch Delivery</Text>
-                <Text style={styles.appOfferDesc}>Free batch delivery above ₹49</Text>
+                <Text style={styles.appOfferDesc}>Free batch delivery above ₹{minPriceOffersBatchVal}</Text>
               </View>
               <TouchableOpacity 
                 style={[styles.appOfferBtn, appliedOffers['app_batch_offer'] ? styles.appOfferRemoveBtn : styles.appOfferAddBtn]}
@@ -2382,8 +2387,8 @@ export const CartScreen = ({ navigation }: any) => {
                       return;
                     }
 
-                    const minOfferPriceBatch = appConfig ? Number(appConfig.min_price_offers_batch) : 49;
-                    const maxOfferDistanceBatch = appConfig ? Number(appConfig.max_offer_distance_batch) : 1;
+                    const minOfferPriceBatch = minPriceOffersBatchVal;
+                    const maxOfferDistanceBatch = maxOfferDistanceBatchVal;
 
                     if (subtotal < minOfferPriceBatch) {
                       showAlert({

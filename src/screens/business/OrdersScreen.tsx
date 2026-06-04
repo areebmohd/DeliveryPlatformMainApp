@@ -442,6 +442,7 @@ export const OrdersScreen = () => {
               {hasAppOffer && (() => {
                 const isFast = !!item.applied_offers?.app_fast_offer;
                 const isLegacy = !!item.applied_offers?.app_offer;
+                const appOffer = item.applied_offers?.app_fast_offer || item.applied_offers?.app_batch_offer || item.applied_offers?.app_offer;
                 return (
                   <View style={[styles.promoBadge, { backgroundColor: Colors.primaryLight, borderColor: Colors.primary + '20', borderWidth: 1, marginBottom: 0 }]}>
                     <View style={[styles.promoIconCircle, { backgroundColor: Colors.primary }]}>
@@ -453,8 +454,8 @@ export const OrdersScreen = () => {
                       </Text>
                       <Text style={[styles.promoDescription, { color: Colors.primary, opacity: 0.8 }]}>
                         {isFast 
-                          ? 'Free fast delivery above ₹149' 
-                          : (isLegacy ? 'Free batch delivery above ₹29' : 'Free batch delivery above ₹49')}
+                          ? `Free fast delivery above ₹${appOffer?.conditions?.min_price ?? 149}` 
+                          : (isLegacy ? `Free batch delivery above ₹${appOffer?.conditions?.min_price ?? 29}` : `Free batch delivery above ₹${appOffer?.conditions?.min_price ?? 49}`)}
                       </Text>
                     </View>
                   </View>

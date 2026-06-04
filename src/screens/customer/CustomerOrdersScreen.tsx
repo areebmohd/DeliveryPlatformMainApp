@@ -400,8 +400,8 @@ export const CustomerOrdersScreen = ({ navigation, route }: any) => {
                 </Text>
                 <Text style={styles.appOfferDesc}>
                   {isFast 
-                    ? 'Free fast delivery above ₹149' 
-                    : (isLegacy ? 'Free batch delivery above ₹29' : 'Free batch delivery above ₹49')}
+                    ? `Free fast delivery above ₹${appOffer?.conditions?.min_price ?? 149}` 
+                    : (isLegacy ? `Free batch delivery above ₹${appOffer?.conditions?.min_price ?? 29}` : `Free batch delivery above ₹${appOffer?.conditions?.min_price ?? 49}`)}
                 </Text>
               </View>
             </View>
