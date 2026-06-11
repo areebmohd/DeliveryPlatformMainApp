@@ -86,8 +86,8 @@ android {
         applicationId "com.zorodelivery.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 9
-        versionName "1.1.1"
+        versionCode 10
+        versionName "1.1.2"
     }
     signingConfigs {
         debug {
