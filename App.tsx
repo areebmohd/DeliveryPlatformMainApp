@@ -19,7 +19,7 @@ import { supabase } from './src/api/supabase';
 export const navigationRef = createNavigationContainerRef();
 
 // IMPORTANT: Update this manually on every release to match versionCode in android/app/build.gradle
-const CURRENT_VERSION_CODE = 10;
+const CURRENT_VERSION_CODE = 11;
 
 function App() {
   return (
@@ -41,7 +41,7 @@ function AppContent() {
   const { session, profile, loading, isResettingPassword } = useAuth();
   const { showAlert } = useAlert();
   const [updateRequired, setUpdateRequired] = useState(false);
-  const [apkUrl, setApkUrl] = useState('https://github.com/areebmohd/DeliveryPlatformWebsite/releases/download/v1.0.0/Zoro.apk');
+  const [apkUrl, setApkUrl] = useState('https://play.google.com/store/apps/details?id=com.zorodelivery.app');
   const [maintenanceAlertShown, setMaintenanceAlertShown] = useState(false);
 
   useNotificationListener();
